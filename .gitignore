@@ -1,0 +1,10 @@
+profiles/clients/*.json
+!profiles/clients/example-client.json
+
+templates/logic/*.logicx
+!templates/logic/README.md
+
+.DS_Store
+*.log
+tmp/
+build/
