@@ -6,10 +6,10 @@ if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
 Usage: new-mix --project PROJECT_NAME [options]
 
 This command is specified in docs/SCRIPT_REFERENCE.md but is not implemented
-in Batch 1.
+until Batch 3.
 EOF
     exit 0
 fi
 
-echo "new-mix is not implemented in Batch 1." >&2
+echo "new-mix is not implemented until Batch 3." >&2
 exit 2

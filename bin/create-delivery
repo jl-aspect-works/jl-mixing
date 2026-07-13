@@ -6,10 +6,10 @@ if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
 Usage: create-delivery [options]
 
 This command is specified in docs/SCRIPT_REFERENCE.md but is not implemented
-in Batch 1.
+until Batch 3.
 EOF
     exit 0
 fi
 
-echo "create-delivery is not implemented in Batch 1." >&2
+echo "create-delivery is not implemented until Batch 3." >&2
 exit 2

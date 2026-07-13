@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
 set -eu
 
-echo "Uninstallation is not implemented in Batch 1." >&2
+echo "Uninstallation is not implemented until Batch 4." >&2
 exit 2

@@ -71,3 +71,18 @@ Runtime schema validation uses a private virtual environment and the pinned
 - Installation never modifies projects.
 - Client snapshots are exact copies.
 - Completion requires approval and recorded delivery.
+
+## Development dependency behavior
+
+`make test` verifies all JSON syntax and performs Draft 2020-12 semantic
+validation when the optional `jsonschema` development package is available.
+It reports a clear skip when that package is absent, because the production
+private virtual environment is implemented in a later batch.
+
+Developers who require strict semantic validation can run:
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r packaging/requirements.txt
+PATH="$PWD/.venv/bin:$PATH" make schema-test
+```

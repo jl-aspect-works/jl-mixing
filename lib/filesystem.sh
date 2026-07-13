@@ -1,6 +1,151 @@
 #!/usr/bin/env bash
-# filesystem.sh
-#
-# Safe directory creation, copy, and project movement.
-#
-# Batch 1 placeholder. Implementation begins in Batch 2.
+# Safe filesystem operations and immutable-original protections.
+
+if [ "${JL_MIXING_FILESYSTEM_LOADED:-0}" = "1" ]; then
+    return 0 2>/dev/null || exit 0
+fi
+JL_MIXING_FILESYSTEM_LOADED=1
+
+JL_FILESYSTEM_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/common.sh
+. "$JL_FILESYSTEM_LIB_DIR/common.sh"
+# shellcheck source=lib/platform.sh
+. "$JL_FILESYSTEM_LIB_DIR/platform.sh"
+
+jl_fs_ensure_directory() {
+    local path
+    path="$1"
+    if [ -e "$path" ] && [ ! -d "$path" ]; then
+        jl_error "Cannot create directory because a non-directory exists: $path"
+        return "$JL_EXIT_UNSAFE"
+    fi
+    mkdir -p "$path"
+}
+
+jl_fs_create_directory() {
+    local path
+    path="$1"
+    if [ -e "$path" ]; then
+        jl_error "Refusing to overwrite existing path: $path"
+        return "$JL_EXIT_UNSAFE"
+    fi
+    mkdir -p "$path"
+}
+
+jl_fs_is_original_delivery_path() {
+    local path
+    path="$(jl_abspath_allow_missing "$1")" || return $?
+    case "$path" in
+        */01_Client_Files/Original_Delivery|*/01_Client_Files/Original_Delivery/*)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+jl_fs_assert_mutable_path() {
+    local path
+    path="$1"
+    if jl_fs_is_original_delivery_path "$path"; then
+        jl_error "Unsafe operation prevented inside immutable Original_Delivery: $path"
+        return "$JL_EXIT_UNSAFE"
+    fi
+}
+
+jl_fs_copy_file_exact() {
+    local source destination
+    source="$1"
+    destination="$2"
+
+    [ -f "$source" ] || {
+        jl_error "Source file not found: $source"
+        return "$JL_EXIT_VALIDATION"
+    }
+    jl_fs_assert_mutable_path "$destination" || return $?
+
+    if [ -e "$destination" ]; then
+        jl_error "Refusing to overwrite existing destination: $destination"
+        return "$JL_EXIT_UNSAFE"
+    fi
+
+    mkdir -p "$(dirname "$destination")"
+    cp -p "$source" "$destination"
+}
+
+jl_fs_copy_tree() {
+    local source destination
+    source="$1"
+    destination="$2"
+
+    [ -d "$source" ] || {
+        jl_error "Source directory not found: $source"
+        return "$JL_EXIT_VALIDATION"
+    }
+    jl_fs_assert_mutable_path "$destination" || return $?
+
+    if [ -e "$destination" ]; then
+        jl_error "Refusing to overwrite existing destination: $destination"
+        return "$JL_EXIT_UNSAFE"
+    fi
+
+    mkdir -p "$(dirname "$destination")"
+    cp -R "$source" "$destination"
+}
+
+jl_fs_atomic_write() {
+    local target temp_file
+    target="$1"
+    jl_fs_assert_mutable_path "$target" || return $?
+    mkdir -p "$(dirname "$target")"
+
+    temp_file="$(jl_mktemp_file_near "$target")" || return $?
+    if ! cat > "$temp_file"; then
+        rm -f "$temp_file"
+        return "$JL_EXIT_GENERAL"
+    fi
+
+    if [ -e "$target" ]; then
+        chmod "$(jl_stat_mode "$target")" "$temp_file"
+    else
+        chmod 644 "$temp_file"
+    fi
+
+    mv "$temp_file" "$target"
+}
+
+jl_fs_safe_move() {
+    local source destination
+    source="$1"
+    destination="$2"
+
+    [ -e "$source" ] || {
+        jl_error "Source path not found: $source"
+        return "$JL_EXIT_VALIDATION"
+    }
+    jl_fs_assert_mutable_path "$source" || return $?
+    jl_fs_assert_mutable_path "$destination" || return $?
+
+    if [ -e "$destination" ]; then
+        jl_error "Refusing to overwrite existing destination: $destination"
+        return "$JL_EXIT_UNSAFE"
+    fi
+
+    mkdir -p "$(dirname "$destination")"
+    mv "$source" "$destination"
+}
+
+jl_fs_same_bytes() {
+    local first second
+    first="$1"
+    second="$2"
+    cmp -s "$first" "$second"
+}
+
+jl_fs_directory_is_empty() {
+    local path
+    path="$1"
+    [ -d "$path" ] || return 1
+    [ -z "$(find "$path" -mindepth 1 -maxdepth 1 -print -quit)" ]
+}

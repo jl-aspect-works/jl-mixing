@@ -6,10 +6,10 @@ if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
 Usage: complete-project [options]
 
 This command is specified in docs/SCRIPT_REFERENCE.md but is not implemented
-in Batch 1.
+until Batch 3.
 EOF
     exit 0
 fi
 
-echo "complete-project is not implemented in Batch 1." >&2
+echo "complete-project is not implemented until Batch 3." >&2
 exit 2
