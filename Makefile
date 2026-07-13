@@ -2,26 +2,30 @@
 SHELL := /bin/bash
 
 # These targets are actions, not files.
-.PHONY: help test strict-test schema-test check install uninstall release-check
+.PHONY: help test strict-test schema-test check install uninstall install-test release release-check
 
-# Display the current command and developer task surface.
+# Display the current command, development, installation, and release surfaces.
 help:
 	@echo "JL Mixing Automation v$$(cat VERSION)"
 	@echo
-	@echo "Batch 3 development targets:"
-	@echo "  make test          Run artifact, unit, integration, and schema tests when dependencies are available"
-	@echo "  make strict-test   Require jq and full Draft 2020-12 validation"
+	@echo "Testing:"
+	@echo "  make test          Run dependency-tolerant artifact, unit, integration, and schema tests"
+	@echo "  make strict-test   Require all runtime dependencies and installation/package tests"
 	@echo "  make schema-test   Run only strict JSON Schema validation"
 	@echo "  make check         Check dependencies and run ShellCheck when installed"
-	@echo "  make release-check Run current release verification"
+	@echo "  make install-test  Run installation and release-package tests"
 	@echo
-	@echo "All eight user commands are implemented. Installers remain Batch 4 placeholders."
+	@echo "Installation and release:"
+	@echo "  make install       Install under ~/.local (override with PREFIX=path)"
+	@echo "  make uninstall     Uninstall from ~/.local (override with PREFIX=path)"
+	@echo "  make release       Build the end-user tarball under dist/"
+	@echo "  make release-check Run all release gates and verify a clean archive"
 
-# Run dependency-tolerant repository, unit, integration, and schema checks.
+# Run all checks that can execute with the currently available dependencies.
 test:
 	@tests/run-tests.sh
 
-# Require all developer dependencies and execute the complete suite.
+# Require all runtime/development dependencies and execute the complete suite.
 strict-test:
 	@PYTHON="$${JL_MIXING_PYTHON:-}"; \
 	if [ -z "$$PYTHON" ] && [ -x .venv/bin/python ]; then PYTHON=.venv/bin/python; fi; \
@@ -45,14 +49,22 @@ check:
 	@tools/check-dependencies
 	@tools/shellcheck-all
 
-# Delegate to the installer; implemented in Batch 4.
+# Install or uninstall under PREFIX without changing project workspaces.
 install:
-	@./install.sh
+	@./install.sh --prefix "$${PREFIX:-$$HOME/.local}"
 
-# Delegate to the uninstaller; implemented in Batch 4.
 uninstall:
-	@./uninstall.sh
+	@./uninstall.sh --prefix "$${PREFIX:-$$HOME/.local}"
 
-# Run release readiness checks; expanded in Batch 4.
+# Run only the Batch 4 installation and package lifecycle tests.
+install-test:
+	@JL_TEST_STRICT=1 tests/installation/test-installation.sh
+	@JL_TEST_STRICT=1 tests/installation/test-release-package.sh
+
+# Build a versioned end-user release tarball.
+release:
+	@tools/build-release
+
+# Run tests, ShellCheck, build, extraction, installation, upgrade, and uninstall checks.
 release-check:
 	@tools/release-check

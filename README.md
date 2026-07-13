@@ -3,21 +3,18 @@
 JL Mixing Automation standardizes project setup, intake validation, revision
 tracking, final delivery, and project completion for professional audio work.
 
-This archive contains **Batch 3** of the Version 1.0 implementation:
+This repository contains the complete **Version 1.0 implementation**:
 
 - approved design documentation;
 - JSON Schemas and valid examples;
 - Markdown and JSON templates;
-- all shared Bash libraries;
+- shared Bash libraries;
 - all eight user-facing commands;
-- shared-library unit tests;
-- command integration tests;
-- CI and release-check foundations; and
-- intent-focused comments throughout commands, libraries, tests, Python tools, Makefile, and CI.
-
-End-user installation, uninstallation, and release packaging are implemented in
-Batch 4. During Batch 3, commands are run directly from `bin/` or with that
-directory added temporarily to `PATH`.
+- unit and integration tests;
+- transactional installation and upgrades;
+- safe uninstallation;
+- release tarball construction and verification; and
+- intent-focused comments throughout the codebase.
 
 ## Developer setup
 
@@ -30,23 +27,34 @@ python -m pip install -r packaging/requirements.txt
 The commands also require `jq`. `ffprobe` is optional and enables enhanced
 intake inspection.
 
-## Verify Batch 3
+## Verify Version 1.0
 
 ```bash
 make test
 make strict-test
+tools/shellcheck-all
+make release-check
 ```
 
-`make test` runs all available checks and skips semantic/integration checks only
-when their runtime dependencies are unavailable. `make strict-test` requires the
-complete Batch 3 dependency set.
-
-## Run the workflow from the repository
+## Install from the source tree
 
 ```bash
-export PATH="$PWD/bin:$PATH"
-new-studio --root "$HOME/Music/JL Mixing"
+make install
 ```
 
-See `docs/USER_GUIDE.md`, `docs/SCRIPT_REFERENCE.md`, and
-`docs/BATCH_3_IMPLEMENTATION.md`.
+Or install to another prefix:
+
+```bash
+PREFIX="$HOME/Applications/jl-local" make install
+```
+
+## Build the end-user package
+
+```bash
+make release
+```
+
+Release archives are written under `dist/`.
+
+See `docs/USER_GUIDE.md`, `docs/INSTALLATION_GUIDE.md`, and
+`docs/BATCH_4_IMPLEMENTATION.md`.

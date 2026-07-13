@@ -7,7 +7,7 @@ on:
   pull_request:
 
 jobs:
-  batch3:
+  batch4:
     # Catch BSD/GNU and default-shell portability differences.
     strategy:
       matrix:
@@ -27,7 +27,7 @@ jobs:
         run: command -v jq >/dev/null 2>&1 || brew install jq
       - name: Install Python validation dependency
         run: python -m pip install -r packaging/requirements.txt
-      - name: Run strict Batch 3 tests
+      - name: Run strict Batch 4 tests
         env:
           JL_MIXING_PYTHON: ${{ env.pythonLocation }}/bin/python
         run: make strict-test

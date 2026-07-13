@@ -86,3 +86,23 @@ python3 -m venv .venv
 .venv/bin/pip install -r packaging/requirements.txt
 PATH="$PWD/.venv/bin:$PATH" make schema-test
 ```
+
+## Batch 4 installation and release implementation
+
+The installed application uses a stable `PREFIX/share/jl-mixing` path and
+managed launchers in `PREFIX/bin`. Launchers set both `JL_MIXING_HOME` and
+`JL_MIXING_PYTHON`, so commands resolve runtime assets and the private validator
+without user configuration.
+
+Release work uses:
+
+```bash
+make install-test
+make release
+make release-check
+```
+
+The release check must prove installation, upgrade behavior, installed command
+execution, archive hygiene, and workspace-preserving uninstallation before a
+Version 1.0 package is published.
+

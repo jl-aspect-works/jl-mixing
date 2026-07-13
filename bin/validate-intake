@@ -86,9 +86,16 @@ if [ "$no_duplicate_check" -eq 1 ]; then
     set -- "$@" --no-duplicate-check
 fi
 
+# Use the same private/runtime Python selected for JSON Schema validation so
+# installed users never need to activate or configure the application venv.
+python_command="$(jl_json_validator_python)" || {
+    jl_error "Python 3 is required for intake reporting."
+    exit "$JL_EXIT_CONFIG"
+}
+
 # Preserve the validator result while still updating the report with discovered issues.
 validation_status=0
-python3 "$APP_ROOT/tools/build-intake-report.py" "$@" || validation_status=$?
+"$python_command" "$APP_ROOT/tools/build-intake-report.py" "$@" || validation_status=$?
 
 # Dry-run prints generated Markdown; normal mode replaces only the marked section.
 if [ "$dry_run" -eq 1 ]; then

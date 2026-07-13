@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# Verify structure, permissions, installation, upgrade, and uninstallation for
+# one end-user release archive.
+set -eu
+
+[ "$#" -eq 1 ] || {
+    echo "Usage: tools/verify-release-archive ARCHIVE.tar.gz" >&2
+    exit 2
+}
+
+archive="$1"
+[ -f "$archive" ] || { echo "Archive not found: $archive" >&2; exit 3; }
+
+work_dir="$(mktemp -d "${TMPDIR:-/tmp}/jl-mixing-release-check.XXXXXX")"
+cleanup() { rm -rf -- "$work_dir"; }
+trap cleanup EXIT HUP INT TERM
+
+tar -xzf "$archive" -C "$work_dir"
+package_root="$(find "$work_dir" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+[ -n "$package_root" ] || { echo "Release archive has no top-level directory." >&2; exit 5; }
+
+# Reject development-only content from an end-user package.
+for forbidden in .git .github tests examples .venv; do
+    if [ -e "$package_root/$forbidden" ]; then
+        echo "Forbidden release content: $forbidden" >&2
+        exit 5
+    fi
+done
+
+for required in install.sh uninstall.sh VERSION LICENSE README.md RELEASE_MANIFEST.txt \
+    bin lib schemas templates docs tools/validate-json.py tools/build-intake-report.py \
+    packaging/requirements.txt; do
+    [ -e "$package_root/$required" ] || {
+        echo "Missing release content: $required" >&2
+        exit 5
+    }
+done
+
+[ -x "$package_root/install.sh" ] || { echo "install.sh is not executable." >&2; exit 5; }
+[ -x "$package_root/bin/new-studio" ] || { echo "commands are not executable." >&2; exit 5; }
+
+# Use system packages only inside verification. Production installs remain
+# isolated and install the pinned dependency normally.
+prefix="$work_dir/prefix"
+workspace="$work_dir/studio-workspace"
+JL_MIXING_TEST_SYSTEM_SITE_PACKAGES=1 "$package_root/install.sh" --prefix "$prefix" >/dev/null
+PATH="$prefix/bin:$PATH" new-studio --root "$workspace" --non-interactive >/dev/null
+[ -f "$workspace/Studio/studio.json" ] || {
+    echo "Installed command failed to create studio.json." >&2
+    exit 5
+}
+
+# Reinstall over the same prefix to exercise the transactional upgrade path.
+JL_MIXING_TEST_SYSTEM_SITE_PACKAGES=1 "$package_root/install.sh" --prefix "$prefix" >/dev/null
+[ -f "$workspace/Studio/studio.json" ] || {
+    echo "Upgrade modified the studio workspace." >&2
+    exit 5
+}
+
+"$prefix/bin/jl-mixing-uninstall" >/dev/null
+[ ! -e "$prefix/share/jl-mixing" ] || {
+    echo "Application remained after uninstall." >&2
+    exit 5
+}
+[ -f "$workspace/Studio/studio.json" ] || {
+    echo "Uninstall modified the studio workspace." >&2
+    exit 5
+}
+
+printf '[OK] Release archive verified: %s\n' "$archive"
