@@ -1,14 +1,18 @@
 #!/usr/bin/env bash
 set -eu
+
+# Purpose: Verify revision numbering, append behavior, approval, and superseding.
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 . "$ROOT/tests/test-helper.sh"
 require_test_command jq
 . "$ROOT/lib/revision.sh"
 
+# Arrange: build an isolated temporary fixture.
 tmp="$(new_test_dir)"
 trap 'rm -rf "$tmp"' EXIT
 cp "$ROOT/examples/project-manifest.json" "$tmp/project.json"
 
+# Assert: verify observable behavior rather than internal implementation.
 assert_eq "2" "$(jl_revision_next_number "$tmp/project.json")" "next revision number"
 record="$(jl_revision_create_record 2 'Vocal changes' 66666666-6666-4666-8666-666666666666 2026-07-19T12:00:00Z)"
 assert_eq "open" "$(printf '%s' "$record" | jq -r '.status')" "new record status"

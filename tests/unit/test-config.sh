@@ -1,16 +1,20 @@
 #!/usr/bin/env bash
 set -eu
+
+# Purpose: Verify studio discovery and explicit/client/studio/fallback precedence.
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 . "$ROOT/tests/test-helper.sh"
 require_test_command jq
 . "$ROOT/lib/config.sh"
 
+# Arrange: build an isolated temporary fixture.
 tmp="$(new_test_dir)"
 trap 'rm -rf "$tmp"' EXIT
 mkdir -p "$tmp/Studio" "$tmp/Clients/Acme"
 cp "$ROOT/examples/studio.json" "$tmp/Studio/studio.json"
 cp "$ROOT/examples/client.json" "$tmp/Clients/Acme/client.json"
 
+# Assert: verify observable behavior rather than internal implementation.
 assert_eq "$tmp/Studio/studio.json" "$(jl_config_file "$tmp")" "config path"
 assert_success "valid studio root" jl_config_validate_root "$tmp"
 assert_eq "Logic Pro" "$(jl_config_get "$tmp" '.default_daw')" "config value"

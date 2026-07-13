@@ -1,9 +1,15 @@
 #!/usr/bin/env bash
 # Mark a delivered project complete and move it from Active to Completed.
+#
+# The manifest is updated before the directory move, but a preserved copy is
+# available to roll the state back if validation or movement fails.
 set -eu
 
+# Resolve the installation root from this launcher. Installed wrappers may
+# override it with JL_MIXING_HOME.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_ROOT="${JL_MIXING_HOME:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+# Load shared services; command files intentionally keep reusable logic in lib/.
 . "$APP_ROOT/lib/common.sh"
 . "$APP_ROOT/lib/context.sh"
 . "$APP_ROOT/lib/filesystem.sh"
@@ -11,6 +17,7 @@ APP_ROOT="${JL_MIXING_HOME:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 . "$APP_ROOT/lib/platform.sh"
 . "$APP_ROOT/lib/validation.sh"
 
+# Print command syntax and supported options, then return to the caller.
 usage() {
     cat <<'USAGE'
 Usage: complete-project [options]
@@ -30,6 +37,7 @@ completion_date=""
 force=0
 dry_run=0
 
+# Parse options explicitly so unknown or missing arguments fail predictably.
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --project) [ "$#" -ge 2 ] || jl_die "--project requires a value." "$JL_EXIT_ARGUMENTS"; project_ref="$2"; shift 2 ;;
@@ -42,6 +50,7 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 
+# Resolve and validate workflow prerequisites before computing the destination.
 project_root="$(jl_context_resolve_project "$project_ref" "$PWD")" || exit $?
 manifest="$project_root/00_Admin/project-manifest.json"
 
@@ -55,6 +64,7 @@ else
     }
 fi
 
+# Completion is permitted only for projects directly beneath Projects/Active.
 active_dir="$(dirname "$project_root")"
 if [ "$(basename "$active_dir")" != Active ]; then
     jl_error "Project is not located directly beneath a Projects/Active directory: $project_root"
@@ -69,11 +79,13 @@ if [ -e "$destination" ]; then
 fi
 [ -n "$completion_date" ] || completion_date="$(jl_now_iso8601)"
 
+# Dry-run reports both source and destination without updating state.
 if [ "$dry_run" -eq 1 ]; then
     printf 'Would complete project and move:\n  %s\n  -> %s\n' "$project_root" "$destination"
     exit 0
 fi
 
+# Update and validate the manifest before moving the complete project atomically when possible.
 mkdir -p "$completed_dir"
 backup="$(jl_mktemp_file_near "$manifest")"
 cp -p "$manifest" "$backup"
@@ -89,6 +101,7 @@ if ! jl_json_validate_schema "$APP_ROOT/schemas/project-manifest.schema.json" "$
     exit "$JL_EXIT_VALIDATION"
 fi
 
+# If movement fails, restore active-state metadata at the original location.
 if ! jl_fs_safe_move "$project_root" "$destination"; then
     cp -p "$backup" "$manifest" 2>/dev/null || true
     rm -f "$backup"

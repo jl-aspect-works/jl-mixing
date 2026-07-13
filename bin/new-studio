@@ -1,10 +1,16 @@
 #!/usr/bin/env bash
 # Create a new JL Mixing Automation studio workspace.
+#
+# The command creates only the configured DAW resources and studio metadata.
+# It refuses to reuse an existing root so no user workspace can be overwritten.
 set -eu
 
+# Resolve the installation root from this launcher. Installed wrappers may
+# override it with JL_MIXING_HOME.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_ROOT="${JL_MIXING_HOME:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 # shellcheck source=lib/common.sh
+# Load shared services; command files intentionally keep reusable logic in lib/.
 . "$APP_ROOT/lib/common.sh"
 # shellcheck source=lib/platform.sh
 . "$APP_ROOT/lib/platform.sh"
@@ -19,6 +25,7 @@ APP_ROOT="${JL_MIXING_HOME:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 # shellcheck source=lib/validation.sh
 . "$APP_ROOT/lib/validation.sh"
 
+# Print command syntax and supported options, then return to the caller.
 usage() {
     cat <<'USAGE'
 Usage: new-studio [options]
@@ -46,6 +53,7 @@ bit_depth=24
 file_format="WAV"
 dry_run=0
 
+# Parse options explicitly so unknown or missing arguments fail predictably.
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --root) [ "$#" -ge 2 ] || jl_die "--root requires a value." "$JL_EXIT_ARGUMENTS"; root="$2"; shift 2 ;;
@@ -62,6 +70,7 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 
+# Validate user-facing settings before creating any directories.
 jl_assert_nonempty "$studio_name" "studio name" || exit $?
 jl_assert_nonempty "$default_daw" "default DAW" || exit $?
 jl_validate_sample_rate "$sample_rate" || { jl_error "Unsupported sample rate: $sample_rate"; exit "$JL_EXIT_VALIDATION"; }
@@ -69,12 +78,14 @@ jl_validate_bit_depth "$bit_depth" || { jl_error "Unsupported bit depth: $bit_de
 file_format="$(printf '%s' "$file_format" | tr '[:lower:]' '[:upper:]')"
 jl_validate_file_format "$file_format" || { jl_error "Unsupported file format: $file_format"; exit "$JL_EXIT_VALIDATION"; }
 
+# Canonicalize the destination and enforce the no-overwrite invariant.
 root="$(jl_abspath_allow_missing "$root")" || exit $?
 if [ -e "$root" ]; then
     jl_error "Refusing to overwrite an existing workspace path: $root"
     exit "$JL_EXIT_UNSAFE"
 fi
 
+# Dry-run exits before the transactional creation block.
 if [ "$dry_run" -eq 1 ]; then
     cat <<EOF_PLAN
 Would create JL Mixing studio workspace:
@@ -88,6 +99,7 @@ EOF_PLAN
 fi
 
 cleanup=1
+# Trap handler that removes a partially created workspace or entity after failure.
 cleanup_on_failure() {
     status=$?
     if [ "$status" -ne 0 ] && [ "$cleanup" -eq 1 ]; then
@@ -97,12 +109,14 @@ cleanup_on_failure() {
 }
 trap cleanup_on_failure EXIT HUP INT TERM
 
+# Create only the minimal Version 1.0 workspace and configured DAW resources.
 mkdir -p \
     "$root/Clients" \
     "$root/DAWs/$default_daw/Mix Templates" \
     "$root/DAWs/$default_daw/Presets" \
     "$root/Studio"
 
+# Render studio.json, then set typed numeric/audio fields with jq.
 created_at="$(jl_now_iso8601)"
 document_id="$(jl_uuid)"
 JL_TEMPLATE_ALLOW_UNRESOLVED=1 jl_template_render_json \
@@ -124,6 +138,7 @@ jl_json_update "$root/Studio/studio.json" \
     --argjson bit_depth "$bit_depth" \
     --arg file_format "$file_format"
 
+# Validate before releasing the rollback trap and reporting success.
 jl_json_validate_schema "$APP_ROOT/schemas/studio.schema.json" "$root/Studio/studio.json"
 cleanup=0
 trap - EXIT HUP INT TERM

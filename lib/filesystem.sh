@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Safe filesystem operations and immutable-original protections.
-
+# Safe filesystem primitives used by commands and transactional workflows.
+#
+# These helpers centralize overwrite protection, atomic writes, exact copies,
+# safe moves, and the invariant that Original_Delivery is never modified.
 if [ "${JL_MIXING_FILESYSTEM_LOADED:-0}" = "1" ]; then
     return 0 2>/dev/null || exit 0
 fi
@@ -12,6 +14,7 @@ JL_FILESYSTEM_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/platform.sh
 . "$JL_FILESYSTEM_LIB_DIR/platform.sh"
 
+# Create a directory tree if missing and accept an existing directory.
 jl_fs_ensure_directory() {
     local path
     path="$1"
@@ -22,6 +25,7 @@ jl_fs_ensure_directory() {
     mkdir -p "$path"
 }
 
+# Create a new directory but refuse any existing destination.
 jl_fs_create_directory() {
     local path
     path="$1"
@@ -32,6 +36,7 @@ jl_fs_create_directory() {
     mkdir -p "$path"
 }
 
+# Identify paths inside the immutable Original_Delivery subtree.
 jl_fs_is_original_delivery_path() {
     local path
     path="$(jl_abspath_allow_missing "$1")" || return $?
@@ -45,6 +50,7 @@ jl_fs_is_original_delivery_path() {
     esac
 }
 
+# Reject any attempted write beneath Original_Delivery.
 jl_fs_assert_mutable_path() {
     local path
     path="$1"
@@ -54,6 +60,7 @@ jl_fs_assert_mutable_path() {
     fi
 }
 
+# Copy one file without overwriting and verify the bytes are identical.
 jl_fs_copy_file_exact() {
     local source destination
     source="$1"
@@ -74,6 +81,7 @@ jl_fs_copy_file_exact() {
     cp -p "$source" "$destination"
 }
 
+# Copy a directory tree into a new destination without overwriting.
 jl_fs_copy_tree() {
     local source destination
     source="$1"
@@ -94,6 +102,7 @@ jl_fs_copy_tree() {
     cp -R "$source" "$destination"
 }
 
+# Write stdin to a sibling temporary file and atomically replace the target.
 jl_fs_atomic_write() {
     local target temp_file
     target="$1"
@@ -115,6 +124,7 @@ jl_fs_atomic_write() {
     mv "$temp_file" "$target"
 }
 
+# Move a source to a non-existing destination after safety checks.
 jl_fs_safe_move() {
     local source destination
     source="$1"
@@ -136,6 +146,7 @@ jl_fs_safe_move() {
     mv "$source" "$destination"
 }
 
+# Return success when two regular files have identical content.
 jl_fs_same_bytes() {
     local first second
     first="$1"
@@ -143,6 +154,7 @@ jl_fs_same_bytes() {
     cmp -s "$first" "$second"
 }
 
+# Return success when a directory has no immediate entries.
 jl_fs_directory_is_empty() {
     local path
     path="$1"
@@ -152,6 +164,7 @@ jl_fs_directory_is_empty() {
 
 # Copy the contents of a source directory into an existing empty destination.
 # This is intended for one-time imports during project creation.
+# Copy every top-level source entry into an existing destination safely.
 jl_fs_copy_directory_contents() {
     local source destination entry
     source="$1"

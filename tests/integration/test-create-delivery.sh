@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 set -eu
+
+# Purpose: Exercise filtering, classification, checksums, manifest creation, and delivery recording.
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 . "$ROOT/tests/integration/integration-helper.sh"
 
+# Arrange: build an isolated temporary fixture.
 tmp="$(new_test_dir)"
 trap 'rm -rf "$tmp"' EXIT
 studio_root="$tmp/studio"
@@ -16,6 +19,7 @@ fixture_wav "$prints/WORK Acme - Blue Sky - Car Test.wav"
 (cd "$project_root" && "$ROOT/bin/create-delivery" --checksum)
 delivery_root="$project_root/05_Final_Delivery"
 delivery_manifest="$delivery_root/delivery-manifest.json"
+# Assert: verify observable behavior rather than internal implementation.
 assert_file_exists "$delivery_root/Acme - Blue Sky - Main Mix.wav"
 assert_path_not_exists "$delivery_root/WORK Acme - Blue Sky - Car Test.wav"
 assert_file_exists "$delivery_manifest"

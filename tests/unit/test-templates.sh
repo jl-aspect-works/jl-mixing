@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
 set -eu
+
+# Purpose: Verify text/JSON rendering and managed Markdown replacement safety.
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 . "$ROOT/tests/test-helper.sh"
 . "$ROOT/lib/templates.sh"
 
+# Arrange: build an isolated temporary fixture.
 tmp="$(new_test_dir)"
 trap 'rm -rf "$tmp"' EXIT
 printf 'Hello {{NAME}} from {{PLACE}}\n' > "$tmp/template.txt"
 jl_template_render "$tmp/template.txt" "$tmp/output.txt" NAME Jake PLACE Studio
+# Assert: verify observable behavior rather than internal implementation.
 assert_eq "Hello Jake from Studio" "$(cat "$tmp/output.txt")" "render literal tokens"
 assert_failure "unresolved token rejected" jl_template_render "$tmp/template.txt" "$tmp/bad.txt" NAME Jake
 

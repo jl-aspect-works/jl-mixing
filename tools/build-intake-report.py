@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
-"""Build the automation-managed section of Intake_Report.md."""
+"""Build the automation-managed section of ``Intake_Report.md``.
+
+The shell command ``validate-intake`` owns project/context resolution and the
+managed-section replacement. This helper focuses only on inspecting one source
+directory and producing deterministic Markdown. It never writes into the source
+folder and treats ``ffprobe`` as an optional enhancement rather than a hard
+runtime dependency.
+"""
 
 from __future__ import annotations
 
@@ -11,11 +18,17 @@ import subprocess
 import sys
 from typing import Any
 
+# Extensions considered audio candidates. A candidate is still reported as
+# unreadable if ffprobe exists but cannot parse it.
 AUDIO_EXTENSIONS = {".wav", ".wave", ".aif", ".aiff", ".flac", ".mp3", ".m4a"}
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser()
+    """Parse the narrow interface used by the Bash wrapper and tests."""
+
+    parser = argparse.ArgumentParser(
+        description="Generate the managed intake-validation Markdown section."
+    )
     parser.add_argument("--source", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--expected-sample-rate", type=int)
@@ -25,6 +38,13 @@ def parse_args() -> argparse.Namespace:
 
 
 def ffprobe_metadata(path: Path) -> tuple[dict[str, Any] | None, str | None]:
+    """Inspect the first audio stream and return normalized metadata or an error.
+
+    ``check=False`` is intentional: invalid client audio is reportable intake
+    data, not a Python exception. The caller decides whether it is a warning or
+    blocking validation error.
+    """
+
     command = [
         "ffprobe",
         "-v",
@@ -48,6 +68,9 @@ def ffprobe_metadata(path: Path) -> tuple[dict[str, Any] | None, str | None]:
         payload = json.loads(result.stdout)
         stream = (payload.get("streams") or [{}])[0]
         fmt = payload.get("format") or {}
+
+        # Some formats expose only bits_per_raw_sample, while others expose
+        # bits_per_sample. Prefer the former but accept either.
         bits = stream.get("bits_per_raw_sample") or stream.get("bits_per_sample") or None
         return (
             {
@@ -59,12 +82,17 @@ def ffprobe_metadata(path: Path) -> tuple[dict[str, Any] | None, str | None]:
             None,
         )
     except (ValueError, TypeError, KeyError, json.JSONDecodeError) as exc:
+        # Malformed or incomplete ffprobe JSON is reported to the intake report
+        # instead of terminating the whole file inventory.
         return None, f"could not parse ffprobe output: {exc}"
 
 
 def format_technical(metadata: dict[str, Any] | None) -> str:
+    """Format available technical metadata for one Markdown table cell."""
+
     if not metadata:
         return "not inspected"
+
     values: list[str] = []
     if metadata.get("sample_rate"):
         values.append(f"{metadata['sample_rate']} Hz")
@@ -78,13 +106,20 @@ def format_technical(metadata: dict[str, Any] | None) -> str:
 
 
 def main() -> int:
+    """Inventory the source, render Markdown, and return validation status."""
+
     args = parse_args()
     source = args.source.resolve()
     if not source.is_dir():
         print(f"Source directory not found: {source}", file=sys.stderr)
         return 5
 
-    files = sorted((path for path in source.rglob("*") if path.is_file()), key=lambda p: str(p).lower())
+    # A case-insensitive path sort keeps generated reports stable across runs
+    # and platforms, which makes both human review and automated tests clearer.
+    files = sorted(
+        (path for path in source.rglob("*") if path.is_file()),
+        key=lambda path: str(path).lower(),
+    )
     ffprobe_available = shutil.which("ffprobe") is not None
     warnings: list[str] = []
     errors: list[str] = []
@@ -93,15 +128,21 @@ def main() -> int:
     if not files:
         errors.append("No files were found in the intake source.")
 
+    # Duplicate basenames can become ambiguous after a DAW import even when the
+    # original files live in separate client subdirectories.
     if not args.no_duplicate_check:
         by_name: dict[str, list[Path]] = {}
         for path in files:
             by_name.setdefault(path.name.lower(), []).append(path)
         for duplicate_paths in by_name.values():
             if len(duplicate_paths) > 1:
-                display = ", ".join(str(path.relative_to(source)) for path in duplicate_paths)
+                display = ", ".join(
+                    str(path.relative_to(source)) for path in duplicate_paths
+                )
                 warnings.append(f"Duplicate filename detected: {display}")
 
+    # Inspect each file independently so one corrupt item does not hide the rest
+    # of the delivery inventory.
     for path in files:
         extension = path.suffix.lower()
         metadata: dict[str, Any] | None = None
@@ -109,26 +150,38 @@ def main() -> int:
             if ffprobe_available:
                 metadata, error = ffprobe_metadata(path)
                 if error:
-                    errors.append(f"Unreadable audio file `{path.relative_to(source)}`: {error}")
+                    errors.append(
+                        f"Unreadable audio file `{path.relative_to(source)}`: {error}"
+                    )
                 elif metadata:
                     actual_rate = metadata.get("sample_rate")
                     actual_depth = metadata.get("bit_depth")
-                    if args.expected_sample_rate and actual_rate and actual_rate != args.expected_sample_rate:
+                    if (
+                        args.expected_sample_rate
+                        and actual_rate
+                        and actual_rate != args.expected_sample_rate
+                    ):
                         warnings.append(
                             f"Sample-rate mismatch for `{path.relative_to(source)}`: "
                             f"{actual_rate} Hz; expected {args.expected_sample_rate} Hz."
                         )
-                    if args.expected_bit_depth and actual_depth and actual_depth != args.expected_bit_depth:
+                    if (
+                        args.expected_bit_depth
+                        and actual_depth
+                        and actual_depth != args.expected_bit_depth
+                    ):
                         warnings.append(
                             f"Bit-depth mismatch for `{path.relative_to(source)}`: "
                             f"{actual_depth}-bit; expected {args.expected_bit_depth}-bit."
                         )
-            else:
-                metadata = None
         else:
-            warnings.append(f"Non-audio or unsupported extension: `{path.relative_to(source)}`")
+            warnings.append(
+                f"Non-audio or unsupported extension: `{path.relative_to(source)}`"
+            )
         inventory.append((path, metadata))
 
+    # Summarize capabilities separately from per-file findings so a report makes
+    # clear whether technical audio inspection actually occurred.
     passed: list[str] = []
     if files:
         passed.append(f"Inventoried {len(files)} file(s).")
@@ -139,6 +192,8 @@ def main() -> int:
     else:
         warnings.append("ffprobe is not installed; enhanced audio inspection was skipped.")
 
+    # Build Markdown as a list of lines to avoid fragile multiline interpolation
+    # and to keep section ordering explicit.
     lines: list[str] = [
         "## Intake Summary",
         "",
@@ -171,10 +226,21 @@ def main() -> int:
     if not errors:
         lines.append("- None.")
 
-    lines.extend(["", "## Source Inventory", "", "| File | Size (bytes) | Technical details |", "|---|---:|---|"])
+    lines.extend(
+        [
+            "",
+            "## Source Inventory",
+            "",
+            "| File | Size (bytes) | Technical details |",
+            "|---|---:|---|",
+        ]
+    )
     for path, metadata in inventory:
+        # Escape table pipes in client filenames so the Markdown row remains valid.
         relative = str(path.relative_to(source)).replace("|", "\\|")
-        lines.append(f"| `{relative}` | {path.stat().st_size} | {format_technical(metadata)} |")
+        lines.append(
+            f"| `{relative}` | {path.stat().st_size} | {format_technical(metadata)} |"
+        )
     if not inventory:
         lines.append("| _No files_ | 0 | — |")
 
@@ -182,10 +248,15 @@ def main() -> int:
     if errors:
         lines.append("- Resolve blocking errors before preparing `Working_Audio/`.")
     if warnings:
-        lines.append("- Review warnings and document any accepted exceptions in `Preparation_Report.md`.")
+        lines.append(
+            "- Review warnings and document any accepted exceptions in "
+            "`Preparation_Report.md`."
+        )
     if not errors and not warnings:
         lines.append("- Intake is ready for manual audio preparation.")
 
+    # The Bash wrapper writes this temporary output into the report's managed
+    # section. A trailing newline keeps the resulting Markdown POSIX-friendly.
     args.output.write_text("\n".join(lines).rstrip() + "\n")
     return 5 if errors else 0
 

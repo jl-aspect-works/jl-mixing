@@ -1,9 +1,15 @@
 #!/usr/bin/env bash
-# Create the next sequential project revision.
+# Create the next immutable numbered revision folder and manifest record.
+#
+# Folder creation and manifest mutation are treated as one transaction: both
+# are rolled back when template rendering or schema validation fails.
 set -eu
 
+# Resolve the installation root from this launcher. Installed wrappers may
+# override it with JL_MIXING_HOME.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_ROOT="${JL_MIXING_HOME:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+# Load shared services; command files intentionally keep reusable logic in lib/.
 . "$APP_ROOT/lib/common.sh"
 . "$APP_ROOT/lib/config.sh"
 . "$APP_ROOT/lib/context.sh"
@@ -14,6 +20,7 @@ APP_ROOT="${JL_MIXING_HOME:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 . "$APP_ROOT/lib/revision.sh"
 . "$APP_ROOT/lib/templates.sh"
 
+# Print command syntax and supported options, then return to the caller.
 usage() {
     cat <<'USAGE'
 Usage: new-revision [options]
@@ -31,6 +38,7 @@ project_ref=""
 description=""
 dry_run=0
 
+# Parse options explicitly so unknown or missing arguments fail predictably.
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --project) [ "$#" -ge 2 ] || jl_die "--project requires a value." "$JL_EXIT_ARGUMENTS"; project_ref="$2"; shift 2 ;;
@@ -42,6 +50,7 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 
+# Resolve project state and calculate the next revision from manifest history.
 project_root="$(jl_context_resolve_project "$project_ref" "$PWD")" || exit $?
 manifest="$project_root/00_Admin/project-manifest.json"
 status="$(jl_json_get "$manifest" '.state.status')"
@@ -61,14 +70,17 @@ if [ -e "$revision_root" ]; then
     exit "$JL_EXIT_UNSAFE"
 fi
 
+# Dry-run verifies naming and numbering without creating a revision.
 if [ "$dry_run" -eq 1 ]; then
     printf 'Would create revision %s at %s\n' "$number" "$revision_root"
     exit 0
 fi
 
+# Preserve the manifest so folder and state changes can be rolled back together.
 backup="$(jl_mktemp_file_near "$manifest")"
 cp -p "$manifest" "$backup"
 cleanup=1
+# Trap handler that restores transactional state when the command exits unsuccessfully.
 rollback_on_failure() {
     exit_status=$?
     if [ "$exit_status" -ne 0 ] && [ "$cleanup" -eq 1 ]; then
@@ -80,6 +92,7 @@ rollback_on_failure() {
 }
 trap rollback_on_failure EXIT HUP INT TERM
 
+# Create the self-contained revision and its human-owned notes template.
 mkdir -p "$revision_root/Prints"
 timestamp="$(jl_now_iso8601)"
 revision_id="$(jl_uuid)"
@@ -94,6 +107,7 @@ jl_template_render "$APP_ROOT/templates/revision/Revision_Notes.md" "$revision_r
     MIX_ENGINEER "$engineer" \
     REVISION_DESCRIPTION "$description"
 
+# Append the machine-readable record only after the folder and notes exist.
 jl_revision_append "$manifest" "$description" "$number" "$timestamp" "$revision_id" "$prefix" "$padding"
 jl_json_validate_schema "$APP_ROOT/schemas/project-manifest.schema.json" "$manifest"
 

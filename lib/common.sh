@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Common helpers shared by every JL Mixing Automation command.
 # Compatible with the Bash 3.2 version included with macOS.
-
+#
+# This module defines the public exit-code contract, logging, prompts, UUID and
+# timestamp generation, and small string helpers used across the application.
 if [ "${JL_MIXING_COMMON_LOADED:-0}" = "1" ]; then
     return 0 2>/dev/null || exit 0
 fi
@@ -22,10 +24,12 @@ readonly \
 
 : "${JL_MIXING_LOG_LEVEL:=info}"
 
+# Return success when the named executable can be resolved through PATH.
 jl_command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
+# Map a textual log level to a numeric threshold for comparison.
 jl_log_level_number() {
     local level
     case "$1" in
@@ -37,6 +41,7 @@ jl_log_level_number() {
     esac
 }
 
+# Write a message to stderr when its level meets the configured threshold.
 jl_log() {
     local level configured requested label
     level="$1"
@@ -55,6 +60,7 @@ jl_info()  { jl_log info "$@"; }
 jl_warn()  { jl_log warn "$@"; }
 jl_error() { jl_log error "$@"; }
 
+# Report an error and return the requested application exit code.
 jl_die() {
     local message code
     message="$1"
@@ -63,6 +69,7 @@ jl_die() {
     return "$code"
 }
 
+# Verify that a required external command is installed and explain how to recover.
 jl_require_command() {
     local command_name install_hint
     command_name="$1"
@@ -75,6 +82,7 @@ jl_require_command() {
     fi
 }
 
+# Reject an empty required value with a consistent argument error.
 jl_assert_nonempty() {
     local value label
     value="$1"
@@ -85,12 +93,14 @@ jl_assert_nonempty() {
     fi
 }
 
+# Remove leading and trailing POSIX whitespace without Bash extglob.
 jl_trim() {
     local value
     # sed is used instead of Bash extglob so this remains portable to Bash 3.2.
     printf '%s' "$1" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
 }
 
+# Recognize the accepted case-insensitive true values.
 jl_is_truthy() {
     local value
     case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" in
@@ -99,6 +109,7 @@ jl_is_truthy() {
     esac
 }
 
+# Join positional arguments using the supplied delimiter.
 jl_join_by() {
     local delimiter result separator item
     delimiter="$1"
@@ -112,11 +123,13 @@ jl_join_by() {
     printf '%s\n' "$result"
 }
 
+# Return a stable UTC ISO-8601 timestamp.
 jl_now_iso8601() {
     # UTC is stable across macOS and Linux and satisfies ISO-8601 date-time.
     date -u '+%Y-%m-%dT%H:%M:%SZ'
 }
 
+# Generate a lowercase UUID using uuidgen, with Python as a portable fallback.
 jl_uuid() {
     if jl_command_exists uuidgen; then
         uuidgen | tr '[:upper:]' '[:lower:]'
@@ -125,6 +138,7 @@ jl_uuid() {
 
     if jl_command_exists python3; then
         python3 - <<'PY_UUID'
+# uuid.uuid4 provides the same random UUID semantics as the uuidgen path.
 import uuid
 print(uuid.uuid4())
 PY_UUID
@@ -135,6 +149,7 @@ PY_UUID
     return "$JL_EXIT_CONFIG"
 }
 
+# Read a line from the user and apply a default when the response is empty.
 jl_prompt() {
     local prompt_text default_value response
     prompt_text="$1"
@@ -153,6 +168,7 @@ jl_prompt() {
     printf '%s\n' "$response"
 }
 
+# Ask a yes/no question and return success only for an affirmative response.
 jl_confirm() {
     local prompt_text default_answer suffix response
     prompt_text="$1"

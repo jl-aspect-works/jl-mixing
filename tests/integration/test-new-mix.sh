@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 set -eu
+
+# Purpose: Exercise project creation, source copying, snapshots, lookup, and duplicate protection.
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 . "$ROOT/tests/integration/integration-helper.sh"
 
+# Arrange: build an isolated temporary fixture.
 tmp="$(new_test_dir)"
 trap 'rm -rf "$tmp"' EXIT
 studio_root="$tmp/studio"
@@ -14,6 +17,7 @@ printf 'client source\n' > "$tmp/source/readme.txt"
 
 (cd "$client_root" && "$ROOT/bin/new-mix" --project "Blue Sky" --source "$tmp/source" --non-interactive)
 project_root="$client_root/Projects/Active/Blue Sky"
+# Assert: verify observable behavior rather than internal implementation.
 assert_file_exists "$project_root/00_Admin/project-manifest.json"
 assert_dir_exists "$project_root/03_DAW_Project/Project"
 assert_file_exists "$project_root/01_Client_Files/Original_Delivery/readme.txt"

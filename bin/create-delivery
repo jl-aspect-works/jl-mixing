@@ -1,9 +1,16 @@
 #!/usr/bin/env bash
 # Assemble approved revision prints into the final delivery package.
+#
+# This command deliberately separates package preparation from recording that
+# the package was sent. It filters working prints, classifies deliverables,
+# writes a schema-valid manifest, and can optionally add checksums or a ZIP.
 set -eu
 
+# Resolve the installation root from this launcher. Installed wrappers may
+# override it with JL_MIXING_HOME.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_ROOT="${JL_MIXING_HOME:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+# Load shared services; command files intentionally keep reusable logic in lib/.
 . "$APP_ROOT/lib/common.sh"
 . "$APP_ROOT/lib/context.sh"
 . "$APP_ROOT/lib/json.sh"
@@ -13,6 +20,7 @@ APP_ROOT="${JL_MIXING_HOME:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 . "$APP_ROOT/lib/revision.sh"
 . "$APP_ROOT/lib/validation.sh"
 
+# Print command syntax and supported options, then return to the caller.
 usage() {
     cat <<'USAGE'
 Usage: create-delivery [options]
@@ -46,6 +54,7 @@ checksum=0
 mark_delivered=0
 dry_run=0
 
+# Parse options explicitly so unknown or missing arguments fail predictably.
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --project) [ "$#" -ge 2 ] || jl_die "--project requires a value." "$JL_EXIT_ARGUMENTS"; project_ref="$2"; shift 2 ;;
@@ -65,6 +74,8 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 
+# Return success when a filename matches at least one comma-separated shell glob.
+# Pattern lists are comma-separated shell globs; matching is performed without eval.
 matches_patterns() {
     local name remaining pattern
     name="$1"
@@ -96,6 +107,8 @@ matches_patterns() {
     return 1
 }
 
+# Infer the manifest deliverable_type from a normalized filename.
+# Classification uses normalized filename keywords and falls back to other.
 classify_deliverable() {
     local lowercase
     lowercase="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
@@ -110,6 +123,7 @@ classify_deliverable() {
     esac
 }
 
+# Resolve the approved revision and package paths before copying any material.
 project_root="$(jl_context_resolve_project "$project_ref" "$PWD")" || exit $?
 manifest="$project_root/00_Admin/project-manifest.json"
 delivery_root="$project_root/05_Final_Delivery"
@@ -147,6 +161,7 @@ if [ "$mark_delivered" -eq 1 ] && [ -f "$delivery_manifest" ] && \
     mark_only=1
 fi
 
+# Dry-run exits before cleanup, copy, manifest, checksum, or ZIP operations.
 if [ "$dry_run" -eq 1 ]; then
     if [ "$mark_only" -eq 1 ]; then
         printf 'Would mark existing delivery as delivered: %s\n' "$delivery_manifest"
@@ -165,14 +180,15 @@ if [ "$mark_only" -eq 0 ]; then
         exit "$JL_EXIT_UNSAFE"
     fi
 
+    # Clean only paths recorded by the prior manifest; never sweep arbitrary user files.
     if [ "$clean" -eq 1 ] && [ -f "$delivery_manifest" ]; then
         jq -r '.files[].path' "$delivery_manifest" |
         while IFS= read -r old_path; do
             case "$old_path" in
                 ''|/*|*'..'*) jl_error "Unsafe path in existing delivery manifest: $old_path"; exit "$JL_EXIT_UNSAFE" ;;
             esac
-            # Both values must be non-empty before recursively removing a prior
-            # deliverable from the controlled final-delivery directory.
+            # Require both path components before recursive deletion. This protects
+            # against an accidental empty expansion reaching the filesystem root.
             rm -rf -- "${delivery_root:?}/${old_path:?}"
         done
         rm -f "$delivery_manifest"
@@ -189,7 +205,7 @@ if [ "$mark_only" -eq 0 ]; then
         if [ "$exit_status" -ne 0 ] && [ "$cleanup" -eq 1 ]; then
             while IFS= read -r copied_path; do
                 if [ -n "$copied_path" ]; then
-                    # Roll back only the file or directory copied during this operation.
+                    # Roll back only an item copied during this invocation.
                     rm -rf -- "${delivery_root:?}/${copied_path:?}"
                 fi
             done < "$copied_paths"
@@ -303,6 +319,7 @@ if [ "$mark_only" -eq 0 ]; then
             files:$files
         }' > "$delivery_manifest"
 
+    # Validate the package manifest before optional archive creation.
     jl_json_validate_schema "$APP_ROOT/schemas/delivery-manifest.schema.json" "$delivery_manifest"
 
     # Replace only the untouched system placeholder, preserving user edits.
@@ -311,6 +328,7 @@ if [ "$mark_only" -eq 0 ]; then
         python3 - "$delivery_notes" "$revision_number" <<'PY_NOTES'
 from pathlib import Path
 import sys
+# Update only the untouched placeholder so prior user edits remain authoritative.
 path = Path(sys.argv[1])
 revision = sys.argv[2]
 text = path.read_text()
@@ -332,6 +350,7 @@ PY_NOTES
     printf 'Prepared final delivery: %s\n' "$delivery_root"
 fi
 
+# Recording delivery is a separate state transition from package preparation.
 if [ "$mark_delivered" -eq 1 ]; then
     [ -f "$delivery_manifest" ] || { jl_error "Delivery manifest not found: $delivery_manifest"; exit "$JL_EXIT_VALIDATION"; }
     timestamp="$(jl_now_iso8601)"

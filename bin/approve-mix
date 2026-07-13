@@ -1,15 +1,26 @@
 #!/usr/bin/env bash
 # Approve one revision and supersede any previously approved revision.
+#
+# Workflow:
+#   1. Resolve the project and revision.
+#   2. Update approval state transactionally.
+#   3. Validate the updated manifest and optionally append a human note.
+#
+# Safety: the original manifest is restored if any update or validation step fails.
 set -eu
 
+# Resolve the installation root from this launcher. Installed wrappers may
+# override it with JL_MIXING_HOME.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_ROOT="${JL_MIXING_HOME:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+# Load shared services; command files intentionally keep reusable logic in lib/.
 . "$APP_ROOT/lib/common.sh"
 . "$APP_ROOT/lib/context.sh"
 . "$APP_ROOT/lib/json.sh"
 . "$APP_ROOT/lib/platform.sh"
 . "$APP_ROOT/lib/revision.sh"
 
+# Print command syntax and supported options, then return to the caller.
 usage() {
     cat <<'USAGE'
 Usage: approve-mix [options]
@@ -33,6 +44,7 @@ notes=""
 approval_date=""
 dry_run=0
 
+# Parse options explicitly so unknown or missing arguments fail predictably.
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --project) [ "$#" -ge 2 ] || jl_die "--project requires a value." "$JL_EXIT_ARGUMENTS"; project_ref="$2"; shift 2 ;;
@@ -47,6 +59,7 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 
+# Resolve the project and reject approval changes after completion.
 project_root="$(jl_context_resolve_project "$project_ref" "$PWD")" || exit $?
 manifest="$project_root/00_Admin/project-manifest.json"
 [ "$(jl_json_get "$manifest" '.state.status')" = active ] || {
@@ -54,6 +67,7 @@ manifest="$project_root/00_Admin/project-manifest.json"
     exit "$JL_EXIT_VALIDATION"
 }
 
+# Default to current_revision, then prove the requested revision exists on disk and in JSON.
 [ -n "$revision_number" ] || revision_number="$(jl_revision_current "$manifest")"
 case "$revision_number" in ''|*[!0-9]*|0) jl_error "Revision number must be a positive integer."; exit "$JL_EXIT_VALIDATION" ;; esac
 revision_folder="$(jq -er --argjson number "$revision_number" '.revisions[] | select(.number == $number) | .folder' "$manifest")" || {
@@ -67,14 +81,17 @@ revision_root="$project_root/$revision_folder"
 [ -n "$approved_by" ] || approved_by="Engineer"
 [ -n "$approval_date" ] || approval_date="$(jl_now_iso8601)"
 
+# Dry-run reports the exact approval event without mutating history.
 if [ "$dry_run" -eq 1 ]; then
     printf 'Would approve revision %s by %s at %s\n' "$revision_number" "$approved_by" "$approval_date"
     exit 0
 fi
 
+# Preserve the manifest because approval updates several related fields atomically.
 backup="$(jl_mktemp_file_near "$manifest")"
 cp -p "$manifest" "$backup"
 cleanup=1
+# Trap handler that restores transactional state when the command exits unsuccessfully.
 rollback_on_failure() {
     exit_status=$?
     if [ "$exit_status" -ne 0 ] && [ "$cleanup" -eq 1 ]; then
@@ -85,9 +102,11 @@ rollback_on_failure() {
 }
 trap rollback_on_failure EXIT HUP INT TERM
 
+# Update approval and superseding state in one jq transformation, then validate it.
 jl_revision_approve "$manifest" "$revision_number" "$approved_by" "$approval_date"
 jl_json_validate_schema "$APP_ROOT/schemas/project-manifest.schema.json" "$manifest"
 
+# Human approval notes are appended only after machine state validates.
 if [ -n "$notes" ]; then
     cat >> "$revision_root/Revision_Notes.md" <<EOF_NOTE
 

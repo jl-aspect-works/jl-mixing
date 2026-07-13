@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-# Shared fixture builders for command integration tests.
+# Reusable fixtures for command-level integration tests.
+#
+# Every fixture is created under a temporary studio root; tests never touch the
+# user's real JL Mixing workspace.
 set -eu
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -8,6 +11,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 export JL_MIXING_HOME="$ROOT"
 
+# Create a minimal valid studio workspace for an integration test.
 fixture_studio() {
     local studio_root
     studio_root="$1"
@@ -21,6 +25,7 @@ fixture_studio() {
         "$ROOT/examples/studio.json" > "$studio_root/Studio/studio.json"
 }
 
+# Create a valid Acme client beneath a fixture studio.
 fixture_client() {
     local studio_root client_root
     studio_root="$1"
@@ -30,6 +35,7 @@ fixture_client() {
     printf '%s\n' "$client_root"
 }
 
+# Create a project fixture in the requested workflow state.
 fixture_project() {
     local studio_root mode client_root project_root manifest timestamp
     studio_root="$1"
@@ -100,6 +106,7 @@ fixture_project() {
     printf '%s\n' "$project_root"
 }
 
+# Generate a small valid 48 kHz, 24-bit stereo WAV fixture.
 fixture_wav() {
     local path
     path="$1"
@@ -108,12 +115,14 @@ import sys
 import wave
 from pathlib import Path
 
+# Generate a tiny silent file; audio content is irrelevant to workflow tests.
 path = Path(sys.argv[1])
 path.parent.mkdir(parents=True, exist_ok=True)
 with wave.open(str(path), "wb") as output:
     output.setnchannels(2)
     output.setsampwidth(3)
     output.setframerate(48000)
+    # A 24-bit stereo frame contains two signed three-byte samples.
     silent_frame = (0).to_bytes(3, "little", signed=True) * 2
     output.writeframes(silent_frame * 480)
 PY_WAV

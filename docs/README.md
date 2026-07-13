@@ -9,3 +9,4 @@
 - [Version 1.0 Scope Freeze](SCOPE_FREEZE_V1.md)
 - [Batch 2 Implementation](BATCH_2_IMPLEMENTATION.md)
 - [Batch 3 Implementation](BATCH_3_IMPLEMENTATION.md)
+- [Batch 3 Code Documentation Pass](CODE_DOCUMENTATION_PASS.md)

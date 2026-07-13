@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Metadata creation and preservation rules for machine-managed JSON.
-
+# Creation and maintenance of the standard metadata block in JSON documents.
+#
+# Creation identity is stable. Only last_modified_at changes during updates.
 if [ "${JL_MIXING_METADATA_LOADED:-0}" = "1" ]; then
     return 0 2>/dev/null || exit 0
 fi
@@ -13,6 +14,7 @@ JL_METADATA_REPO_ROOT="$(cd "$JL_METADATA_LIB_DIR/.." && pwd)"
 # shellcheck source=lib/json.sh
 . "$JL_METADATA_LIB_DIR/json.sh"
 
+# Read the application VERSION file from the resolved installation root.
 jl_software_version() {
     local version_file first_line
     version_file="${JL_MIXING_VERSION_FILE:-$JL_METADATA_REPO_ROOT/VERSION}"
@@ -25,10 +27,12 @@ jl_software_version() {
     printf '%s\n' "$first_line"
 }
 
+# Build the standard created_with software identity string.
 jl_created_with() {
     printf 'jl-mixing %s\n' "$(jl_software_version)"
 }
 
+# Create a complete metadata object for a new JSON document.
 jl_metadata_create() {
     local schema_name created_by schema_version document_id timestamp
     schema_name="$1"
@@ -56,6 +60,7 @@ jl_metadata_create() {
         }'
 }
 
+# Refresh only last_modified_at on an existing document.
 jl_metadata_touch() {
     local file timestamp
     file="$1"
@@ -63,6 +68,7 @@ jl_metadata_touch() {
     jl_json_set_string "$file" '.metadata.last_modified_at' "$timestamp"
 }
 
+# Validate required metadata fields and supported schema identity.
 jl_metadata_validate() {
     local file expected_schema field value
     file="$1"
@@ -78,6 +84,7 @@ jl_metadata_validate() {
     done
 }
 
+# Copy immutable creation metadata from one document to another JSON object.
 jl_metadata_copy_creation_fields() {
     local source_file target_file
     source_file="$1"

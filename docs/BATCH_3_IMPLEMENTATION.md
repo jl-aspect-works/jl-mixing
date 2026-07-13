@@ -40,3 +40,10 @@ Batch 3 adds one integration test for each user-facing command, including a full
 - Private installed Python virtual environment
 - Installed command launchers
 - Release archive generation and installation verification
+
+## Code documentation pass
+
+A dedicated follow-up revision adds intent-focused comments across the Batch 3
+codebase. The comments document public function contracts, workflow phases,
+rollback behavior, portability choices, test intent, and CI/tool responsibilities
+without narrating obvious syntax line by line.

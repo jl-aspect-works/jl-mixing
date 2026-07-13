@@ -1,9 +1,15 @@
 #!/usr/bin/env bash
 # Inventory and validate the immutable client-delivery source.
+#
+# A Python helper builds the machine-managed Markdown section. This wrapper
+# preserves engineer notes and never modifies files in Original_Delivery.
 set -eu
 
+# Resolve the installation root from this launcher. Installed wrappers may
+# override it with JL_MIXING_HOME.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_ROOT="${JL_MIXING_HOME:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+# Load shared services; command files intentionally keep reusable logic in lib/.
 . "$APP_ROOT/lib/common.sh"
 . "$APP_ROOT/lib/context.sh"
 . "$APP_ROOT/lib/filesystem.sh"
@@ -12,6 +18,7 @@ APP_ROOT="${JL_MIXING_HOME:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 . "$APP_ROOT/lib/templates.sh"
 . "$APP_ROOT/lib/validation.sh"
 
+# Print command syntax and supported options, then return to the caller.
 usage() {
     cat <<'USAGE'
 Usage: validate-intake [options]
@@ -36,6 +43,7 @@ expected_bit_depth=""
 no_duplicate_check=0
 dry_run=0
 
+# Parse options explicitly so unknown or missing arguments fail predictably.
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --project) [ "$#" -ge 2 ] || jl_die "--project requires a value." "$JL_EXIT_ARGUMENTS"; project_ref="$2"; shift 2 ;;
@@ -50,6 +58,7 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 
+# Resolve the project and expected format before scanning the source tree.
 project_root="$(jl_context_resolve_project "$project_ref" "$PWD")" || exit $?
 manifest="$project_root/00_Admin/project-manifest.json"
 report="$project_root/00_Admin/Intake_Report.md"
@@ -62,10 +71,12 @@ source_path="$(jl_abspath_allow_missing "$source_path")"
 jl_validate_sample_rate "$expected_sample_rate" || { jl_error "Unsupported expected sample rate: $expected_sample_rate"; exit "$JL_EXIT_VALIDATION"; }
 jl_validate_bit_depth "$expected_bit_depth" || { jl_error "Unsupported expected bit depth: $expected_bit_depth"; exit "$JL_EXIT_VALIDATION"; }
 
+# Generate the automated section in a temporary sibling file for safe replacement.
 replacement="$(jl_mktemp_file_near "$report")"
 cleanup_report() { rm -f "$replacement"; }
 trap cleanup_report EXIT HUP INT TERM
 
+# Build the Python helper argument vector without eval or string re-parsing.
 set -- \
     --source "$source_path" \
     --output "$replacement" \
@@ -75,9 +86,11 @@ if [ "$no_duplicate_check" -eq 1 ]; then
     set -- "$@" --no-duplicate-check
 fi
 
+# Preserve the validator result while still updating the report with discovered issues.
 validation_status=0
 python3 "$APP_ROOT/tools/build-intake-report.py" "$@" || validation_status=$?
 
+# Dry-run prints generated Markdown; normal mode replaces only the marked section.
 if [ "$dry_run" -eq 1 ]; then
     cat "$replacement"
 else

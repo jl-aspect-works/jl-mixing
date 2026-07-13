@@ -1,16 +1,20 @@
+# Verify behavior on both target operating-system families.
 name: Tests
 
+# Run for every proposed or direct repository change.
 on:
   push:
   pull_request:
 
 jobs:
   batch3:
+    # Catch BSD/GNU and default-shell portability differences.
     strategy:
       matrix:
         os: [macos-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
+      # Fetch the exact commit under review.
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:

@@ -11,8 +11,9 @@ This archive contains **Batch 3** of the Version 1.0 implementation:
 - all shared Bash libraries;
 - all eight user-facing commands;
 - shared-library unit tests;
-- command integration tests; and
-- CI and release-check foundations.
+- command integration tests;
+- CI and release-check foundations; and
+- intent-focused comments throughout commands, libraries, tests, Python tools, Makefile, and CI.
 
 End-user installation, uninstallation, and release packaging are implemented in
 Batch 4. During Batch 3, commands are run directly from `bin/` or with that

@@ -1,9 +1,15 @@
 #!/usr/bin/env bash
-# Create a client profile and Active/Completed project containers.
+# Create a client profile and the minimal Active/Completed project structure.
+#
+# Defaults are inherited from studio.json, while explicit command-line values
+# take precedence. Creation is transactional so partial clients are removed.
 set -eu
 
+# Resolve the installation root from this launcher. Installed wrappers may
+# override it with JL_MIXING_HOME.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_ROOT="${JL_MIXING_HOME:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+# Load shared services; command files intentionally keep reusable logic in lib/.
 . "$APP_ROOT/lib/common.sh"
 . "$APP_ROOT/lib/config.sh"
 . "$APP_ROOT/lib/context.sh"
@@ -14,6 +20,7 @@ APP_ROOT="${JL_MIXING_HOME:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 . "$APP_ROOT/lib/templates.sh"
 . "$APP_ROOT/lib/validation.sh"
 
+# Print command syntax and supported options, then return to the caller.
 usage() {
     cat <<'USAGE'
 Usage: new-client CLIENT_ID [options]
@@ -51,6 +58,7 @@ if [ "$#" -gt 0 ]; then
     esac
 fi
 
+# Parse options explicitly so unknown or missing arguments fail predictably.
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --name) [ "$#" -ge 2 ] || jl_die "--name requires a value." "$JL_EXIT_ARGUMENTS"; client_name="$2"; shift 2 ;;
@@ -71,6 +79,7 @@ done
 jl_assert_nonempty "$client_id" "client ID" || exit $?
 jl_validate_slug "$client_id" || { jl_error "Client ID must be a lowercase slug: $client_id"; exit "$JL_EXIT_VALIDATION"; }
 
+# Resolve and validate the studio before deriving client defaults.
 studio_root="$(jl_context_studio_root "$PWD")" || {
     jl_error "Studio workspace not found. Run new-studio first or set JL_MIXING_ROOT."
     exit "$JL_EXIT_CONTEXT"
@@ -125,6 +134,7 @@ if [ -e "$client_root" ]; then
     exit "$JL_EXIT_UNSAFE"
 fi
 
+# Dry-run reports the resolved client without touching the workspace.
 if [ "$dry_run" -eq 1 ]; then
     printf 'Would create client: %s (%s)\n' "$client_name" "$client_id"
     printf 'Location: %s\n' "$client_root"
@@ -132,6 +142,7 @@ if [ "$dry_run" -eq 1 ]; then
 fi
 
 cleanup=1
+# Trap handler that removes a partially created workspace or entity after failure.
 cleanup_on_failure() {
     status=$?
     if [ "$status" -ne 0 ] && [ "$cleanup" -eq 1 ]; then
@@ -141,6 +152,7 @@ cleanup_on_failure() {
 }
 trap cleanup_on_failure EXIT HUP INT TERM
 
+# Create the minimal client folder structure before rendering client.json.
 mkdir -p "$client_root/Projects/Active" "$client_root/Projects/Completed"
 created_at="$(jl_now_iso8601)"
 document_id="$(jl_uuid)"
@@ -169,6 +181,7 @@ jl_json_update "$client_root/client.json" \
     --argjson deliverables "$deliverables_json" \
     --argjson revision_limit "$revision_limit"
 
+# Schema validation is the commit point for client creation.
 jl_json_validate_schema "$APP_ROOT/schemas/client.schema.json" "$client_root/client.json"
 cleanup=0
 trap - EXIT HUP INT TERM

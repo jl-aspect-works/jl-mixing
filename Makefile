@@ -1,7 +1,10 @@
+# Use Bash consistently for recipes on macOS and Linux.
 SHELL := /bin/bash
 
+# These targets are actions, not files.
 .PHONY: help test strict-test schema-test check install uninstall release-check
 
+# Display the current command and developer task surface.
 help:
 	@echo "JL Mixing Automation v$$(cat VERSION)"
 	@echo
@@ -14,9 +17,11 @@ help:
 	@echo
 	@echo "All eight user commands are implemented. Installers remain Batch 4 placeholders."
 
+# Run dependency-tolerant repository, unit, integration, and schema checks.
 test:
 	@tests/run-tests.sh
 
+# Require all developer dependencies and execute the complete suite.
 strict-test:
 	@PYTHON="$${JL_MIXING_PYTHON:-}"; \
 	if [ -z "$$PYTHON" ] && [ -x .venv/bin/python ]; then PYTHON=.venv/bin/python; fi; \
@@ -26,6 +31,7 @@ strict-test:
 	"$$PYTHON" -c 'import jsonschema' 2>/dev/null || { echo "Missing jsonschema. Run: python3 -m venv .venv && .venv/bin/pip install -r packaging/requirements.txt" >&2; exit 1; }; \
 	JL_MIXING_PYTHON="$$PYTHON" JL_TEST_STRICT=1 tests/run-tests.sh
 
+# Run semantic Draft 2020-12 validation only.
 schema-test:
 	@PYTHON="$${JL_MIXING_PYTHON:-}"; \
 	if [ -z "$$PYTHON" ] && [ -x .venv/bin/python ]; then PYTHON=.venv/bin/python; fi; \
@@ -34,15 +40,19 @@ schema-test:
 	"$$PYTHON" -c 'import jsonschema' 2>/dev/null || { echo "Missing jsonschema. Run: python3 -m venv .venv && .venv/bin/pip install -r packaging/requirements.txt" >&2; exit 1; }; \
 	"$$PYTHON" tools/validate-json.py --strict
 
+# Check dependencies and static shell analysis.
 check:
 	@tools/check-dependencies
 	@tools/shellcheck-all
 
+# Delegate to the installer; implemented in Batch 4.
 install:
 	@./install.sh
 
+# Delegate to the uninstaller; implemented in Batch 4.
 uninstall:
 	@./uninstall.sh
 
+# Run release readiness checks; expanded in Batch 4.
 release-check:
 	@tools/release-check

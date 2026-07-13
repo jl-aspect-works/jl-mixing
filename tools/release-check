@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Batch 3 release-check placeholder.
+# Full archive construction and install/upgrade/uninstall verification belong to Batch 4.
 set -eu
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

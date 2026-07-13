@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Literal token rendering and managed Markdown section replacement.
-
+# Text/JSON template rendering and managed Markdown section replacement.
+#
+# Python is used for literal replacement and escaping so user values cannot
+# corrupt JSON or be interpreted as regular expressions.
 if [ "${JL_MIXING_TEMPLATES_LOADED:-0}" = "1" ]; then
     return 0 2>/dev/null || exit 0
 fi
@@ -12,6 +14,7 @@ JL_TEMPLATES_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/filesystem.sh
 . "$JL_TEMPLATES_LIB_DIR/filesystem.sh"
 
+# Render a text template from TOKEN/VALUE pairs without overwriting output.
 jl_template_render() {
     local template_file output_file temp_file
     template_file="$1"
@@ -40,12 +43,14 @@ output_path = Path(sys.argv[2])
 allow_unresolved = sys.argv[3] == "1"
 values = sys.argv[4:]
 
+# Apply literal replacements; values are never interpreted as regex patterns.
 text = template_path.read_text()
 for index in range(0, len(values), 2):
     token = values[index]
     value = values[index + 1]
     text = text.replace("{{" + token + "}}", value)
 
+# Reject forgotten tokens unless the caller explicitly permits a staged render.
 unresolved = sorted(set(re.findall(r"\{\{[A-Z0-9_]+\}\}", text)))
 if unresolved and not allow_unresolved:
     print("Unresolved template tokens: " + ", ".join(unresolved), file=sys.stderr)
@@ -70,6 +75,7 @@ PY_TEMPLATE
     mv "$temp_file" "$output_file"
 }
 
+# Replace exactly one marked Markdown region while preserving human text.
 jl_markdown_replace_managed_section() {
     local markdown_file begin_marker end_marker replacement_file temp_file
     markdown_file="$1"
@@ -98,6 +104,7 @@ begin = sys.argv[3]
 end = sys.argv[4]
 output_path = Path(sys.argv[5])
 
+# Preserve all content outside the single explicitly managed marker pair.
 text = markdown_path.read_text()
 replacement = replacement_path.read_text().strip("\n")
 
@@ -105,6 +112,7 @@ if text.count(begin) != 1 or text.count(end) != 1:
     print("Managed-section markers must each appear exactly once.", file=sys.stderr)
     raise SystemExit(5)
 
+# Splice only the marker interior, retaining the marker lines themselves.
 start = text.index(begin) + len(begin)
 finish = text.index(end, start)
 new_text = text[:start] + "\n\n" + replacement + "\n\n" + text[finish:]
@@ -122,6 +130,7 @@ PY_MANAGED
 
 # Render a JSON text template while escaping replacement values as JSON string
 # contents. Templates used with this function must place tokens inside quotes.
+# Render JSON-safe token values, parse the result, and write it atomically.
 jl_template_render_json() {
     local template_file output_file temp_file allow_unresolved
     template_file="$1"
@@ -158,6 +167,7 @@ allow_unresolved = sys.argv[3] == "1"
 values = sys.argv[4:]
 text = template_path.read_text()
 
+# JSON-escape string contents before placing values inside quoted tokens.
 for index in range(0, len(values), 2):
     token = values[index]
     value = values[index + 1]

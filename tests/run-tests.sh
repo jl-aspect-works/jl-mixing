@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# Batch 3 test orchestrator.
+#
+# The basic mode always verifies artifacts, syntax, and unit tests. Integration
+# and semantic schema tests run when their dependencies are available; strict
+# mode converts missing dependencies into a failure.
 set -eu
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -6,6 +11,7 @@ cd "$ROOT"
 
 echo "Verifying Batch 3 repository artifacts..."
 
+# Keep this list explicit so missing packaged artifacts fail immediately.
 required='README.md
 VERSION
 Makefile
@@ -18,6 +24,7 @@ docs/ARCHITECTURE_DECISIONS.md
 docs/SCOPE_FREEZE_V1.md
 docs/BATCH_2_IMPLEMENTATION.md
 docs/BATCH_3_IMPLEMENTATION.md
+docs/CODE_DOCUMENTATION_PASS.md
 schemas/studio.schema.json
 schemas/client.schema.json
 schemas/project-manifest.schema.json
@@ -54,6 +61,7 @@ bin/create-delivery
 bin/complete-project
 tools/build-intake-report.py'
 
+# Verify the release-shaped repository contains every required contract and implementation file.
 echo "$required" | while IFS= read -r path; do
     [ -n "$path" ] || continue
     if [ ! -f "$path" ]; then
@@ -64,15 +72,18 @@ done
 
 echo "[OK] Required artifacts"
 
+# Syntax-check every JSON example, schema, and fixture before executing tests.
 python3 - <<'PY'
 import json
 from pathlib import Path
+# Parse syntax only here; Draft 2020-12 semantics are checked later when available.
 for directory in ('schemas', 'examples', 'tests/fixtures'):
     for path in Path(directory).glob('*.json'):
         json.loads(path.read_text())
 print('[OK] JSON syntax')
 PY
 
+# Parse every shell-identified file without executing it.
 for path in install.sh uninstall.sh bin/* lib/*.sh tests/*.sh tests/unit/*.sh tests/integration/*.sh tools/*; do
     [ -f "$path" ] || continue
     first_line="$(sed -n '1p' "$path")"
@@ -85,12 +96,14 @@ done
 
 echo "[OK] Shell syntax"
 
+# Unit tests are dependency-light and always run.
 for test_file in tests/unit/test-*.sh; do
     echo
     echo "Running $test_file"
     "$test_file"
 done
 
+# Prefer an explicit/private interpreter, then the repository venv, then system Python.
 validator_python="${JL_MIXING_PYTHON:-}"
 if [ -z "$validator_python" ] && [ -x "$ROOT/.venv/bin/python" ]; then
     validator_python="$ROOT/.venv/bin/python"
@@ -99,9 +112,11 @@ if [ -z "$validator_python" ]; then
     validator_python="$(command -v python3 || true)"
 fi
 
+# Integration tests require jq plus jsonschema because commands validate every JSON write.
 integration_available=1
 command -v jq >/dev/null 2>&1 || integration_available=0
 [ -n "$validator_python" ] || integration_available=0
+# Run the full command lifecycle only when all runtime validation dependencies exist.
 if [ "$integration_available" -eq 1 ]; then
     "$validator_python" -c 'import jsonschema' >/dev/null 2>&1 || integration_available=0
 fi

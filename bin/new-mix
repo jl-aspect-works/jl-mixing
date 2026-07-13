@@ -1,9 +1,16 @@
 #!/usr/bin/env bash
-# Create a complete project workspace beneath a client.
+# Create a new project beneath a client's Projects/Active directory.
+#
+# The command resolves defaults, snapshots the client profile byte-for-byte,
+# renders project documents, optionally copies source files without modifying
+# them, and validates the completed project manifest before success.
 set -eu
 
+# Resolve the installation root from this launcher. Installed wrappers may
+# override it with JL_MIXING_HOME.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_ROOT="${JL_MIXING_HOME:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+# Load shared services; command files intentionally keep reusable logic in lib/.
 . "$APP_ROOT/lib/common.sh"
 . "$APP_ROOT/lib/config.sh"
 . "$APP_ROOT/lib/context.sh"
@@ -14,6 +21,7 @@ APP_ROOT="${JL_MIXING_HOME:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 . "$APP_ROOT/lib/templates.sh"
 . "$APP_ROOT/lib/validation.sh"
 
+# Print command syntax and supported options, then return to the caller.
 usage() {
     cat <<'USAGE'
 Usage: new-mix --project PROJECT_NAME [options]
@@ -68,6 +76,7 @@ description=""
 source_path=""
 dry_run=0
 
+# Parse options explicitly so unknown or missing arguments fail predictably.
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --client) [ "$#" -ge 2 ] || jl_die "--client requires a value." "$JL_EXIT_ARGUMENTS"; client_ref="$2"; shift 2 ;;
@@ -185,6 +194,7 @@ if [ -n "$daw_template" ]; then
     fi
 fi
 
+# Dry-run reports all resolved choices before any project files are created.
 if [ "$dry_run" -eq 1 ]; then
     printf 'Would create project: %s\n' "$project_name"
     printf 'Client:   %s (%s)\n' "$client_name" "$client_id"
@@ -194,6 +204,7 @@ if [ "$dry_run" -eq 1 ]; then
 fi
 
 cleanup=1
+# Trap handler that removes a partially created workspace or entity after failure.
 cleanup_on_failure() {
     status=$?
     if [ "$status" -ne 0 ] && [ "$cleanup" -eq 1 ]; then
@@ -203,6 +214,7 @@ cleanup_on_failure() {
 }
 trap cleanup_on_failure EXIT HUP INT TERM
 
+# Create the locked Version 1.0 project structure.
 mkdir -p \
     "$project_root/00_Admin" \
     "$project_root/01_Client_Files/Original_Delivery" \
@@ -216,6 +228,7 @@ mkdir -p \
     "$project_root/06_Recall/External_Files" \
     "$project_root/06_Recall/Screenshots"
 
+# Preserve an exact client profile snapshot for historical reproducibility.
 cp -p "$client_file" "$project_root/00_Admin/client-profile-snapshot.json"
 
 created_at="$(jl_now_iso8601)"
@@ -280,6 +293,7 @@ jl_template_render "$APP_ROOT/templates/project/Delivery_Notes.md" "$project_roo
 jl_template_render "$APP_ROOT/templates/project/Recall_Sheet.md" "$project_root/06_Recall/Recall_Sheet.md" \
     PROJECT_NAME "$project_name" CLIENT_NAME "$client_name" LAST_UPDATED "$created_at"
 
+# Optional source import copies content into immutable originals; it never moves input files.
 if [ -n "$source_path" ]; then
     if [ -d "$source_path" ]; then
         jl_fs_copy_directory_contents "$source_path" "$project_root/01_Client_Files/Original_Delivery"
@@ -292,6 +306,7 @@ if [ -n "$resolved_template" ]; then
     cp -Rp "$resolved_template" "$project_root/03_DAW_Project/Project/"
 fi
 
+# The schema-valid manifest commits the otherwise provisional project tree.
 jl_json_validate_schema "$APP_ROOT/schemas/project-manifest.schema.json" "$project_root/00_Admin/project-manifest.json"
 cleanup=0
 trap - EXIT HUP INT TERM

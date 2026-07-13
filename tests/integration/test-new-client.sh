@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 set -eu
+
+# Purpose: Exercise client creation, inherited values, lookup, and duplicate protection.
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 . "$ROOT/tests/integration/integration-helper.sh"
 
+# Arrange: build an isolated temporary fixture.
 tmp="$(new_test_dir)"
 trap 'rm -rf "$tmp"' EXIT
 studio_root="$tmp/studio"
@@ -11,6 +14,7 @@ export JL_MIXING_ROOT="$studio_root"
 
 (cd "$tmp" && "$ROOT/bin/new-client" acme --name "Acme Records" --artist "The Acmes" --non-interactive)
 client_root="$studio_root/Clients/Acme Records"
+# Assert: verify observable behavior rather than internal implementation.
 assert_file_exists "$client_root/client.json"
 assert_dir_exists "$client_root/Projects/Active"
 assert_dir_exists "$client_root/Projects/Completed"
