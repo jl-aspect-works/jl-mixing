@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
 set -eu
+
+# Purpose: Verify business rules not expressible solely through JSON Schema.
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 . "$ROOT/tests/test-helper.sh"
 require_test_command jq
 . "$ROOT/lib/validation.sh"
 
+# Arrange: build an isolated temporary fixture.
 tmp="$(new_test_dir)"
 trap 'rm -rf "$tmp"' EXIT
 
+# Assert: verify observable behavior rather than internal implementation.
 assert_success "valid slug" jl_validate_slug acme-records
 assert_failure "invalid slug" jl_validate_slug 'Acme Records'
 assert_success "valid project name" jl_validate_project_name 'Blue Sky'

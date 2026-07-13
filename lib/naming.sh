@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Consistent identifiers, revision folders, and audio filenames.
-
+# Portable naming helpers for IDs, folders, DAW projects, and deliverables.
+#
+# The routines avoid Bash 4 features and sanitize user-controlled components
+# before they become filesystem names.
 if [ "${JL_MIXING_NAMING_LOADED:-0}" = "1" ]; then
     return 0 2>/dev/null || exit 0
 fi
@@ -10,6 +12,7 @@ JL_NAMING_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/common.sh
 . "$JL_NAMING_LIB_DIR/common.sh"
 
+# Best-effort transliteration to ASCII using iconv when available.
 jl_transliterate_ascii() {
     local value
     value="$1"
@@ -20,6 +23,7 @@ jl_transliterate_ascii() {
     fi
 }
 
+# Convert user text into a lowercase hyphenated stable identifier.
 jl_slugify() {
     local value
     value="$(jl_transliterate_ascii "$1")"
@@ -28,6 +32,7 @@ jl_slugify() {
         sed 's/[^a-z0-9][^a-z0-9]*/-/g;s/^-//;s/-$//'
 }
 
+# Convert a slug into a readable title-cased default name.
 jl_title_from_slug() {
     local slug
     slug="$1"
@@ -39,6 +44,7 @@ jl_title_from_slug() {
     }'
 }
 
+# Remove unsafe filename characters and normalize whitespace.
 jl_sanitize_component() {
     local value
     value="$1"
@@ -47,6 +53,7 @@ jl_sanitize_component() {
         sed 's#[/:*?"<>|]#-#g;s/[[:space:]][[:space:]]*/ /g;s/^[[:space:].-]*//;s/[[:space:].-]*$//'
 }
 
+# Format a zero-padded revision folder name.
 jl_revision_name() {
     local number prefix padding
     number="$1"
@@ -55,6 +62,7 @@ jl_revision_name() {
     printf '%s%0*d\n' "$prefix" "$padding" "$number"
 }
 
+# Build the readable DAW project name from artist and project.
 jl_daw_project_name() {
     local artist project
     artist="$(jl_sanitize_component "$1")"
@@ -62,6 +70,7 @@ jl_daw_project_name() {
     printf '%s - %s\n' "$artist" "$project"
 }
 
+# Build a deliverable filename stem from artist, project, and label.
 jl_deliverable_name() {
     local artist project deliverable extension
     artist="$(jl_sanitize_component "$1")"
@@ -72,6 +81,7 @@ jl_deliverable_name() {
     printf '%s - %s - %s.%s\n' "$artist" "$project" "$deliverable" "$extension"
 }
 
+# Prefix a deliverable name so working prints are excluded from delivery.
 jl_working_print_name() {
     local prefix artist project label extension
     prefix="$1"
@@ -82,6 +92,7 @@ jl_working_print_name() {
     printf '%s%s\n' "$prefix" "$(jl_deliverable_name "$artist" "$project" "$label" "$extension")"
 }
 
+# Replace supported naming tokens in a configured pattern.
 jl_expand_naming_pattern() {
     local pattern artist project deliverable result
     pattern="$1"

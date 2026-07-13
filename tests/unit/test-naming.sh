@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 set -eu
+
+# Purpose: Verify stable slugs and filesystem-safe naming conventions.
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 . "$ROOT/tests/test-helper.sh"
 . "$ROOT/lib/naming.sh"
 
+# Assert: verify observable behavior rather than internal implementation.
 assert_eq "acme-records" "$(jl_slugify 'Acme Records')" "slugify name"
 assert_eq "Acme Records" "$(jl_title_from_slug acme-records)" "title from slug"
 assert_eq "Bad-Name" "$(jl_sanitize_component ' Bad/Name ')" "sanitize filename component"

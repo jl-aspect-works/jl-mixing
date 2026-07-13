@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
 set -eu
+
+# Purpose: Verify safe creation, exact copy, atomic write, move, and immutability guards.
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 . "$ROOT/tests/test-helper.sh"
 . "$ROOT/lib/filesystem.sh"
 
+# Arrange: build an isolated temporary fixture.
 tmp="$(new_test_dir)"
 trap 'rm -rf "$tmp"' EXIT
 
 jl_fs_ensure_directory "$tmp/a/b"
+# Assert: verify observable behavior rather than internal implementation.
 assert_dir_exists "$tmp/a/b"
 printf 'original' > "$tmp/source.txt"
 jl_fs_copy_file_exact "$tmp/source.txt" "$tmp/copy.txt"

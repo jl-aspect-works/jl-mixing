@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
+# Report required and optional developer/runtime dependencies.
+# This tool is diagnostic only; it never installs or modifies the system.
 set -eu
 
+# Accumulate missing required dependencies so every problem is reported in one run.
 status=0
 for command_name in bash python3 jq; do
     if command -v "$command_name" >/dev/null 2>&1; then

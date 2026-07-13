@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Revision numbering and manifest state transitions.
-
+# Revision numbering and project-manifest state transitions.
+#
+# Approval guarantees at most one approved revision by converting any previous
+# approval to superseded in the same atomic JSON transformation.
 if [ "${JL_MIXING_REVISION_LOADED:-0}" = "1" ]; then
     return 0 2>/dev/null || exit 0
 fi
@@ -16,6 +18,7 @@ JL_REVISION_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/naming.sh
 . "$JL_REVISION_LIB_DIR/naming.sh"
 
+# Return one greater than the largest recorded revision number.
 jl_revision_next_number() {
     local manifest
     manifest="$1"
@@ -23,6 +26,7 @@ jl_revision_next_number() {
     jq -r '([.revisions[].number] | max // 0) + 1' "$manifest"
 }
 
+# Build one schema-compatible revision record as JSON.
 jl_revision_create_record() {
     local number description revision_id timestamp prefix padding folder
     number="$1"
@@ -50,14 +54,17 @@ jl_revision_create_record() {
         }'
 }
 
+# Append a revision record and update current_revision atomically.
 jl_revision_append() {
-    local manifest description number timestamp revision_id record
+    local manifest description number timestamp revision_id prefix padding record
     manifest="$1"
     description="$2"
-    number="${3:-$(jl_revision_next_number "$manifest")}"
+    number="${3:-$(jl_revision_next_number "$manifest")}" 
     timestamp="${4:-$(jl_now_iso8601)}"
     revision_id="${5:-$(jl_uuid)}"
-    record="$(jl_revision_create_record "$number" "$description" "$revision_id" "$timestamp")" || return $?
+    prefix="${6:-Revision_}"
+    padding="${7:-2}"
+    record="$(jl_revision_create_record "$number" "$description" "$revision_id" "$timestamp" "$prefix" "$padding")" || return $?
 
     jl_json_update "$manifest" \
         '.revisions += [$revision] |
@@ -68,6 +75,7 @@ jl_revision_append() {
         --arg timestamp "$timestamp"
 }
 
+# Approve one revision and supersede any previously approved revision atomically.
 jl_revision_approve() {
     local manifest number approved_by timestamp exists
     manifest="$1"
@@ -97,6 +105,7 @@ jl_revision_approve() {
         --arg approved_by "$approved_by"
 }
 
+# Read the status of a numbered revision.
 jl_revision_status() {
     local manifest number
     manifest="$1"
@@ -104,6 +113,7 @@ jl_revision_status() {
     jq -er --argjson number "$number" '.revisions[] | select(.number == $number) | .status' "$manifest"
 }
 
+# Read the current revision number from project state.
 jl_revision_current() {
     local manifest
     manifest="$1"

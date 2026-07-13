@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Cross-platform helpers for macOS and Linux.
-
+# macOS/Linux portability helpers.
+#
+# BSD and GNU implementations differ for realpath, stat, checksum, and open.
+# This module hides those differences from the rest of the application.
 if [ "${JL_MIXING_PLATFORM_LOADED:-0}" = "1" ]; then
     return 0 2>/dev/null || exit 0
 fi
@@ -10,6 +12,7 @@ JL_PLATFORM_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/common.sh
 . "$JL_PLATFORM_LIB_DIR/common.sh"
 
+# Normalize uname output to the supported macos or linux identifier.
 jl_platform_name() {
     case "$(uname -s)" in
         Darwin) printf '%s\n' macos ;;
@@ -18,6 +21,7 @@ jl_platform_name() {
     esac
 }
 
+# Reject unsupported operating systems early.
 jl_platform_require_supported() {
     local platform
     platform="$(jl_platform_name)"
@@ -27,16 +31,18 @@ jl_platform_require_supported() {
     fi
 }
 
+# Expand a literal ~ or ~/ prefix without relying on eval.
 jl_expand_home_path() {
     local path
     path="$1"
     case "$path" in
-        \~) printf '%s\n' "$HOME" ;;
-        \~/*) printf '%s/%s\n' "$HOME" "${path#~/}" ;;
+        '~') printf '%s\n' "$HOME" ;;
+        \~/*) printf '%s/%s\n' "$HOME" "${path#\~/}" ;;
         *) printf '%s\n' "$path" ;;
     esac
 }
 
+# Resolve an existing path canonically, with a Python fallback for portability.
 jl_realpath() {
     local path directory base
     path="$(jl_expand_home_path "$1")"
@@ -56,12 +62,14 @@ jl_realpath() {
 
     jl_require_command python3 "Python 3 is required for portable path handling." || return $?
     python3 - "$path" <<'PY_REALPATH'
+# Python supplies realpath behavior on platforms lacking a suitable utility.
 import os
 import sys
 print(os.path.realpath(sys.argv[1]))
 PY_REALPATH
 }
 
+# Build an absolute path even when the final component does not exist.
 jl_abspath_allow_missing() {
     local path absolute directory base
     path="$(jl_expand_home_path "$1")"
@@ -80,12 +88,14 @@ jl_abspath_allow_missing() {
 
     jl_require_command python3 "Python 3 is required for portable path handling." || return $?
     python3 - "$absolute" <<'PY_ABSPATH'
+# abspath normalizes dot segments without requiring the final path to exist.
 import os
 import sys
 print(os.path.abspath(sys.argv[1]))
 PY_ABSPATH
 }
 
+# Return file size using the platform-appropriate stat syntax.
 jl_stat_size() {
     local path
     path="$1"
@@ -96,6 +106,7 @@ jl_stat_size() {
     fi
 }
 
+# Return numeric permission bits using BSD or GNU stat.
 jl_stat_mode() {
     local path
     path="$1"
@@ -106,6 +117,7 @@ jl_stat_mode() {
     fi
 }
 
+# Calculate a SHA-256 digest using the available platform utility.
 jl_sha256() {
     local path
     path="$1"
@@ -119,6 +131,7 @@ jl_sha256() {
     fi
 }
 
+# Create a temporary file beside a target so final rename remains atomic.
 jl_mktemp_file_near() {
     local target directory base
     target="$1"
@@ -128,12 +141,14 @@ jl_mktemp_file_near() {
     mktemp "$directory/.${base}.tmp.XXXXXX"
 }
 
+# Create a portable temporary directory for isolated work.
 jl_mktemp_dir() {
     local prefix
     prefix="${1:-jl-mixing}"
     mktemp -d "${TMPDIR:-/tmp}/${prefix}.XXXXXX"
 }
 
+# Open a path in the platform file manager when supported.
 jl_open_path() {
     local path
     path="$1"

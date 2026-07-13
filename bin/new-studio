@@ -1,15 +1,147 @@
 #!/usr/bin/env bash
+# Create a new JL Mixing Automation studio workspace.
+#
+# The command creates only the configured DAW resources and studio metadata.
+# It refuses to reuse an existing root so no user workspace can be overwritten.
 set -eu
 
-if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
-    cat <<'EOF'
+# Resolve the installation root from this launcher. Installed wrappers may
+# override it with JL_MIXING_HOME.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+APP_ROOT="${JL_MIXING_HOME:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+# shellcheck source=lib/common.sh
+# Load shared services; command files intentionally keep reusable logic in lib/.
+. "$APP_ROOT/lib/common.sh"
+# shellcheck source=lib/platform.sh
+. "$APP_ROOT/lib/platform.sh"
+# shellcheck source=lib/filesystem.sh
+. "$APP_ROOT/lib/filesystem.sh"
+# shellcheck source=lib/json.sh
+. "$APP_ROOT/lib/json.sh"
+# shellcheck source=lib/metadata.sh
+. "$APP_ROOT/lib/metadata.sh"
+# shellcheck source=lib/templates.sh
+. "$APP_ROOT/lib/templates.sh"
+# shellcheck source=lib/validation.sh
+. "$APP_ROOT/lib/validation.sh"
+
+# Print command syntax and supported options, then return to the caller.
+usage() {
+    cat <<'USAGE'
 Usage: new-studio [options]
 
-This command is specified in docs/SCRIPT_REFERENCE.md but is not implemented
-until Batch 3.
-EOF
+Options:
+  --root PATH          Workspace root (default: ~/Music/JL Mixing)
+  --name NAME          Studio name (default: Mixing Studio)
+  --daw NAME           Default DAW (default: Logic Pro)
+  --engineer NAME      Default mix engineer
+  --sample-rate HZ     Default sample rate (default: 48000)
+  --bit-depth BITS     Default bit depth (default: 24)
+  --file-format FORMAT WAV or AIFF (default: WAV)
+  --non-interactive    Accept supplied values and defaults without prompting
+  --dry-run            Print the planned workspace without creating it
+  -h, --help           Show this help
+USAGE
+}
+
+root="${JL_MIXING_ROOT:-$HOME/Music/JL Mixing}"
+studio_name="Mixing Studio"
+default_daw="Logic Pro"
+default_engineer=""
+sample_rate=48000
+bit_depth=24
+file_format="WAV"
+dry_run=0
+
+# Parse options explicitly so unknown or missing arguments fail predictably.
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --root) [ "$#" -ge 2 ] || jl_die "--root requires a value." "$JL_EXIT_ARGUMENTS"; root="$2"; shift 2 ;;
+        --name) [ "$#" -ge 2 ] || jl_die "--name requires a value." "$JL_EXIT_ARGUMENTS"; studio_name="$2"; shift 2 ;;
+        --daw) [ "$#" -ge 2 ] || jl_die "--daw requires a value." "$JL_EXIT_ARGUMENTS"; default_daw="$2"; shift 2 ;;
+        --engineer) [ "$#" -ge 2 ] || jl_die "--engineer requires a value." "$JL_EXIT_ARGUMENTS"; default_engineer="$2"; shift 2 ;;
+        --sample-rate) [ "$#" -ge 2 ] || jl_die "--sample-rate requires a value." "$JL_EXIT_ARGUMENTS"; sample_rate="$2"; shift 2 ;;
+        --bit-depth) [ "$#" -ge 2 ] || jl_die "--bit-depth requires a value." "$JL_EXIT_ARGUMENTS"; bit_depth="$2"; shift 2 ;;
+        --file-format) [ "$#" -ge 2 ] || jl_die "--file-format requires a value." "$JL_EXIT_ARGUMENTS"; file_format="$2"; shift 2 ;;
+        --non-interactive) shift ;;
+        --dry-run) dry_run=1; shift ;;
+        -h|--help) usage; exit 0 ;;
+        *) jl_die "Unknown option: $1" "$JL_EXIT_ARGUMENTS"; exit $? ;;
+    esac
+done
+
+# Validate user-facing settings before creating any directories.
+jl_assert_nonempty "$studio_name" "studio name" || exit $?
+jl_assert_nonempty "$default_daw" "default DAW" || exit $?
+jl_validate_sample_rate "$sample_rate" || { jl_error "Unsupported sample rate: $sample_rate"; exit "$JL_EXIT_VALIDATION"; }
+jl_validate_bit_depth "$bit_depth" || { jl_error "Unsupported bit depth: $bit_depth"; exit "$JL_EXIT_VALIDATION"; }
+file_format="$(printf '%s' "$file_format" | tr '[:lower:]' '[:upper:]')"
+jl_validate_file_format "$file_format" || { jl_error "Unsupported file format: $file_format"; exit "$JL_EXIT_VALIDATION"; }
+
+# Canonicalize the destination and enforce the no-overwrite invariant.
+root="$(jl_abspath_allow_missing "$root")" || exit $?
+if [ -e "$root" ]; then
+    jl_error "Refusing to overwrite an existing workspace path: $root"
+    exit "$JL_EXIT_UNSAFE"
+fi
+
+# Dry-run exits before the transactional creation block.
+if [ "$dry_run" -eq 1 ]; then
+    cat <<EOF_PLAN
+Would create JL Mixing studio workspace:
+  Root:       $root
+  Studio:     $studio_name
+  Default DAW:$default_daw
+  Engineer:   ${default_engineer:-<not set>}
+  Audio:      $sample_rate Hz / $bit_depth-bit / $file_format
+EOF_PLAN
     exit 0
 fi
 
-echo "new-studio is not implemented until Batch 3." >&2
-exit 2
+cleanup=1
+# Trap handler that removes a partially created workspace or entity after failure.
+cleanup_on_failure() {
+    status=$?
+    if [ "$status" -ne 0 ] && [ "$cleanup" -eq 1 ]; then
+        rm -rf "$root"
+    fi
+    exit "$status"
+}
+trap cleanup_on_failure EXIT HUP INT TERM
+
+# Create only the minimal Version 1.0 workspace and configured DAW resources.
+mkdir -p \
+    "$root/Clients" \
+    "$root/DAWs/$default_daw/Mix Templates" \
+    "$root/DAWs/$default_daw/Presets" \
+    "$root/Studio"
+
+# Render studio.json, then set typed numeric/audio fields with jq.
+created_at="$(jl_now_iso8601)"
+document_id="$(jl_uuid)"
+JL_TEMPLATE_ALLOW_UNRESOLVED=1 jl_template_render_json \
+    "$APP_ROOT/templates/studio/studio.json.template" \
+    "$root/Studio/studio.json" \
+    DOCUMENT_ID "$document_id" \
+    SOFTWARE_VERSION "$(jl_software_version)" \
+    CREATED_AT "$created_at" \
+    STUDIO_NAME "$studio_name" \
+    WORKSPACE_ROOT "$root" \
+    DEFAULT_DAW "$default_daw" \
+    DEFAULT_MIX_ENGINEER "$default_engineer"
+
+jl_json_update "$root/Studio/studio.json" \
+    '.audio_defaults.sample_rate = $sample_rate |
+     .audio_defaults.bit_depth = $bit_depth |
+     .audio_defaults.file_format = $file_format' \
+    --argjson sample_rate "$sample_rate" \
+    --argjson bit_depth "$bit_depth" \
+    --arg file_format "$file_format"
+
+# Validate before releasing the rollback trap and reporting success.
+jl_json_validate_schema "$APP_ROOT/schemas/studio.schema.json" "$root/Studio/studio.json"
+cleanup=0
+trap - EXIT HUP INT TERM
+
+printf 'Created studio workspace: %s\n' "$root"
+printf 'Next: new-client <client-id>\n'

@@ -1,15 +1,190 @@
 #!/usr/bin/env bash
+# Create a client profile and the minimal Active/Completed project structure.
+#
+# Defaults are inherited from studio.json, while explicit command-line values
+# take precedence. Creation is transactional so partial clients are removed.
 set -eu
 
-if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
-    cat <<'EOF'
+# Resolve the installation root from this launcher. Installed wrappers may
+# override it with JL_MIXING_HOME.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+APP_ROOT="${JL_MIXING_HOME:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+# Load shared services; command files intentionally keep reusable logic in lib/.
+. "$APP_ROOT/lib/common.sh"
+. "$APP_ROOT/lib/config.sh"
+. "$APP_ROOT/lib/context.sh"
+. "$APP_ROOT/lib/filesystem.sh"
+. "$APP_ROOT/lib/json.sh"
+. "$APP_ROOT/lib/metadata.sh"
+. "$APP_ROOT/lib/naming.sh"
+. "$APP_ROOT/lib/templates.sh"
+. "$APP_ROOT/lib/validation.sh"
+
+# Print command syntax and supported options, then return to the caller.
+usage() {
+    cat <<'USAGE'
 Usage: new-client CLIENT_ID [options]
 
-This command is specified in docs/SCRIPT_REFERENCE.md but is not implemented
-until Batch 3.
-EOF
+Options:
+  --name NAME             Display name (default: title-cased client ID)
+  --artist NAME           Default artist or program name
+  --sample-rate HZ        Client sample-rate default
+  --bit-depth BITS        Client bit-depth default
+  --file-format FORMAT    WAV or AIFF
+  --revision-limit COUNT  Included revision count
+  --delivery-method TEXT  Default delivery method
+  --deliverables LIST     Comma-separated deliverable types
+  --non-interactive       Accept supplied values and defaults
+  --dry-run               Print the planned client without creating it
+  -h, --help              Show this help
+USAGE
+}
+
+client_id=""
+client_name=""
+artist_name=""
+sample_rate=""
+bit_depth=""
+file_format=""
+revision_limit=""
+delivery_method=""
+deliverables_csv=""
+dry_run=0
+
+if [ "$#" -gt 0 ]; then
+    case "$1" in
+        -* ) ;;
+        * ) client_id="$1"; shift ;;
+    esac
+fi
+
+# Parse options explicitly so unknown or missing arguments fail predictably.
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --name) [ "$#" -ge 2 ] || jl_die "--name requires a value." "$JL_EXIT_ARGUMENTS"; client_name="$2"; shift 2 ;;
+        --artist) [ "$#" -ge 2 ] || jl_die "--artist requires a value." "$JL_EXIT_ARGUMENTS"; artist_name="$2"; shift 2 ;;
+        --sample-rate) [ "$#" -ge 2 ] || jl_die "--sample-rate requires a value." "$JL_EXIT_ARGUMENTS"; sample_rate="$2"; shift 2 ;;
+        --bit-depth) [ "$#" -ge 2 ] || jl_die "--bit-depth requires a value." "$JL_EXIT_ARGUMENTS"; bit_depth="$2"; shift 2 ;;
+        --file-format) [ "$#" -ge 2 ] || jl_die "--file-format requires a value." "$JL_EXIT_ARGUMENTS"; file_format="$2"; shift 2 ;;
+        --revision-limit) [ "$#" -ge 2 ] || jl_die "--revision-limit requires a value." "$JL_EXIT_ARGUMENTS"; revision_limit="$2"; shift 2 ;;
+        --delivery-method) [ "$#" -ge 2 ] || jl_die "--delivery-method requires a value." "$JL_EXIT_ARGUMENTS"; delivery_method="$2"; shift 2 ;;
+        --deliverables) [ "$#" -ge 2 ] || jl_die "--deliverables requires a value." "$JL_EXIT_ARGUMENTS"; deliverables_csv="$2"; shift 2 ;;
+        --non-interactive) shift ;;
+        --dry-run) dry_run=1; shift ;;
+        -h|--help) usage; exit 0 ;;
+        *) jl_die "Unknown option: $1" "$JL_EXIT_ARGUMENTS"; exit $? ;;
+    esac
+done
+
+jl_assert_nonempty "$client_id" "client ID" || exit $?
+jl_validate_slug "$client_id" || { jl_error "Client ID must be a lowercase slug: $client_id"; exit "$JL_EXIT_VALIDATION"; }
+
+# Resolve and validate the studio before deriving client defaults.
+studio_root="$(jl_context_studio_root "$PWD")" || {
+    jl_error "Studio workspace not found. Run new-studio first or set JL_MIXING_ROOT."
+    exit "$JL_EXIT_CONTEXT"
+}
+studio_file="$studio_root/Studio/studio.json"
+
+[ -n "$client_name" ] || client_name="$(jl_title_from_slug "$client_id")"
+client_folder_name="$(jl_sanitize_component "$client_name")"
+jl_assert_nonempty "$client_folder_name" "client folder name" || exit $?
+
+sample_rate="${sample_rate:-$(jl_json_get "$studio_file" '.audio_defaults.sample_rate')}"
+bit_depth="${bit_depth:-$(jl_json_get "$studio_file" '.audio_defaults.bit_depth')}"
+file_format="${file_format:-$(jl_json_get "$studio_file" '.audio_defaults.file_format')}"
+revision_limit="${revision_limit:-2}"
+delivery_method="${delivery_method:-$(jl_json_get "$studio_file" '.delivery_defaults.method')}"
+
+jl_validate_sample_rate "$sample_rate" || { jl_error "Unsupported sample rate: $sample_rate"; exit "$JL_EXIT_VALIDATION"; }
+jl_validate_bit_depth "$bit_depth" || { jl_error "Unsupported bit depth: $bit_depth"; exit "$JL_EXIT_VALIDATION"; }
+file_format="$(printf '%s' "$file_format" | tr '[:lower:]' '[:upper:]')"
+jl_validate_file_format "$file_format" || { jl_error "Unsupported file format: $file_format"; exit "$JL_EXIT_VALIDATION"; }
+case "$revision_limit" in ''|*[!0-9]*) jl_error "Revision limit must be a nonnegative integer."; exit "$JL_EXIT_VALIDATION" ;; esac
+
+if [ -n "$deliverables_csv" ]; then
+    deliverables_json="$(jl_json_array_from_csv "$deliverables_csv")"
+else
+    deliverables_json="$(jl_json_get_json "$studio_file" '.delivery_defaults.deliverables')"
+fi
+
+while IFS= read -r deliverable; do
+    jl_validate_enum "$deliverable" main_mix instrumental acapella tv_mix performance_mix stems master || {
+        jl_error "Unsupported deliverable type: $deliverable"
+        exit "$JL_EXIT_VALIDATION"
+    }
+done < <(printf '%s' "$deliverables_json" | jq -r '.[]')
+
+# Refuse duplicate stable IDs even when the requested display name differs.
+duplicate_client=0
+while IFS= read -r existing_file; do
+    if [ "$(jl_json_get_optional "$existing_file" '.client_id' '')" = "$client_id" ]; then
+        duplicate_client=1
+        break
+    fi
+done < <(find "$studio_root/Clients" -mindepth 2 -maxdepth 2 -name client.json -type f -print 2>/dev/null)
+if [ "$duplicate_client" -eq 1 ]; then
+    jl_error "A client with ID '$client_id' already exists."
+    exit "$JL_EXIT_UNSAFE"
+fi
+
+client_root="$studio_root/Clients/$client_folder_name"
+if [ -e "$client_root" ]; then
+    jl_error "Refusing to overwrite existing client path: $client_root"
+    exit "$JL_EXIT_UNSAFE"
+fi
+
+# Dry-run reports the resolved client without touching the workspace.
+if [ "$dry_run" -eq 1 ]; then
+    printf 'Would create client: %s (%s)\n' "$client_name" "$client_id"
+    printf 'Location: %s\n' "$client_root"
     exit 0
 fi
 
-echo "new-client is not implemented until Batch 3." >&2
-exit 2
+cleanup=1
+# Trap handler that removes a partially created workspace or entity after failure.
+cleanup_on_failure() {
+    status=$?
+    if [ "$status" -ne 0 ] && [ "$cleanup" -eq 1 ]; then
+        rm -rf "$client_root"
+    fi
+    exit "$status"
+}
+trap cleanup_on_failure EXIT HUP INT TERM
+
+# Create the minimal client folder structure before rendering client.json.
+mkdir -p "$client_root/Projects/Active" "$client_root/Projects/Completed"
+created_at="$(jl_now_iso8601)"
+document_id="$(jl_uuid)"
+jl_template_render_json \
+    "$APP_ROOT/templates/client/client.json.template" \
+    "$client_root/client.json" \
+    DOCUMENT_ID "$document_id" \
+    SOFTWARE_VERSION "$(jl_software_version)" \
+    CREATED_AT "$created_at" \
+    CLIENT_ID "$client_id" \
+    CLIENT_NAME "$client_name"
+
+jl_json_update "$client_root/client.json" \
+    '.artist_name = $artist |
+     .audio_defaults.sample_rate = $sample_rate |
+     .audio_defaults.bit_depth = $bit_depth |
+     .audio_defaults.file_format = $file_format |
+     .delivery_defaults.method = $delivery_method |
+     .delivery_defaults.deliverables = $deliverables |
+     .revision_defaults.included_revisions = $revision_limit' \
+    --arg artist "$artist_name" \
+    --argjson sample_rate "$sample_rate" \
+    --argjson bit_depth "$bit_depth" \
+    --arg file_format "$file_format" \
+    --arg delivery_method "$delivery_method" \
+    --argjson deliverables "$deliverables_json" \
+    --argjson revision_limit "$revision_limit"
+
+# Schema validation is the commit point for client creation.
+jl_json_validate_schema "$APP_ROOT/schemas/client.schema.json" "$client_root/client.json"
+cleanup=0
+trap - EXIT HUP INT TERM
+
+printf 'Created client: %s\n' "$client_root"
+printf 'Next: cd %s && new-mix --project "Project Name"\n' "$client_root"

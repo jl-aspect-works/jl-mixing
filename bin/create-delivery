@@ -1,15 +1,383 @@
 #!/usr/bin/env bash
+# Assemble approved revision prints into the final delivery package.
+#
+# This command deliberately separates package preparation from recording that
+# the package was sent. It filters working prints, classifies deliverables,
+# writes a schema-valid manifest, and can optionally add checksums or a ZIP.
 set -eu
 
-if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
-    cat <<'EOF'
+# Resolve the installation root from this launcher. Installed wrappers may
+# override it with JL_MIXING_HOME.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+APP_ROOT="${JL_MIXING_HOME:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+# Load shared services; command files intentionally keep reusable logic in lib/.
+. "$APP_ROOT/lib/common.sh"
+. "$APP_ROOT/lib/context.sh"
+. "$APP_ROOT/lib/json.sh"
+. "$APP_ROOT/lib/metadata.sh"
+. "$APP_ROOT/lib/naming.sh"
+. "$APP_ROOT/lib/platform.sh"
+. "$APP_ROOT/lib/revision.sh"
+. "$APP_ROOT/lib/validation.sh"
+
+# Print command syntax and supported options, then return to the caller.
+usage() {
+    cat <<'USAGE'
 Usage: create-delivery [options]
 
-This command is specified in docs/SCRIPT_REFERENCE.md but is not implemented
-until Batch 3.
-EOF
+Options:
+  --project PATH          Explicit project path
+  --revision NUMBER       Approved revision (default: project approval)
+  --include LIST          Comma-separated filename glob patterns
+  --exclude LIST          Comma-separated filename glob patterns
+  --working-prefix TEXT   Working-print prefix to ignore
+  --overwrite             Replace conflicting generated deliverables
+  --clean                 Remove paths from the prior delivery manifest first
+  --zip                   Create a ZIP archive inside 05_Final_Delivery
+  --checksum              Add SHA-256 checksums for regular files
+  --mark-delivered        Record that the prepared package was sent
+  --non-interactive       Accept defaults without prompting
+  --dry-run               Print the plan without modifying files
+  -h, --help              Show this help
+USAGE
+}
+
+project_ref=""
+revision_number=""
+include_csv=""
+exclude_csv=""
+working_prefix=""
+overwrite=0
+clean=0
+make_zip=0
+checksum=0
+mark_delivered=0
+dry_run=0
+
+# Parse options explicitly so unknown or missing arguments fail predictably.
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --project) [ "$#" -ge 2 ] || jl_die "--project requires a value." "$JL_EXIT_ARGUMENTS"; project_ref="$2"; shift 2 ;;
+        --revision) [ "$#" -ge 2 ] || jl_die "--revision requires a value." "$JL_EXIT_ARGUMENTS"; revision_number="$2"; shift 2 ;;
+        --include) [ "$#" -ge 2 ] || jl_die "--include requires a value." "$JL_EXIT_ARGUMENTS"; include_csv="$2"; shift 2 ;;
+        --exclude) [ "$#" -ge 2 ] || jl_die "--exclude requires a value." "$JL_EXIT_ARGUMENTS"; exclude_csv="$2"; shift 2 ;;
+        --working-prefix) [ "$#" -ge 2 ] || jl_die "--working-prefix requires a value." "$JL_EXIT_ARGUMENTS"; working_prefix="$2"; shift 2 ;;
+        --overwrite) overwrite=1; shift ;;
+        --clean) clean=1; shift ;;
+        --zip) make_zip=1; shift ;;
+        --checksum) checksum=1; shift ;;
+        --mark-delivered) mark_delivered=1; shift ;;
+        --non-interactive) shift ;;
+        --dry-run) dry_run=1; shift ;;
+        -h|--help) usage; exit 0 ;;
+        *) jl_die "Unknown option: $1" "$JL_EXIT_ARGUMENTS"; exit $? ;;
+    esac
+done
+
+# Return success when a filename matches at least one comma-separated shell glob.
+# Pattern lists are comma-separated shell globs; matching is performed without eval.
+matches_patterns() {
+    local name remaining pattern
+    name="$1"
+    remaining="$2"
+    [ -n "$remaining" ] || return 1
+
+    while :; do
+        case "$remaining" in
+            *,*)
+                pattern="${remaining%%,*}"
+                remaining="${remaining#*,}"
+                ;;
+            *)
+                pattern="$remaining"
+                remaining=""
+                ;;
+        esac
+        pattern="$(jl_trim "$pattern")"
+        if [ -n "$pattern" ]; then
+            # The unquoted expansion is intentional: the value is a user-supplied
+            # shell glob pattern matched against one filename.
+            # shellcheck disable=SC2254
+            case "$name" in
+                $pattern) return 0 ;;
+            esac
+        fi
+        [ -n "$remaining" ] || break
+    done
+    return 1
+}
+
+# Infer the manifest deliverable_type from a normalized filename.
+# Classification uses normalized filename keywords and falls back to other.
+classify_deliverable() {
+    local lowercase
+    lowercase="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+    case "$lowercase" in
+        *instrumental*) printf '%s\n' instrumental ;;
+        *acapella*|*a-cappella*|*a_cappella*) printf '%s\n' acapella ;;
+        *tv*mix*) printf '%s\n' tv_mix ;;
+        *performance*) printf '%s\n' performance_mix ;;
+        *master*) printf '%s\n' master ;;
+        *stem*) printf '%s\n' stems ;;
+        *) printf '%s\n' main_mix ;;
+    esac
+}
+
+# Resolve the approved revision and package paths before copying any material.
+project_root="$(jl_context_resolve_project "$project_ref" "$PWD")" || exit $?
+manifest="$project_root/00_Admin/project-manifest.json"
+delivery_root="$project_root/05_Final_Delivery"
+delivery_manifest="$delivery_root/delivery-manifest.json"
+
+[ "$(jl_json_get "$manifest" '.state.status')" = active ] || {
+    jl_error "Cannot create a delivery for a completed project."
+    exit "$JL_EXIT_VALIDATION"
+}
+[ "$(jl_json_get "$manifest" '.state.approved')" = true ] || {
+    jl_error "A revision must be approved before delivery can be created."
+    exit "$JL_EXIT_VALIDATION"
+}
+
+[ -n "$revision_number" ] || revision_number="$(jl_json_get "$manifest" '.state.approved_revision')"
+case "$revision_number" in ''|*[!0-9]*|0) jl_error "Approved revision number is invalid."; exit "$JL_EXIT_VALIDATION" ;; esac
+[ "$(jl_revision_status "$manifest" "$revision_number")" = approved ] || {
+    jl_error "Revision $revision_number is not the approved revision."
+    exit "$JL_EXIT_VALIDATION"
+}
+revision_folder="$(jq -er --argjson number "$revision_number" '.revisions[] | select(.number == $number) | .folder' "$manifest")"
+prints_root="$project_root/$revision_folder/Prints"
+[ -d "$prints_root" ] || { jl_error "Approved revision Prints folder is missing: $prints_root"; exit "$JL_EXIT_VALIDATION"; }
+
+studio_root="$(jl_context_studio_root "$project_root")" || exit $?
+studio_file="$studio_root/Studio/studio.json"
+[ -n "$working_prefix" ] || working_prefix="$(jl_json_get_optional "$studio_file" '.naming.working_print_prefix' 'WORK ')"
+
+# A second-stage --mark-delivered call records delivery without rebuilding.
+mark_only=0
+if [ "$mark_delivered" -eq 1 ] && [ -f "$delivery_manifest" ] && \
+   [ -z "$include_csv" ] && [ -z "$exclude_csv" ] && \
+   [ "$overwrite" -eq 0 ] && [ "$clean" -eq 0 ] && \
+   [ "$make_zip" -eq 0 ] && [ "$checksum" -eq 0 ] ; then
+    mark_only=1
+fi
+
+# Dry-run exits before cleanup, copy, manifest, checksum, or ZIP operations.
+if [ "$dry_run" -eq 1 ]; then
+    if [ "$mark_only" -eq 1 ]; then
+        printf 'Would mark existing delivery as delivered: %s\n' "$delivery_manifest"
+    else
+        printf 'Would assemble revision %s from %s into %s\n' "$revision_number" "$prints_root" "$delivery_root"
+        [ "$mark_delivered" -eq 1 ] && printf 'Would also mark the package delivered.\n'
+    fi
     exit 0
 fi
 
-echo "create-delivery is not implemented until Batch 3." >&2
-exit 2
+mkdir -p "$delivery_root/Stems"
+
+if [ "$mark_only" -eq 0 ]; then
+    if [ -f "$delivery_manifest" ] && [ "$overwrite" -eq 0 ] && [ "$clean" -eq 0 ]; then
+        jl_error "A delivery manifest already exists. Use --overwrite, --clean, or --mark-delivered."
+        exit "$JL_EXIT_UNSAFE"
+    fi
+
+    # Clean only paths recorded by the prior manifest; never sweep arbitrary user files.
+    if [ "$clean" -eq 1 ] && [ -f "$delivery_manifest" ]; then
+        jq -r '.files[].path' "$delivery_manifest" |
+        while IFS= read -r old_path; do
+            case "$old_path" in
+                ''|/*|*'..'*) jl_error "Unsafe path in existing delivery manifest: $old_path"; exit "$JL_EXIT_UNSAFE" ;;
+            esac
+            # Require both path components before recursive deletion. This protects
+            # against an accidental empty expansion reaching the filesystem root.
+            rm -rf -- "${delivery_root:?}/${old_path:?}"
+        done
+        rm -f "$delivery_manifest"
+        mkdir -p "$delivery_root/Stems"
+    fi
+
+    files_json='[]'
+    copied_count=0
+    copied_paths="$(jl_mktemp_file_near "$delivery_root/.copied-paths")"
+    : > "$copied_paths"
+    cleanup=1
+    cleanup_on_failure() {
+        exit_status=$?
+        if [ "$exit_status" -ne 0 ] && [ "$cleanup" -eq 1 ]; then
+            while IFS= read -r copied_path; do
+                if [ -n "$copied_path" ]; then
+                    # Roll back only an item copied during this invocation.
+                    rm -rf -- "${delivery_root:?}/${copied_path:?}"
+                fi
+            done < "$copied_paths"
+            rm -f "$delivery_manifest"
+        fi
+        rm -f "$copied_paths"
+        exit "$exit_status"
+    }
+    trap cleanup_on_failure EXIT HUP INT TERM
+
+    for source_item in "$prints_root"/*; do
+        [ -e "$source_item" ] || continue
+        item_name="$(basename "$source_item")"
+
+        case "$item_name" in
+            "$working_prefix"*) continue ;;
+        esac
+        if [ -n "$include_csv" ] && ! matches_patterns "$item_name" "$include_csv"; then
+            continue
+        fi
+        if matches_patterns "$item_name" "$exclude_csv"; then
+            continue
+        fi
+
+        if [ -d "$source_item" ]; then
+            case "$(printf '%s' "$item_name" | tr '[:upper:]' '[:lower:]')" in
+                stems)
+                    if [ "$(find "$source_item" -mindepth 1 -print -quit)" ]; then
+                        if [ "$(find "$delivery_root/Stems" -mindepth 1 -print -quit)" ] && [ "$overwrite" -eq 0 ]; then
+                            jl_error "Stems destination is not empty. Use --overwrite or --clean."
+                            exit "$JL_EXIT_UNSAFE"
+                        fi
+                        [ "$overwrite" -eq 0 ] || find "$delivery_root/Stems" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+                        cp -Rp "$source_item"/. "$delivery_root/Stems/"
+                        printf '%s\n' 'Stems/' >> "$copied_paths"
+                        files_json="$(printf '%s' "$files_json" | jq -c '. + [{path:"Stems/", deliverable_type:"stems"}]')"
+                        copied_count=$((copied_count + 1))
+                    fi
+                    ;;
+                *) jl_warn "Ignoring unsupported delivery subdirectory: $item_name" ;;
+            esac
+            continue
+        fi
+
+        [ -f "$source_item" ] || continue
+        destination="$delivery_root/$item_name"
+        if [ -e "$destination" ]; then
+            if [ "$overwrite" -eq 1 ]; then
+                rm -f "$destination"
+            else
+                jl_error "Delivery file already exists: $destination"
+                exit "$JL_EXIT_UNSAFE"
+            fi
+        fi
+        cp -p "$source_item" "$destination"
+        printf '%s\n' "$item_name" >> "$copied_paths"
+
+        deliverable_type="$(classify_deliverable "$item_name")"
+        file_size="$(jl_stat_size "$destination")"
+        extension="$(printf '%s' "${item_name##*.}" | tr '[:lower:]' '[:upper:]')"
+        entry="$(jq -n \
+            --arg path "$item_name" \
+            --arg deliverable_type "$deliverable_type" \
+            --arg file_format "$extension" \
+            --argjson file_size_bytes "$file_size" \
+            '{path:$path, deliverable_type:$deliverable_type, file_format:$file_format, file_size_bytes:$file_size_bytes}')"
+        if [ "$checksum" -eq 1 ]; then
+            digest="$(jl_sha256 "$destination")"
+            entry="$(printf '%s' "$entry" | jq -c --arg digest "$digest" '.checksum={algorithm:"sha256",value:$digest}')"
+        fi
+        files_json="$(printf '%s' "$files_json" | jq -c --argjson entry "$entry" '. + [$entry]')"
+        copied_count=$((copied_count + 1))
+    done
+
+    if [ "$copied_count" -eq 0 ]; then
+        jl_error "No approved deliverables were found after applying filters."
+        exit "$JL_EXIT_VALIDATION"
+    fi
+
+    project_document_id="$(jl_json_get "$manifest" '.metadata.document_id')"
+    project_id="$(jl_json_get "$manifest" '.project_id')"
+    project_name="$(jl_json_get "$manifest" '.project_name')"
+    client_document_id="$(jl_json_get "$manifest" '.client.client_document_id')"
+    client_id="$(jl_json_get "$manifest" '.client.client_id')"
+    delivery_method="$(jl_json_get "$manifest" '.delivery.method')"
+    timestamp="$(jl_now_iso8601)"
+    document_id="$(jl_uuid)"
+
+    jq -n \
+        --arg schema mixing-delivery \
+        --arg schema_version 1.0.0 \
+        --arg document_id "$document_id" \
+        --arg created_by create-delivery \
+        --arg created_with "$(jl_created_with)" \
+        --arg timestamp "$timestamp" \
+        --arg project_document_id "$project_document_id" \
+        --arg project_id "$project_id" \
+        --arg project_name "$project_name" \
+        --arg client_document_id "$client_document_id" \
+        --arg client_id "$client_id" \
+        --argjson approved_revision "$revision_number" \
+        --arg delivery_method "$delivery_method" \
+        --argjson files "$files_json" \
+        '{
+            metadata:{schema:$schema,schema_version:$schema_version,document_id:$document_id,
+                created_by:$created_by,created_with:$created_with,created_at:$timestamp,last_modified_at:$timestamp},
+            project:{project_document_id:$project_document_id,project_id:$project_id,project_name:$project_name},
+            client:{client_document_id:$client_document_id,client_id:$client_id},
+            approved_revision:$approved_revision,
+            delivery:{method:$delivery_method,delivered_at:null,delivered_by:"",notes:""},
+            files:$files
+        }' > "$delivery_manifest"
+
+    # Validate the package manifest before optional archive creation.
+    jl_json_validate_schema "$APP_ROOT/schemas/delivery-manifest.schema.json" "$delivery_manifest"
+
+    # Replace only the untouched system placeholder, preserving user edits.
+    delivery_notes="$delivery_root/Delivery_Notes.md"
+    if [ -f "$delivery_notes" ]; then
+        python3 - "$delivery_notes" "$revision_number" <<'PY_NOTES'
+from pathlib import Path
+import sys
+# Update only the untouched placeholder so prior user edits remain authoritative.
+path = Path(sys.argv[1])
+revision = sys.argv[2]
+text = path.read_text()
+text = text.replace("**Approved Revision:** Not yet approved", f"**Approved Revision:** {revision}", 1)
+path.write_text(text)
+PY_NOTES
+    fi
+
+    if [ "$make_zip" -eq 1 ]; then
+        jl_require_command zip "Install zip to use create-delivery --zip." || exit $?
+        zip_name="${project_id}-delivery.zip"
+        rm -f "$delivery_root/$zip_name"
+        (cd "$delivery_root" && zip -qr "$zip_name" . -x "$zip_name")
+    fi
+
+    cleanup=0
+    rm -f "$copied_paths"
+    trap - EXIT HUP INT TERM
+    printf 'Prepared final delivery: %s\n' "$delivery_root"
+fi
+
+# Recording delivery is a separate state transition from package preparation.
+if [ "$mark_delivered" -eq 1 ]; then
+    [ -f "$delivery_manifest" ] || { jl_error "Delivery manifest not found: $delivery_manifest"; exit "$JL_EXIT_VALIDATION"; }
+    timestamp="$(jl_now_iso8601)"
+    delivered_by="$(jl_json_get_optional "$manifest" '.mix_engineer' '')"
+    [ -n "$delivered_by" ] || delivered_by="Engineer"
+
+    project_backup="$(jl_mktemp_file_near "$manifest")"
+    delivery_backup="$(jl_mktemp_file_near "$delivery_manifest")"
+    cp -p "$manifest" "$project_backup"
+    cp -p "$delivery_manifest" "$delivery_backup"
+    if ! jl_json_update "$delivery_manifest" \
+        '.delivery.delivered_at = $timestamp |
+         .delivery.delivered_by = $delivered_by |
+         .metadata.last_modified_at = $timestamp' \
+        --arg timestamp "$timestamp" --arg delivered_by "$delivered_by" ||
+       ! jl_json_update "$manifest" \
+        '.state.delivered = true |
+         .state.delivered_at = $timestamp |
+         .metadata.last_modified_at = $timestamp' \
+        --arg timestamp "$timestamp" ||
+       ! jl_json_validate_schema "$APP_ROOT/schemas/delivery-manifest.schema.json" "$delivery_manifest" ||
+       ! jl_json_validate_schema "$APP_ROOT/schemas/project-manifest.schema.json" "$manifest"; then
+        cp -p "$project_backup" "$manifest"
+        cp -p "$delivery_backup" "$delivery_manifest"
+        rm -f "$project_backup" "$delivery_backup"
+        exit "$JL_EXIT_VALIDATION"
+    fi
+    rm -f "$project_backup" "$delivery_backup"
+    printf 'Recorded delivery at %s\n' "$timestamp"
+fi
