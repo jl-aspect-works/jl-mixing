@@ -1,15 +1,94 @@
 #!/usr/bin/env bash
+# Inventory and validate the immutable client-delivery source.
 set -eu
 
-if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
-    cat <<'EOF'
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+APP_ROOT="${JL_MIXING_HOME:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+. "$APP_ROOT/lib/common.sh"
+. "$APP_ROOT/lib/context.sh"
+. "$APP_ROOT/lib/filesystem.sh"
+. "$APP_ROOT/lib/json.sh"
+. "$APP_ROOT/lib/platform.sh"
+. "$APP_ROOT/lib/templates.sh"
+. "$APP_ROOT/lib/validation.sh"
+
+usage() {
+    cat <<'USAGE'
 Usage: validate-intake [options]
 
-This command is specified in docs/SCRIPT_REFERENCE.md but is not implemented
-until Batch 3.
-EOF
-    exit 0
+Options:
+  --project PATH             Explicit project path
+  --source PATH              Intake source directory
+  --report-only              Validate and report without other actions
+  --expected-sample-rate HZ  Override expected sample rate
+  --expected-bit-depth BITS  Override expected bit depth
+  --no-duplicate-check       Skip duplicate-basename detection
+  --non-interactive          Accepted for command consistency
+  --dry-run                  Build a temporary report without updating the project
+  -h, --help                 Show this help
+USAGE
+}
+
+project_ref=""
+source_path=""
+expected_sample_rate=""
+expected_bit_depth=""
+no_duplicate_check=0
+dry_run=0
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --project) [ "$#" -ge 2 ] || jl_die "--project requires a value." "$JL_EXIT_ARGUMENTS"; project_ref="$2"; shift 2 ;;
+        --source) [ "$#" -ge 2 ] || jl_die "--source requires a value." "$JL_EXIT_ARGUMENTS"; source_path="$2"; shift 2 ;;
+        --report-only|--non-interactive) shift ;;
+        --expected-sample-rate) [ "$#" -ge 2 ] || jl_die "--expected-sample-rate requires a value." "$JL_EXIT_ARGUMENTS"; expected_sample_rate="$2"; shift 2 ;;
+        --expected-bit-depth) [ "$#" -ge 2 ] || jl_die "--expected-bit-depth requires a value." "$JL_EXIT_ARGUMENTS"; expected_bit_depth="$2"; shift 2 ;;
+        --no-duplicate-check) no_duplicate_check=1; shift ;;
+        --dry-run) dry_run=1; shift ;;
+        -h|--help) usage; exit 0 ;;
+        *) jl_die "Unknown option: $1" "$JL_EXIT_ARGUMENTS"; exit $? ;;
+    esac
+done
+
+project_root="$(jl_context_resolve_project "$project_ref" "$PWD")" || exit $?
+manifest="$project_root/00_Admin/project-manifest.json"
+report="$project_root/00_Admin/Intake_Report.md"
+[ -n "$source_path" ] || source_path="$project_root/01_Client_Files/Original_Delivery"
+source_path="$(jl_abspath_allow_missing "$source_path")"
+
+[ -d "$source_path" ] || { jl_error "Intake source directory not found: $source_path"; exit "$JL_EXIT_VALIDATION"; }
+[ -n "$expected_sample_rate" ] || expected_sample_rate="$(jl_json_get "$manifest" '.audio.sample_rate')"
+[ -n "$expected_bit_depth" ] || expected_bit_depth="$(jl_json_get "$manifest" '.audio.bit_depth')"
+jl_validate_sample_rate "$expected_sample_rate" || { jl_error "Unsupported expected sample rate: $expected_sample_rate"; exit "$JL_EXIT_VALIDATION"; }
+jl_validate_bit_depth "$expected_bit_depth" || { jl_error "Unsupported expected bit depth: $expected_bit_depth"; exit "$JL_EXIT_VALIDATION"; }
+
+replacement="$(jl_mktemp_file_near "$report")"
+cleanup_report() { rm -f "$replacement"; }
+trap cleanup_report EXIT HUP INT TERM
+
+set -- \
+    --source "$source_path" \
+    --output "$replacement" \
+    --expected-sample-rate "$expected_sample_rate" \
+    --expected-bit-depth "$expected_bit_depth"
+if [ "$no_duplicate_check" -eq 1 ]; then
+    set -- "$@" --no-duplicate-check
 fi
 
-echo "validate-intake is not implemented until Batch 3." >&2
-exit 2
+validation_status=0
+python3 "$APP_ROOT/tools/build-intake-report.py" "$@" || validation_status=$?
+
+if [ "$dry_run" -eq 1 ]; then
+    cat "$replacement"
+else
+    jl_markdown_replace_managed_section \
+        "$report" \
+        '<!-- BEGIN AUTOMATED SECTION -->' \
+        '<!-- END AUTOMATED SECTION -->' \
+        "$replacement"
+    printf 'Updated intake report: %s\n' "$report"
+fi
+
+rm -f "$replacement"
+trap - EXIT HUP INT TERM
+exit "$validation_status"

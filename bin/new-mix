@@ -1,15 +1,300 @@
 #!/usr/bin/env bash
+# Create a complete project workspace beneath a client.
 set -eu
 
-if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
-    cat <<'EOF'
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+APP_ROOT="${JL_MIXING_HOME:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+. "$APP_ROOT/lib/common.sh"
+. "$APP_ROOT/lib/config.sh"
+. "$APP_ROOT/lib/context.sh"
+. "$APP_ROOT/lib/filesystem.sh"
+. "$APP_ROOT/lib/json.sh"
+. "$APP_ROOT/lib/metadata.sh"
+. "$APP_ROOT/lib/naming.sh"
+. "$APP_ROOT/lib/templates.sh"
+. "$APP_ROOT/lib/validation.sh"
+
+usage() {
+    cat <<'USAGE'
 Usage: new-mix --project PROJECT_NAME [options]
 
-This command is specified in docs/SCRIPT_REFERENCE.md but is not implemented
-until Batch 3.
-EOF
+Options:
+  --client ID_OR_PATH      Client ID or client-directory path
+  --project NAME           Project display name (required)
+  --project-id ID          Stable project slug (default: derived from name)
+  --project-type TYPE      mixing, podcast, audiobook, dialogue_edit,
+                           live_recording, or other
+  --artist NAME            Artist or program name
+  --album TITLE            Album or collection title
+  --producer NAME          Producer name
+  --engineer NAME          Mix engineer
+  --bpm NUMBER             Tempo
+  --key TEXT               Musical key
+  --time-signature TEXT    Time signature (default: 4/4)
+  --sample-rate HZ         Project sample rate
+  --bit-depth BITS         Project bit depth
+  --file-format FORMAT     WAV or AIFF
+  --daw NAME               DAW name
+  --template NAME_OR_PATH  DAW template to copy into the Project boundary
+  --deadline YYYY-MM-DD    Project deadline
+  --deliverables LIST      Comma-separated deliverable types
+  --description TEXT       Creative direction
+  --source PATH            Initial client delivery file or directory
+  --non-interactive        Accept supplied values and defaults
+  --dry-run                Print the planned project without creating it
+  -h, --help               Show this help
+USAGE
+}
+
+client_ref=""
+project_name=""
+project_id=""
+project_type="mixing"
+artist=""
+album=""
+producer=""
+engineer=""
+bpm=""
+musical_key=""
+time_signature="4/4"
+sample_rate=""
+bit_depth=""
+file_format=""
+daw=""
+daw_template=""
+deadline=""
+deliverables_csv=""
+description=""
+source_path=""
+dry_run=0
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --client) [ "$#" -ge 2 ] || jl_die "--client requires a value." "$JL_EXIT_ARGUMENTS"; client_ref="$2"; shift 2 ;;
+        --project) [ "$#" -ge 2 ] || jl_die "--project requires a value." "$JL_EXIT_ARGUMENTS"; project_name="$2"; shift 2 ;;
+        --project-id) [ "$#" -ge 2 ] || jl_die "--project-id requires a value." "$JL_EXIT_ARGUMENTS"; project_id="$2"; shift 2 ;;
+        --project-type) [ "$#" -ge 2 ] || jl_die "--project-type requires a value." "$JL_EXIT_ARGUMENTS"; project_type="$2"; shift 2 ;;
+        --artist) [ "$#" -ge 2 ] || jl_die "--artist requires a value." "$JL_EXIT_ARGUMENTS"; artist="$2"; shift 2 ;;
+        --album) [ "$#" -ge 2 ] || jl_die "--album requires a value." "$JL_EXIT_ARGUMENTS"; album="$2"; shift 2 ;;
+        --producer) [ "$#" -ge 2 ] || jl_die "--producer requires a value." "$JL_EXIT_ARGUMENTS"; producer="$2"; shift 2 ;;
+        --engineer) [ "$#" -ge 2 ] || jl_die "--engineer requires a value." "$JL_EXIT_ARGUMENTS"; engineer="$2"; shift 2 ;;
+        --bpm) [ "$#" -ge 2 ] || jl_die "--bpm requires a value." "$JL_EXIT_ARGUMENTS"; bpm="$2"; shift 2 ;;
+        --key) [ "$#" -ge 2 ] || jl_die "--key requires a value." "$JL_EXIT_ARGUMENTS"; musical_key="$2"; shift 2 ;;
+        --time-signature) [ "$#" -ge 2 ] || jl_die "--time-signature requires a value." "$JL_EXIT_ARGUMENTS"; time_signature="$2"; shift 2 ;;
+        --sample-rate) [ "$#" -ge 2 ] || jl_die "--sample-rate requires a value." "$JL_EXIT_ARGUMENTS"; sample_rate="$2"; shift 2 ;;
+        --bit-depth) [ "$#" -ge 2 ] || jl_die "--bit-depth requires a value." "$JL_EXIT_ARGUMENTS"; bit_depth="$2"; shift 2 ;;
+        --file-format) [ "$#" -ge 2 ] || jl_die "--file-format requires a value." "$JL_EXIT_ARGUMENTS"; file_format="$2"; shift 2 ;;
+        --daw) [ "$#" -ge 2 ] || jl_die "--daw requires a value." "$JL_EXIT_ARGUMENTS"; daw="$2"; shift 2 ;;
+        --template) [ "$#" -ge 2 ] || jl_die "--template requires a value." "$JL_EXIT_ARGUMENTS"; daw_template="$2"; shift 2 ;;
+        --deadline) [ "$#" -ge 2 ] || jl_die "--deadline requires a value." "$JL_EXIT_ARGUMENTS"; deadline="$2"; shift 2 ;;
+        --deliverables) [ "$#" -ge 2 ] || jl_die "--deliverables requires a value." "$JL_EXIT_ARGUMENTS"; deliverables_csv="$2"; shift 2 ;;
+        --description) [ "$#" -ge 2 ] || jl_die "--description requires a value." "$JL_EXIT_ARGUMENTS"; description="$2"; shift 2 ;;
+        --source) [ "$#" -ge 2 ] || jl_die "--source requires a value." "$JL_EXIT_ARGUMENTS"; source_path="$2"; shift 2 ;;
+        --non-interactive) shift ;;
+        --dry-run) dry_run=1; shift ;;
+        -h|--help) usage; exit 0 ;;
+        *) jl_die "Unknown option: $1" "$JL_EXIT_ARGUMENTS"; exit $? ;;
+    esac
+done
+
+jl_validate_project_name "$project_name" || { jl_error "A valid --project name is required."; exit "$JL_EXIT_VALIDATION"; }
+jl_validate_project_type "$project_type" || { jl_error "Unsupported project type: $project_type"; exit "$JL_EXIT_VALIDATION"; }
+
+studio_root="$(jl_context_studio_root "$PWD")" || {
+    jl_error "Studio workspace not found. Run new-studio first or set JL_MIXING_ROOT."
+    exit "$JL_EXIT_CONTEXT"
+}
+studio_file="$studio_root/Studio/studio.json"
+client_root="$(jl_context_find_client "$studio_root" "$client_ref")" || exit $?
+client_file="$client_root/client.json"
+
+[ -n "$project_id" ] || project_id="$(jl_slugify "$project_name")"
+jl_validate_slug "$project_id" || { jl_error "Project ID must be a lowercase slug: $project_id"; exit "$JL_EXIT_VALIDATION"; }
+project_folder_name="$(jl_sanitize_component "$project_name")"
+jl_assert_nonempty "$project_folder_name" "project folder name" || exit $?
+
+client_name="$(jl_json_get "$client_file" '.client_name')"
+client_id="$(jl_json_get "$client_file" '.client_id')"
+client_document_id="$(jl_json_get "$client_file" '.metadata.document_id')"
+if [ -z "$artist" ]; then
+    artist="$(jl_json_get_optional "$client_file" '.artist_name' '')"
+    [ -n "$artist" ] || artist="$client_name"
+fi
+[ -n "$engineer" ] || engineer="$(jl_json_get_optional "$studio_file" '.default_mix_engineer' '')"
+[ -n "$sample_rate" ] || sample_rate="$(jl_json_get "$client_file" '.audio_defaults.sample_rate')"
+[ -n "$bit_depth" ] || bit_depth="$(jl_json_get "$client_file" '.audio_defaults.bit_depth')"
+[ -n "$file_format" ] || file_format="$(jl_json_get "$client_file" '.audio_defaults.file_format')"
+[ -n "$daw" ] || daw="$(jl_json_get "$studio_file" '.default_daw')"
+delivery_method="$(jl_json_get "$client_file" '.delivery_defaults.method')"
+if [ -n "$deliverables_csv" ]; then
+    deliverables_json="$(jl_json_array_from_csv "$deliverables_csv")"
+else
+    deliverables_json="$(jl_json_get_json "$client_file" '.delivery_defaults.deliverables')"
+fi
+
+jl_validate_sample_rate "$sample_rate" || { jl_error "Unsupported sample rate: $sample_rate"; exit "$JL_EXIT_VALIDATION"; }
+jl_validate_bit_depth "$bit_depth" || { jl_error "Unsupported bit depth: $bit_depth"; exit "$JL_EXIT_VALIDATION"; }
+file_format="$(printf '%s' "$file_format" | tr '[:lower:]' '[:upper:]')"
+jl_validate_file_format "$file_format" || { jl_error "Unsupported file format: $file_format"; exit "$JL_EXIT_VALIDATION"; }
+while IFS= read -r deliverable; do
+    jl_validate_enum "$deliverable" main_mix instrumental acapella tv_mix performance_mix stems master || {
+        jl_error "Unsupported deliverable type: $deliverable"
+        exit "$JL_EXIT_VALIDATION"
+    }
+done < <(printf '%s' "$deliverables_json" | jq -r '.[]')
+if [ -n "$bpm" ]; then
+    printf '%s' "$bpm" | grep -Eq '^[0-9]+([.][0-9]+)?$' || { jl_error "BPM must be a positive number."; exit "$JL_EXIT_VALIDATION"; }
+    awk "BEGIN { exit !($bpm > 0) }" || { jl_error "BPM must be greater than zero."; exit "$JL_EXIT_VALIDATION"; }
+fi
+if [ -n "$deadline" ]; then
+    printf '%s' "$deadline" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' || { jl_error "Deadline must use YYYY-MM-DD."; exit "$JL_EXIT_VALIDATION"; }
+fi
+if [ -n "$source_path" ] && [ ! -e "$source_path" ]; then
+    jl_error "Source delivery not found: $source_path"
+    exit "$JL_EXIT_VALIDATION"
+fi
+
+# Stable project IDs are unique within a client, including completed projects.
+duplicate_project=0
+while IFS= read -r existing_manifest; do
+    if [ "$(jl_json_get_optional "$existing_manifest" '.project_id' '')" = "$project_id" ]; then
+        duplicate_project=1
+        break
+    fi
+done < <(find "$client_root/Projects" -name project-manifest.json -type f -print 2>/dev/null)
+if [ "$duplicate_project" -eq 1 ]; then
+    jl_error "A project with ID '$project_id' already exists for this client."
+    exit "$JL_EXIT_UNSAFE"
+fi
+
+project_root="$client_root/Projects/Active/$project_folder_name"
+if [ -e "$project_root" ]; then
+    jl_error "Refusing to overwrite existing project path: $project_root"
+    exit "$JL_EXIT_UNSAFE"
+fi
+
+resolved_template=""
+if [ -n "$daw_template" ]; then
+    if [ -e "$daw_template" ]; then
+        resolved_template="$(jl_abspath_allow_missing "$daw_template")"
+    elif [ -e "$studio_root/DAWs/$daw/Mix Templates/$daw_template" ]; then
+        resolved_template="$studio_root/DAWs/$daw/Mix Templates/$daw_template"
+    else
+        jl_error "DAW template not found: $daw_template"
+        exit "$JL_EXIT_VALIDATION"
+    fi
+fi
+
+if [ "$dry_run" -eq 1 ]; then
+    printf 'Would create project: %s\n' "$project_name"
+    printf 'Client:   %s (%s)\n' "$client_name" "$client_id"
+    printf 'Location: %s\n' "$project_root"
+    printf 'DAW:      %s\n' "$daw"
     exit 0
 fi
 
-echo "new-mix is not implemented until Batch 3." >&2
-exit 2
+cleanup=1
+cleanup_on_failure() {
+    status=$?
+    if [ "$status" -ne 0 ] && [ "$cleanup" -eq 1 ]; then
+        rm -rf "$project_root"
+    fi
+    exit "$status"
+}
+trap cleanup_on_failure EXIT HUP INT TERM
+
+mkdir -p \
+    "$project_root/00_Admin" \
+    "$project_root/01_Client_Files/Original_Delivery" \
+    "$project_root/01_Client_Files/References" \
+    "$project_root/01_Client_Files/Documentation" \
+    "$project_root/02_Audio_Preparation/Working_Audio" \
+    "$project_root/02_Audio_Preparation/Rejected_Files" \
+    "$project_root/03_DAW_Project/Project" \
+    "$project_root/04_Revisions" \
+    "$project_root/05_Final_Delivery/Stems" \
+    "$project_root/06_Recall/External_Files" \
+    "$project_root/06_Recall/Screenshots"
+
+cp -p "$client_file" "$project_root/00_Admin/client-profile-snapshot.json"
+
+created_at="$(jl_now_iso8601)"
+project_document_id="$(jl_uuid)"
+jl_template_render_json \
+    "$APP_ROOT/templates/project/project-manifest.json.template" \
+    "$project_root/00_Admin/project-manifest.json" \
+    DOCUMENT_ID "$project_document_id" \
+    SOFTWARE_VERSION "$(jl_software_version)" \
+    CREATED_AT "$created_at" \
+    PROJECT_ID "$project_id" \
+    PROJECT_NAME "$project_name" \
+    CLIENT_DOCUMENT_ID "$client_document_id" \
+    CLIENT_ID "$client_id" \
+    ARTIST "$artist" \
+    MIX_ENGINEER "$engineer"
+
+if [ -n "$bpm" ]; then bpm_json="$bpm"; else bpm_json="null"; fi
+if [ -n "$deadline" ]; then deadline_json="$(jq -Rn --arg value "$deadline" '$value')"; else deadline_json="null"; fi
+jl_json_update "$project_root/00_Admin/project-manifest.json" \
+    '.project_type = $project_type |
+     .album = $album |
+     .producer = $producer |
+     .music.bpm = $bpm |
+     .music.key = $key |
+     .music.time_signature = $time_signature |
+     .audio.sample_rate = $sample_rate |
+     .audio.bit_depth = $bit_depth |
+     .audio.file_format = $file_format |
+     .daw.name = $daw |
+     .daw.template = $template |
+     .delivery.method = $delivery_method |
+     .delivery.requested_deliverables = $deliverables |
+     .schedule.deadline = $deadline |
+     .creative_direction = $description' \
+    --arg project_type "$project_type" \
+    --arg album "$album" \
+    --arg producer "$producer" \
+    --argjson bpm "$bpm_json" \
+    --arg key "$musical_key" \
+    --arg time_signature "$time_signature" \
+    --argjson sample_rate "$sample_rate" \
+    --argjson bit_depth "$bit_depth" \
+    --arg file_format "$file_format" \
+    --arg daw "$daw" \
+    --arg template "$daw_template" \
+    --arg delivery_method "$delivery_method" \
+    --argjson deliverables "$deliverables_json" \
+    --argjson deadline "$deadline_json" \
+    --arg description "$description"
+
+jl_template_render "$APP_ROOT/templates/project/Project_Notes.md" "$project_root/00_Admin/Project_Notes.md" \
+    PROJECT_NAME "$project_name" CLIENT_NAME "$client_name" ARTIST "$artist" \
+    PROJECT_TYPE "$project_type" MIX_ENGINEER "$engineer" CREATED_AT "$created_at"
+jl_template_render "$APP_ROOT/templates/project/Intake_Report.md" "$project_root/00_Admin/Intake_Report.md" \
+    PROJECT_NAME "$project_name" CLIENT_NAME "$client_name" GENERATED_AT "$created_at"
+jl_template_render "$APP_ROOT/templates/project/Preparation_Report.md" "$project_root/02_Audio_Preparation/Preparation_Report.md" \
+    PROJECT_NAME "$project_name" CLIENT_NAME "$client_name" CREATED_AT "$created_at"
+jl_template_render "$APP_ROOT/templates/project/Delivery_Notes.md" "$project_root/05_Final_Delivery/Delivery_Notes.md" \
+    PROJECT_NAME "$project_name" CLIENT_NAME "$client_name" APPROVED_REVISION "Not yet approved" \
+    CREATED_AT "$created_at" DELIVERY_METHOD "$delivery_method"
+jl_template_render "$APP_ROOT/templates/project/Recall_Sheet.md" "$project_root/06_Recall/Recall_Sheet.md" \
+    PROJECT_NAME "$project_name" CLIENT_NAME "$client_name" LAST_UPDATED "$created_at"
+
+if [ -n "$source_path" ]; then
+    if [ -d "$source_path" ]; then
+        jl_fs_copy_directory_contents "$source_path" "$project_root/01_Client_Files/Original_Delivery"
+    else
+        cp -p "$source_path" "$project_root/01_Client_Files/Original_Delivery/"
+    fi
+fi
+
+if [ -n "$resolved_template" ]; then
+    cp -Rp "$resolved_template" "$project_root/03_DAW_Project/Project/"
+fi
+
+jl_json_validate_schema "$APP_ROOT/schemas/project-manifest.schema.json" "$project_root/00_Admin/project-manifest.json"
+cleanup=0
+trap - EXIT HUP INT TERM
+
+printf 'Created project: %s\n' "$project_root"
+printf 'Next: copy client files to 01_Client_Files/Original_Delivery and run validate-intake\n'

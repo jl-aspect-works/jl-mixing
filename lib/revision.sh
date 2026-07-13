@@ -51,13 +51,15 @@ jl_revision_create_record() {
 }
 
 jl_revision_append() {
-    local manifest description number timestamp revision_id record
+    local manifest description number timestamp revision_id prefix padding record
     manifest="$1"
     description="$2"
-    number="${3:-$(jl_revision_next_number "$manifest")}"
+    number="${3:-$(jl_revision_next_number "$manifest")}" 
     timestamp="${4:-$(jl_now_iso8601)}"
     revision_id="${5:-$(jl_uuid)}"
-    record="$(jl_revision_create_record "$number" "$description" "$revision_id" "$timestamp")" || return $?
+    prefix="${6:-Revision_}"
+    padding="${7:-2}"
+    record="$(jl_revision_create_record "$number" "$description" "$revision_id" "$timestamp" "$prefix" "$padding")" || return $?
 
     jl_json_update "$manifest" \
         '.revisions += [$revision] |

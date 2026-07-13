@@ -1,15 +1,103 @@
 #!/usr/bin/env bash
+# Create the next sequential project revision.
 set -eu
 
-if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
-    cat <<'EOF'
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+APP_ROOT="${JL_MIXING_HOME:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+. "$APP_ROOT/lib/common.sh"
+. "$APP_ROOT/lib/config.sh"
+. "$APP_ROOT/lib/context.sh"
+. "$APP_ROOT/lib/json.sh"
+. "$APP_ROOT/lib/metadata.sh"
+. "$APP_ROOT/lib/naming.sh"
+. "$APP_ROOT/lib/platform.sh"
+. "$APP_ROOT/lib/revision.sh"
+. "$APP_ROOT/lib/templates.sh"
+
+usage() {
+    cat <<'USAGE'
 Usage: new-revision [options]
 
-This command is specified in docs/SCRIPT_REFERENCE.md but is not implemented
-until Batch 3.
-EOF
+Options:
+  --project PATH       Explicit project path
+  --description TEXT   Revision summary
+  --non-interactive    Accept defaults without prompting
+  --dry-run            Print the planned revision without creating it
+  -h, --help           Show this help
+USAGE
+}
+
+project_ref=""
+description=""
+dry_run=0
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --project) [ "$#" -ge 2 ] || jl_die "--project requires a value." "$JL_EXIT_ARGUMENTS"; project_ref="$2"; shift 2 ;;
+        --description) [ "$#" -ge 2 ] || jl_die "--description requires a value." "$JL_EXIT_ARGUMENTS"; description="$2"; shift 2 ;;
+        --non-interactive) shift ;;
+        --dry-run) dry_run=1; shift ;;
+        -h|--help) usage; exit 0 ;;
+        *) jl_die "Unknown option: $1" "$JL_EXIT_ARGUMENTS"; exit $? ;;
+    esac
+done
+
+project_root="$(jl_context_resolve_project "$project_ref" "$PWD")" || exit $?
+manifest="$project_root/00_Admin/project-manifest.json"
+status="$(jl_json_get "$manifest" '.state.status')"
+[ "$status" = active ] || { jl_error "Cannot create a revision for a completed project."; exit "$JL_EXIT_VALIDATION"; }
+
+number="$(jl_revision_next_number "$manifest")"
+[ -n "$description" ] || description="Revision $number"
+studio_root="$(jl_context_studio_root "$project_root")" || exit $?
+studio_file="$studio_root/Studio/studio.json"
+prefix="$(jl_json_get_optional "$studio_file" '.naming.revision_prefix' 'Revision_')"
+padding="$(jl_json_get_optional "$studio_file" '.naming.revision_padding' '2')"
+revision_name="$(jl_revision_name "$number" "$prefix" "$padding")"
+revision_root="$project_root/04_Revisions/$revision_name"
+
+if [ -e "$revision_root" ]; then
+    jl_error "Refusing to overwrite existing revision path: $revision_root"
+    exit "$JL_EXIT_UNSAFE"
+fi
+
+if [ "$dry_run" -eq 1 ]; then
+    printf 'Would create revision %s at %s\n' "$number" "$revision_root"
     exit 0
 fi
 
-echo "new-revision is not implemented until Batch 3." >&2
-exit 2
+backup="$(jl_mktemp_file_near "$manifest")"
+cp -p "$manifest" "$backup"
+cleanup=1
+rollback_on_failure() {
+    exit_status=$?
+    if [ "$exit_status" -ne 0 ] && [ "$cleanup" -eq 1 ]; then
+        cp -p "$backup" "$manifest" 2>/dev/null || true
+        rm -rf "$revision_root"
+    fi
+    rm -f "$backup"
+    exit "$exit_status"
+}
+trap rollback_on_failure EXIT HUP INT TERM
+
+mkdir -p "$revision_root/Prints"
+timestamp="$(jl_now_iso8601)"
+revision_id="$(jl_uuid)"
+project_name="$(jl_json_get "$manifest" '.project_name')"
+engineer="$(jl_json_get_optional "$manifest" '.mix_engineer' '')"
+
+jl_template_render "$APP_ROOT/templates/revision/Revision_Notes.md" "$revision_root/Revision_Notes.md" \
+    REVISION_NAME "$revision_name" \
+    REVISION_NUMBER "$number" \
+    CREATED_AT "$timestamp" \
+    REVISION_ID "$revision_id" \
+    MIX_ENGINEER "$engineer" \
+    REVISION_DESCRIPTION "$description"
+
+jl_revision_append "$manifest" "$description" "$number" "$timestamp" "$revision_id" "$prefix" "$padding"
+jl_json_validate_schema "$APP_ROOT/schemas/project-manifest.schema.json" "$manifest"
+
+cleanup=0
+rm -f "$backup"
+trap - EXIT HUP INT TERM
+printf 'Created revision %s for %s: %s\n' "$number" "$project_name" "$revision_root"

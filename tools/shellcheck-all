@@ -10,32 +10,26 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"
 
 check_file() {
+    local file first_line
     file="$1"
 
-    # Files ending in .sh are always shell scripts.
     case "$file" in
         *.sh)
             shellcheck --severity=warning "$file"
-            return
+            return 0
             ;;
     esac
 
-    # Extensionless commands and tools are checked only when their shebang
-    # identifies them as shell scripts. This excludes tools such as
-    # validate-json.py.
     first_line="$(sed -n '1p' "$file")"
-
     case "$first_line" in
-        '#!'*'/sh' | '#!'*'/bash' | '#!'*'env sh' | '#!'*'env bash')
+        '#!'*'/sh'|'#!'*'/bash'|'#!'*'env sh'|'#!'*'env bash')
             shellcheck --severity=warning "$file"
             ;;
     esac
 }
 
 for file in install.sh uninstall.sh; do
-    if [ -f "$file" ]; then
-        check_file "$file"
-    fi
+    [ -f "$file" ] && check_file "$file"
 done
 
 find bin lib tools tests -type f -print |

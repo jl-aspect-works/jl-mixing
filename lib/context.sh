@@ -127,3 +127,46 @@ jl_context_current_revision_root() {
         ".revisions[] | select(.number == $revision_number) | .folder")" || return $?
     printf '%s/%s\n' "${project_root%/}" "$revision_folder"
 }
+
+# Resolve a client reference that may be a path, client.json file, or client ID.
+jl_context_find_client() {
+    local studio_root reference candidate matches match_count
+    studio_root="$1"
+    reference="$2"
+
+    if [ -z "$reference" ]; then
+        jl_context_resolve_client "" "$PWD"
+        return $?
+    fi
+
+    candidate="$(jl_abspath_allow_missing "$reference")" || return $?
+    if [ -f "$candidate" ] && [ "$(basename "$candidate")" = client.json ]; then
+        candidate="$(dirname "$candidate")"
+    fi
+    if [ -f "$candidate/client.json" ]; then
+        printf '%s\n' "$candidate"
+        return 0
+    fi
+
+    matches="$(find "$studio_root/Clients" -mindepth 2 -maxdepth 2 -name client.json -type f -print 2>/dev/null |
+        while IFS= read -r client_file; do
+            if [ "$(jl_json_get_optional "$client_file" '.client_id' '')" = "$reference" ]; then
+                dirname "$client_file"
+            fi
+            # Keep the loop status successful when this file is not a match.
+            :
+        done)"
+
+    match_count="$(printf '%s\n' "$matches" | sed '/^$/d' | wc -l | tr -d ' ')"
+    if [ "$match_count" = 1 ]; then
+        printf '%s\n' "$matches"
+        return 0
+    fi
+    if [ "$match_count" -gt 1 ]; then
+        jl_error "Multiple clients use the ID '$reference'."
+        return "$JL_EXIT_VALIDATION"
+    fi
+
+    jl_error "Client not found: $reference"
+    return "$JL_EXIT_CONTEXT"
+}

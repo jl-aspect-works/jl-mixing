@@ -149,3 +149,30 @@ jl_fs_directory_is_empty() {
     [ -d "$path" ] || return 1
     [ -z "$(find "$path" -mindepth 1 -maxdepth 1 -print -quit)" ]
 }
+
+# Copy the contents of a source directory into an existing empty destination.
+# This is intended for one-time imports during project creation.
+jl_fs_copy_directory_contents() {
+    local source destination entry
+    source="$1"
+    destination="$2"
+
+    [ -d "$source" ] || {
+        jl_error "Source directory not found: $source"
+        return "$JL_EXIT_VALIDATION"
+    }
+    [ -d "$destination" ] || {
+        jl_error "Destination directory not found: $destination"
+        return "$JL_EXIT_VALIDATION"
+    }
+    jl_fs_directory_is_empty "$destination" || {
+        jl_error "Destination must be empty before importing files: $destination"
+        return "$JL_EXIT_UNSAFE"
+    }
+
+    # Include dotfiles without relying on shell-specific glob options.
+    find "$source" -mindepth 1 -maxdepth 1 -print |
+    while IFS= read -r entry; do
+        cp -Rp "$entry" "$destination/"
+    done
+}

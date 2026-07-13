@@ -1,15 +1,98 @@
 #!/usr/bin/env bash
+# Mark a delivered project complete and move it from Active to Completed.
 set -eu
 
-if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
-    cat <<'EOF'
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+APP_ROOT="${JL_MIXING_HOME:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+. "$APP_ROOT/lib/common.sh"
+. "$APP_ROOT/lib/context.sh"
+. "$APP_ROOT/lib/filesystem.sh"
+. "$APP_ROOT/lib/json.sh"
+. "$APP_ROOT/lib/platform.sh"
+. "$APP_ROOT/lib/validation.sh"
+
+usage() {
+    cat <<'USAGE'
 Usage: complete-project [options]
 
-This command is specified in docs/SCRIPT_REFERENCE.md but is not implemented
-until Batch 3.
-EOF
+Options:
+  --project PATH          Explicit project path
+  --completion-date TIME  ISO-8601 completion timestamp
+  --force                 Bypass approval/delivery prerequisite checks
+  --non-interactive       Accept defaults without prompting
+  --dry-run               Print the planned move without changing files
+  -h, --help              Show this help
+USAGE
+}
+
+project_ref=""
+completion_date=""
+force=0
+dry_run=0
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --project) [ "$#" -ge 2 ] || jl_die "--project requires a value." "$JL_EXIT_ARGUMENTS"; project_ref="$2"; shift 2 ;;
+        --completion-date) [ "$#" -ge 2 ] || jl_die "--completion-date requires a value." "$JL_EXIT_ARGUMENTS"; completion_date="$2"; shift 2 ;;
+        --force) force=1; shift ;;
+        --non-interactive) shift ;;
+        --dry-run) dry_run=1; shift ;;
+        -h|--help) usage; exit 0 ;;
+        *) jl_die "Unknown option: $1" "$JL_EXIT_ARGUMENTS"; exit $? ;;
+    esac
+done
+
+project_root="$(jl_context_resolve_project "$project_ref" "$PWD")" || exit $?
+manifest="$project_root/00_Admin/project-manifest.json"
+
+if [ "$force" -eq 0 ]; then
+    jl_validate_project_completable "$manifest" || exit $?
+else
+    jl_warn "Forcing completion without enforcing approval and delivery prerequisites."
+    [ "$(jl_json_get "$manifest" '.state.status')" = active ] || {
+        jl_error "Only active projects can be completed."
+        exit "$JL_EXIT_VALIDATION"
+    }
+fi
+
+active_dir="$(dirname "$project_root")"
+if [ "$(basename "$active_dir")" != Active ]; then
+    jl_error "Project is not located directly beneath a Projects/Active directory: $project_root"
+    exit "$JL_EXIT_VALIDATION"
+fi
+projects_dir="$(dirname "$active_dir")"
+completed_dir="$projects_dir/Completed"
+destination="$completed_dir/$(basename "$project_root")"
+if [ -e "$destination" ]; then
+    jl_error "Completed-project destination already exists: $destination"
+    exit "$JL_EXIT_UNSAFE"
+fi
+[ -n "$completion_date" ] || completion_date="$(jl_now_iso8601)"
+
+if [ "$dry_run" -eq 1 ]; then
+    printf 'Would complete project and move:\n  %s\n  -> %s\n' "$project_root" "$destination"
     exit 0
 fi
 
-echo "complete-project is not implemented until Batch 3." >&2
-exit 2
+mkdir -p "$completed_dir"
+backup="$(jl_mktemp_file_near "$manifest")"
+cp -p "$manifest" "$backup"
+
+jl_json_update "$manifest" \
+    '.state.status = "completed" |
+     .state.completed_at = $timestamp |
+     .metadata.last_modified_at = $timestamp' \
+    --arg timestamp "$completion_date"
+if ! jl_json_validate_schema "$APP_ROOT/schemas/project-manifest.schema.json" "$manifest"; then
+    cp -p "$backup" "$manifest"
+    rm -f "$backup"
+    exit "$JL_EXIT_VALIDATION"
+fi
+
+if ! jl_fs_safe_move "$project_root" "$destination"; then
+    cp -p "$backup" "$manifest" 2>/dev/null || true
+    rm -f "$backup"
+    exit "$JL_EXIT_GENERAL"
+fi
+rm -f "$backup"
+printf 'Completed project: %s\n' "$destination"

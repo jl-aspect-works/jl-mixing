@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -eu
 
-# Exposed for test scripts that source this helper.
+# Shared by tests that source this helper.
 # shellcheck disable=SC2034
-#TEST_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+TEST_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TEST_COUNT=0
 
 fail() {
@@ -76,4 +76,24 @@ new_test_dir() {
     local temp_dir
     temp_dir="$(mktemp -d "${TMPDIR:-/tmp}/jl-mixing-test.XXXXXX")" || return $?
     (cd "$temp_dir" && pwd -P)
+}
+
+assert_path_not_exists() {
+    [ ! -e "$1" ] || fail "Expected path not to exist: $1"
+    pass "path does not exist: $1"
+}
+
+assert_json_eq() {
+    local expected file filter actual message
+    expected="$1"
+    file="$2"
+    filter="$3"
+    message="$4"
+    actual="$(jq -er "$filter" "$file")" || fail "$message: jq filter failed"
+    assert_eq "$expected" "$actual" "$message"
+}
+
+assert_same_bytes() {
+    cmp -s "$1" "$2" || fail "Files differ: $1 and $2"
+    pass "files have identical bytes"
 }

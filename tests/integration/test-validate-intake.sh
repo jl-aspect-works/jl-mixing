@@ -1,3 +1,26 @@
 #!/usr/bin/env bash
 set -eu
-echo "SKIP: validate-intake is not implemented until Batch 3."
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+. "$ROOT/tests/integration/integration-helper.sh"
+
+tmp="$(new_test_dir)"
+trap 'rm -rf "$tmp"' EXIT
+studio_root="$tmp/studio"
+fixture_studio "$studio_root"
+project_root="$(fixture_project "$studio_root" fresh)"
+report="$project_root/00_Admin/Intake_Report.md"
+fixture_wav "$project_root/01_Client_Files/Original_Delivery/Lead Vocal.wav"
+python3 - "$report" <<'PY'
+from pathlib import Path
+import sys
+path = Path(sys.argv[1])
+path.write_text(path.read_text().replace("Add manual observations here.", "Keep this engineer note."))
+PY
+
+(cd "$project_root/01_Client_Files" && "$ROOT/bin/validate-intake")
+report_text="$(cat "$report")"
+assert_contains "$report_text" "Keep this engineer note." "engineer notes are preserved"
+assert_contains "$report_text" "Lead Vocal.wav" "source inventory is written"
+assert_contains "$report_text" "Files discovered: 1" "file count is reported"
+
+printf '[OK] validate-intake (%s assertions)\n' "$TEST_COUNT"

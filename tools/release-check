@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -eu
 
-tests/run-tests.sh
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
 
-echo "[OK] Batch 2 release check passed"
+make strict-test
+
+echo "[OK] Batch 3 release check passed"

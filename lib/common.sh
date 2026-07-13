@@ -9,8 +9,8 @@ JL_MIXING_COMMON_LOADED=1
 
 # Standard JL Mixing Automation exit codes.
 #
-# These constants form part of the shared-library API and may be consumed by
-# commands that source this file. ShellCheck analyzes common.sh independently.
+# These constants form part of the public shared-library API and are consumed
+# by commands that source this file. ShellCheck analyzes this file separately.
 # shellcheck disable=SC2034
 readonly \
     JL_EXIT_GENERAL=1 \

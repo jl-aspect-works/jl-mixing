@@ -1,15 +1,106 @@
 #!/usr/bin/env bash
+# Approve one revision and supersede any previously approved revision.
 set -eu
 
-if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
-    cat <<'EOF'
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+APP_ROOT="${JL_MIXING_HOME:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+. "$APP_ROOT/lib/common.sh"
+. "$APP_ROOT/lib/context.sh"
+. "$APP_ROOT/lib/json.sh"
+. "$APP_ROOT/lib/platform.sh"
+. "$APP_ROOT/lib/revision.sh"
+
+usage() {
+    cat <<'USAGE'
 Usage: approve-mix [options]
 
-This command is specified in docs/SCRIPT_REFERENCE.md but is not implemented
-until Batch 3.
-EOF
+Options:
+  --project PATH       Explicit project path
+  --revision NUMBER    Revision to approve (default: current revision)
+  --approved-by NAME   Approver name (default: project mix engineer)
+  --notes TEXT         Append an explicit approval note to Revision_Notes.md
+  --date TIMESTAMP     ISO-8601 approval timestamp
+  --non-interactive    Accept defaults without prompting
+  --dry-run            Print the approval action without changing files
+  -h, --help           Show this help
+USAGE
+}
+
+project_ref=""
+revision_number=""
+approved_by=""
+notes=""
+approval_date=""
+dry_run=0
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --project) [ "$#" -ge 2 ] || jl_die "--project requires a value." "$JL_EXIT_ARGUMENTS"; project_ref="$2"; shift 2 ;;
+        --revision) [ "$#" -ge 2 ] || jl_die "--revision requires a value." "$JL_EXIT_ARGUMENTS"; revision_number="$2"; shift 2 ;;
+        --approved-by) [ "$#" -ge 2 ] || jl_die "--approved-by requires a value." "$JL_EXIT_ARGUMENTS"; approved_by="$2"; shift 2 ;;
+        --notes) [ "$#" -ge 2 ] || jl_die "--notes requires a value." "$JL_EXIT_ARGUMENTS"; notes="$2"; shift 2 ;;
+        --date) [ "$#" -ge 2 ] || jl_die "--date requires a value." "$JL_EXIT_ARGUMENTS"; approval_date="$2"; shift 2 ;;
+        --non-interactive) shift ;;
+        --dry-run) dry_run=1; shift ;;
+        -h|--help) usage; exit 0 ;;
+        *) jl_die "Unknown option: $1" "$JL_EXIT_ARGUMENTS"; exit $? ;;
+    esac
+done
+
+project_root="$(jl_context_resolve_project "$project_ref" "$PWD")" || exit $?
+manifest="$project_root/00_Admin/project-manifest.json"
+[ "$(jl_json_get "$manifest" '.state.status')" = active ] || {
+    jl_error "Cannot approve a revision in a completed project."
+    exit "$JL_EXIT_VALIDATION"
+}
+
+[ -n "$revision_number" ] || revision_number="$(jl_revision_current "$manifest")"
+case "$revision_number" in ''|*[!0-9]*|0) jl_error "Revision number must be a positive integer."; exit "$JL_EXIT_VALIDATION" ;; esac
+revision_folder="$(jq -er --argjson number "$revision_number" '.revisions[] | select(.number == $number) | .folder' "$manifest")" || {
+    jl_error "Revision $revision_number does not exist."
+    exit "$JL_EXIT_VALIDATION"
+}
+revision_root="$project_root/$revision_folder"
+[ -d "$revision_root" ] || { jl_error "Revision folder is missing: $revision_root"; exit "$JL_EXIT_VALIDATION"; }
+
+[ -n "$approved_by" ] || approved_by="$(jl_json_get_optional "$manifest" '.mix_engineer' '')"
+[ -n "$approved_by" ] || approved_by="Engineer"
+[ -n "$approval_date" ] || approval_date="$(jl_now_iso8601)"
+
+if [ "$dry_run" -eq 1 ]; then
+    printf 'Would approve revision %s by %s at %s\n' "$revision_number" "$approved_by" "$approval_date"
     exit 0
 fi
 
-echo "approve-mix is not implemented until Batch 3." >&2
-exit 2
+backup="$(jl_mktemp_file_near "$manifest")"
+cp -p "$manifest" "$backup"
+cleanup=1
+rollback_on_failure() {
+    exit_status=$?
+    if [ "$exit_status" -ne 0 ] && [ "$cleanup" -eq 1 ]; then
+        cp -p "$backup" "$manifest" 2>/dev/null || true
+    fi
+    rm -f "$backup"
+    exit "$exit_status"
+}
+trap rollback_on_failure EXIT HUP INT TERM
+
+jl_revision_approve "$manifest" "$revision_number" "$approved_by" "$approval_date"
+jl_json_validate_schema "$APP_ROOT/schemas/project-manifest.schema.json" "$manifest"
+
+if [ -n "$notes" ]; then
+    cat >> "$revision_root/Revision_Notes.md" <<EOF_NOTE
+
+### Approval
+
+**Approved:** $approval_date  
+**Approved by:** $approved_by
+
+$notes
+EOF_NOTE
+fi
+
+cleanup=0
+rm -f "$backup"
+trap - EXIT HUP INT TERM
+printf 'Approved revision %s. Any previously approved revision is now superseded.\n' "$revision_number"

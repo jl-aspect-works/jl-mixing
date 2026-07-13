@@ -159,3 +159,19 @@ jl_json_validate_schema() {
     "$python_command" "$JL_JSON_REPO_ROOT/tools/validate-json.py" \
         --strict --schema "$schema_file" --document "$document_file"
 }
+
+# Convert a comma-separated string into a compact JSON string array.
+# Empty input becomes an empty array. Whitespace around entries is removed.
+jl_json_array_from_csv() {
+    local csv
+    csv="$1"
+    jl_json_require_jq || return $?
+
+    if [ -z "$csv" ]; then
+        printf '%s\n' '[]'
+        return 0
+    fi
+
+    printf '%s' "$csv" |
+        jq -R -c 'split(",") | map(gsub("^[[:space:]]+|[[:space:]]+$"; "")) | map(select(length > 0))'
+}
