@@ -1,0 +1,60 @@
+# Build and publish platform-labelled JL Mixing release tarballs from version tags.
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            platform: macos
+          - os: ubuntu-latest
+            platform: linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install jq on Linux
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y jq shellcheck
+      - name: Install jq and ShellCheck on macOS
+        if: runner.os == 'macOS'
+        run: brew install jq shellcheck
+      - name: Install validation dependency
+        run: python -m pip install -r packaging/requirements.txt
+      - name: Run release gates
+        env:
+          JL_MIXING_PYTHON: ${{ env.pythonLocation }}/bin/python
+        run: make release-check
+      - name: Build platform release
+        run: tools/build-release --platform '${{ matrix.platform }}' --output-dir dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jl-mixing-${{ matrix.platform }}
+          path: |
+            dist/*.tar.gz
+            dist/*.sha256
+            dist/*.inventory.txt
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create '${{ github.ref_name }}' release-assets/* --generate-notes

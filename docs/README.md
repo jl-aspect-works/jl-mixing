@@ -10,3 +10,4 @@
 - [Batch 2 Implementation](BATCH_2_IMPLEMENTATION.md)
 - [Batch 3 Implementation](BATCH_3_IMPLEMENTATION.md)
 - [Batch 3 Code Documentation Pass](CODE_DOCUMENTATION_PASS.md)
+- [Batch 4 Implementation](BATCH_4_IMPLEMENTATION.md)
