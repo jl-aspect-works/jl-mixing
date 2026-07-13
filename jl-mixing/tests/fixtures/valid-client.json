@@ -1,0 +1,36 @@
+{
+  "metadata": {
+    "schema": "mixing-client",
+    "document_id": "22222222-2222-4222-8222-222222222222",
+    "created_by": "new-client",
+    "schema_version": "1.0.0",
+    "created_with": "jl-mixing 1.0.0",
+    "created_at": "2026-07-13T12:00:00-04:00",
+    "last_modified_at": "2026-07-13T12:00:00-04:00"
+  },
+  "client_id": "acme",
+  "client_name": "Acme",
+  "artist_name": "",
+  "contact": {
+    "name": "",
+    "email": "",
+    "phone": ""
+  },
+  "company": "",
+  "audio_defaults": {
+    "sample_rate": 48000,
+    "bit_depth": 24,
+    "file_format": "WAV"
+  },
+  "delivery_defaults": {
+    "method": "Cloud transfer",
+    "deliverables": [
+      "main_mix",
+      "instrumental"
+    ]
+  },
+  "revision_defaults": {
+    "included_revisions": 2
+  },
+  "notes": ""
+}

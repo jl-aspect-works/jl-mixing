@@ -1,0 +1,43 @@
+{
+  "metadata": {
+    "schema": "mixing-delivery",
+    "document_id": "55555555-5555-4555-8555-555555555555",
+    "created_by": "create-delivery",
+    "schema_version": "1.0.0",
+    "created_with": "jl-mixing 1.0.0",
+    "created_at": "2026-07-13T12:00:00-04:00",
+    "last_modified_at": "2026-07-13T12:00:00-04:00"
+  },
+  "project": {
+    "project_document_id": "33333333-3333-4333-8333-333333333333",
+    "project_id": "blue-sky",
+    "project_name": "Blue Sky"
+  },
+  "client": {
+    "client_document_id": "22222222-2222-4222-8222-222222222222",
+    "client_id": "acme"
+  },
+  "approved_revision": 1,
+  "delivery": {
+    "method": "Cloud transfer",
+    "delivered_at": null,
+    "delivered_by": "",
+    "notes": ""
+  },
+  "files": [
+    {
+      "path": "Acme - Blue Sky - Main Mix.wav",
+      "deliverable_type": "main_mix",
+      "sample_rate": 48000,
+      "bit_depth": 24,
+      "file_format": "WAV",
+      "channels": 2,
+      "duration_seconds": 243.52,
+      "file_size_bytes": 70133760
+    },
+    {
+      "path": "Stems/",
+      "deliverable_type": "stems"
+    }
+  ]
+}

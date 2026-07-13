@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -eu
+
+if ! command -v shellcheck >/dev/null 2>&1; then
+    echo "ShellCheck is not installed; skipping."
+    exit 0
+fi
+
+find bin tools tests -type f -print | while IFS= read -r file; do
+    case "$file" in
+        *.sh|bin/*|tools/check-dependencies|tools/shellcheck-all|tools/release-check) shellcheck "$file" ;;
+    esac
+done
