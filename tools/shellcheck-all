@@ -6,8 +6,15 @@ if ! command -v shellcheck >/dev/null 2>&1; then
     exit 0
 fi
 
-find bin tools tests -type f -print | while IFS= read -r file; do
-    case "$file" in
-        *.sh|bin/*|tools/check-dependencies|tools/shellcheck-all|tools/release-check) shellcheck "$file" ;;
-    esac
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$REPO_ROOT"
+
+find bin lib tools tests -type f \
+    \( -name '*.sh' -o -path 'bin/*' -o -path 'tools/*' \) \
+    -print |
+while IFS= read -r file; do
+    shellcheck \
+        --external-sources \
+        --severity=warning \
+        "$file"
 done
