@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
 set -eu
-echo "SKIP: new-revision is not implemented in Batch 1."
+echo "SKIP: new-revision is not implemented until Batch 3."

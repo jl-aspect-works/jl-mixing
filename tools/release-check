@@ -3,4 +3,4 @@ set -eu
 
 tests/run-tests.sh
 
-echo "[OK] Batch 1 release check passed"
+echo "[OK] Batch 2 release check passed"

@@ -6,8 +6,39 @@ if ! command -v shellcheck >/dev/null 2>&1; then
     exit 0
 fi
 
-find bin tools tests -type f -print | while IFS= read -r file; do
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$REPO_ROOT"
+
+check_file() {
+    file="$1"
+
+    # Files ending in .sh are always shell scripts.
     case "$file" in
-        *.sh|bin/*|tools/check-dependencies|tools/shellcheck-all|tools/release-check) shellcheck "$file" ;;
+        *.sh)
+            shellcheck --severity=warning "$file"
+            return
+            ;;
     esac
+
+    # Extensionless commands and tools are checked only when their shebang
+    # identifies them as shell scripts. This excludes tools such as
+    # validate-json.py.
+    first_line="$(sed -n '1p' "$file")"
+
+    case "$first_line" in
+        '#!'*'/sh' | '#!'*'/bash' | '#!'*'env sh' | '#!'*'env bash')
+            shellcheck --severity=warning "$file"
+            ;;
+    esac
+}
+
+for file in install.sh uninstall.sh; do
+    if [ -f "$file" ]; then
+        check_file "$file"
+    fi
+done
+
+find bin lib tools tests -type f -print |
+while IFS= read -r file; do
+    check_file "$file"
 done
