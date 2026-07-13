@@ -14,7 +14,6 @@ find bin lib tools tests -type f \
     -print |
 while IFS= read -r file; do
     shellcheck \
-        --external-sources \
         --severity=warning \
         "$file"
 done

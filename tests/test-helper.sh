@@ -3,7 +3,7 @@ set -eu
 
 # Exposed for test scripts that source this helper.
 # shellcheck disable=SC2034
-TEST_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+#TEST_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TEST_COUNT=0
 
 fail() {
