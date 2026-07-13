@@ -171,7 +171,9 @@ if [ "$mark_only" -eq 0 ]; then
             case "$old_path" in
                 ''|/*|*'..'*) jl_error "Unsafe path in existing delivery manifest: $old_path"; exit "$JL_EXIT_UNSAFE" ;;
             esac
-            rm -rf "$delivery_root/$old_path"
+            # Both values must be non-empty before recursively removing a prior
+            # deliverable from the controlled final-delivery directory.
+            rm -rf -- "${delivery_root:?}/${old_path:?}"
         done
         rm -f "$delivery_manifest"
         mkdir -p "$delivery_root/Stems"
@@ -186,7 +188,10 @@ if [ "$mark_only" -eq 0 ]; then
         exit_status=$?
         if [ "$exit_status" -ne 0 ] && [ "$cleanup" -eq 1 ]; then
             while IFS= read -r copied_path; do
-                [ -n "$copied_path" ] && rm -rf "$delivery_root/$copied_path"
+                if [ -n "$copied_path" ]; then
+                    # Roll back only the file or directory copied during this operation.
+                    rm -rf -- "${delivery_root:?}/${copied_path:?}"
+                fi
             done < "$copied_paths"
             rm -f "$delivery_manifest"
         fi
