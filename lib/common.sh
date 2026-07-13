@@ -7,12 +7,18 @@ if [ "${JL_MIXING_COMMON_LOADED:-0}" = "1" ]; then
 fi
 JL_MIXING_COMMON_LOADED=1
 
-JL_EXIT_GENERAL=1
-JL_EXIT_ARGUMENTS=2
-JL_EXIT_CONFIG=3
-JL_EXIT_CONTEXT=4
-JL_EXIT_VALIDATION=5
-JL_EXIT_UNSAFE=6
+# Standard JL Mixing Automation exit codes.
+#
+# These constants form part of the shared-library API and may be consumed by
+# commands that source this file. ShellCheck analyzes common.sh independently.
+# shellcheck disable=SC2034
+readonly \
+    JL_EXIT_GENERAL=1 \
+    JL_EXIT_ARGUMENTS=2 \
+    JL_EXIT_CONFIG=3 \
+    JL_EXIT_CONTEXT=4 \
+    JL_EXIT_VALIDATION=5 \
+    JL_EXIT_UNSAFE=6
 
 : "${JL_MIXING_LOG_LEVEL:=info}"
 
