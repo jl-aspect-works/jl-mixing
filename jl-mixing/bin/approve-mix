@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -eu
+
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    cat <<'EOF'
+Usage: approve-mix [options]
+
+This command is specified in docs/SCRIPT_REFERENCE.md but is not implemented
+in Batch 1.
+EOF
+    exit 0
+fi
+
+echo "approve-mix is not implemented in Batch 1." >&2
+exit 2

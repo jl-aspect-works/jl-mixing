@@ -1,0 +1,37 @@
+{
+  "metadata": {
+    "schema": "mixing-project",
+    "schema_version": "1.0.0",
+    "document_id": "{{DOCUMENT_ID}}",
+    "created_by": "new-mix",
+    "created_with": "jl-mixing {{SOFTWARE_VERSION}}",
+    "created_at": "{{CREATED_AT}}",
+    "last_modified_at": "{{CREATED_AT}}"
+  },
+  "project_id": "{{PROJECT_ID}}",
+  "project_name": "{{PROJECT_NAME}}",
+  "project_type": "mixing",
+  "client": {"client_document_id": "{{CLIENT_DOCUMENT_ID}}", "client_id": "{{CLIENT_ID}}"},
+  "artist": "{{ARTIST}}",
+  "album": "",
+  "producer": "",
+  "mix_engineer": "{{MIX_ENGINEER}}",
+  "music": {"bpm": null, "key": "", "time_signature": "4/4"},
+  "audio": {"sample_rate": 48000, "bit_depth": 24, "file_format": "WAV"},
+  "daw": {"name": "Logic Pro", "template": "", "project_path": "03_DAW_Project/Project"},
+  "delivery": {"method": "Cloud transfer", "requested_deliverables": ["main_mix", "instrumental"]},
+  "schedule": {"deadline": null},
+  "creative_direction": "",
+  "state": {
+    "status": "active",
+    "current_revision": 0,
+    "approved": false,
+    "approved_revision": null,
+    "approved_at": null,
+    "approved_by": "",
+    "delivered": false,
+    "delivered_at": null,
+    "completed_at": null
+  },
+  "revisions": []
+}
