@@ -7,7 +7,7 @@
 - [Developer Guide](DEVELOPER_GUIDE.md)
 - [Architecture Decisions](ARCHITECTURE_DECISIONS.md)
 - [Version 1.0 Scope Freeze](SCOPE_FREEZE_V1.md)
-- [Batch 2 Implementation](BATCH_2_IMPLEMENTATION.md)
+- [Project Maintenance](PROJECT_MAINTENANCE.md)
 - [Batch 3 Implementation](BATCH_3_IMPLEMENTATION.md)
 - [Batch 3 Code Documentation Pass](CODE_DOCUMENTATION_PASS.md)
 - [Batch 4 Implementation](BATCH_4_IMPLEMENTATION.md)
