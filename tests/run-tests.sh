@@ -23,10 +23,7 @@ docs/INSTALLATION_GUIDE.md
 docs/DEVELOPER_GUIDE.md
 docs/ARCHITECTURE_DECISIONS.md
 docs/SCOPE_FREEZE_V1.md
-docs/BATCH_2_IMPLEMENTATION.md
-docs/BATCH_3_IMPLEMENTATION.md
-docs/CODE_DOCUMENTATION_PASS.md
-docs/BATCH_4_IMPLEMENTATION.md
+docs/PROJECT_MAINTENANCE.md
 schemas/studio.schema.json
 schemas/client.schema.json
 schemas/project-manifest.schema.json
