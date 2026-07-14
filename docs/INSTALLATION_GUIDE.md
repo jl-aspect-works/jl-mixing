@@ -7,8 +7,8 @@ End users install from a versioned `.tar.gz` release archive. Git, a GitHub
 account, and repository configuration are not required.
 
 ```text
-jl-mixing-1.0.1-macos.tar.gz
-jl-mixing-1.0.1-linux.tar.gz
+jl-mixing-x.y.z-macos.tar.gz
+jl-mixing-x.y.z-linux.tar.gz
 ```
 
 ## Requirements
@@ -27,8 +27,8 @@ not install `jsonschema` globally and do not activate the application venv.
 ## Install
 
 ```bash
-tar -xzf jl-mixing-1.0.1-macos.tar.gz
-cd jl-mixing-1.0.1
+tar -xzf jl-mixing-x.y.z-macos.tar.gz
+cd jl-mixing-x.y.z
 ./install.sh
 ```
 

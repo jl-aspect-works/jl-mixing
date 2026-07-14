@@ -37,8 +37,8 @@ The downloaded files normally appear in `~/Downloads`.
 ```bash
 cd ~/Downloads
 
-tar -xzf jl-mixing-1.0.1-macos.tar.gz
-cd jl-mixing-1.0.1
+tar -xzf jl-mixing-x.y.z-macos.tar.gz
+cd jl-mixing-x.y.z
 
 ./install.sh
 ```
@@ -89,8 +89,8 @@ Logic Pro is the Version 1.0 default DAW. Existing workspaces created at
 ```bash
 cd ~/Downloads
 
-tar -xzf jl-mixing-1.0.1-linux.tar.gz
-cd jl-mixing-1.0.1
+tar -xzf jl-mixing-x.y.z-linux.tar.gz
+cd jl-mixing-x.y.z
 
 ./install.sh
 ```
@@ -107,8 +107,8 @@ source ~/.bashrc
 On macOS:
 
 ```bash
-shasum -a 256 jl-mixing-1.0.1-macos.tar.gz
-cat jl-mixing-1.0.1-macos.tar.gz.sha256
+shasum -a 256 jl-mixing-x.y.z-macos.tar.gz
+cat jl-mixing-x.y.z-macos.tar.gz.sha256
 ```
 
 The two SHA-256 values should match.
