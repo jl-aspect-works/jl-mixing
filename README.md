@@ -16,7 +16,138 @@ This repository contains the complete **Version 1.0 implementation**:
 - release tarball construction and verification; and
 - intent-focused comments throughout the codebase.
 
+## End-user installation
+
+End users do **not** need to clone this Git repository. Download the appropriate
+Version 1.0 release archive from the project's GitHub **Releases** page.
+
+### Requirements
+
+- macOS or Linux
+- Bash 3.2 or newer
+- Python 3.10 or newer
+- `jq`
+
+`ffprobe` is optional in Version 1.0 and enables enhanced intake inspection.
+
+### macOS installation
+
+The downloaded files normally appear in `~/Downloads`.
+
+```bash
+cd ~/Downloads
+
+tar -xzf jl-mixing-1.0.0-macos.tar.gz
+cd jl-mixing-1.0.0
+
+./install.sh
+```
+
+The default installation locations are:
+
+```text
+Application files: ~/.local/share/jl-mixing/
+Commands:          ~/.local/bin/
+```
+
+The installer creates a private Python environment for JL Mixing Automation and
+installs its pinned JSON Schema dependency. End users do not need to activate or
+manage that environment.
+
+If the installer reports that `~/.local/bin` is not in `PATH`, add it to the
+macOS Zsh configuration:
+
+```bash
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+```
+
+Verify the installation:
+
+```bash
+which new-studio
+new-studio --help
+```
+
+Start by creating the studio workspace:
+
+```bash
+new-studio
+```
+
+Logic Pro is the Version 1.0 default DAW.
+
+### Linux installation
+
+```bash
+cd ~/Downloads
+
+tar -xzf jl-mixing-1.0.0-linux.tar.gz
+cd jl-mixing-1.0.0
+
+./install.sh
+```
+
+If required, add the installed command directory to the shell configuration:
+
+```bash
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+### Optional checksum verification
+
+On macOS:
+
+```bash
+shasum -a 256 jl-mixing-1.0.0-macos.tar.gz
+cat jl-mixing-1.0.0-macos.tar.gz.sha256
+```
+
+The two SHA-256 values should match.
+
+On Linux:
+
+```bash
+sha256sum -c jl-mixing-1.0.0-linux.tar.gz.sha256
+```
+
+### Install to another location
+
+```bash
+./install.sh --prefix "$HOME/Applications/jl-local"
+```
+
+### Upgrade
+
+Download and extract the newer release archive, then run its installer:
+
+```bash
+./install.sh
+```
+
+Application files are replaced transactionally. Existing studio workspaces and
+projects are not modified.
+
+### Uninstall
+
+```bash
+jl-mixing-uninstall
+```
+
+Uninstallation removes the application and managed command launchers. It does
+not remove the default studio workspace at `~/Music/JL Mixing/` or another
+configured workspace.
+
+After a successful installation, the downloaded archive and extracted release
+directory may be deleted.
+
+See `docs/USER_GUIDE.md` and `docs/INSTALLATION_GUIDE.md` for the complete user
+workflow and installation details.
+
 ## Developer setup
+
+Clone the repository, then create a project-local Python environment:
 
 ```bash
 python3 -m venv .venv
@@ -24,8 +155,8 @@ source .venv/bin/activate
 python -m pip install -r packaging/requirements.txt
 ```
 
-The commands also require `jq`. `ffprobe` is optional and enables enhanced
-intake inspection.
+The commands also require `jq`. ShellCheck is used by the development and CI
+quality gates.
 
 ## Verify Version 1.0
 
@@ -37,6 +168,8 @@ make release-check
 ```
 
 ## Install from the source tree
+
+For development or source-tree testing:
 
 ```bash
 make install
@@ -54,7 +187,7 @@ PREFIX="$HOME/Applications/jl-local" make install
 make release
 ```
 
-Release archives are written under `dist/`.
+Release archives, checksums, and inventories are written under `dist/`.
 
-See `docs/USER_GUIDE.md`, `docs/INSTALLATION_GUIDE.md`, and
-`docs/BATCH_4_IMPLEMENTATION.md`.
+See `docs/DEVELOPER_GUIDE.md` and `docs/BATCH_4_IMPLEMENTATION.md` for developer
+and release-engineering details.
