@@ -28,7 +28,7 @@ new-studio [--root PATH] [--name NAME] [--daw NAME] [--engineer NAME]
 ```
 
 Defaults include Logic Pro, 48 kHz, 24-bit WAV, and
-`~/Music/JL Mixing`. It never overwrites an existing workspace.
+`~/Music/Mixes`. It never overwrites an existing workspace.
 
 ### `new-client`
 

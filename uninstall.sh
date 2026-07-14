@@ -2,7 +2,7 @@
 # Remove JL Mixing Automation application files and managed command launchers.
 #
 # The uninstaller is deliberately scoped to the installation prefix. It never
-# reads, changes, or deletes a studio workspace such as ~/Music/JL Mixing.
+# reads, changes, or deletes a studio workspace such as ~/Music/Mixes.
 set -eu
 
 usage() {

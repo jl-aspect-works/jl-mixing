@@ -7,8 +7,8 @@ End users install from a versioned `.tar.gz` release archive. Git, a GitHub
 account, and repository configuration are not required.
 
 ```text
-jl-mixing-1.0.0-macos.tar.gz
-jl-mixing-1.0.0-linux.tar.gz
+jl-mixing-1.0.1-macos.tar.gz
+jl-mixing-1.0.1-linux.tar.gz
 ```
 
 ## Requirements
@@ -27,8 +27,8 @@ not install `jsonschema` globally and do not activate the application venv.
 ## Install
 
 ```bash
-tar -xzf jl-mixing-1.0.0-macos.tar.gz
-cd jl-mixing-1.0.0
+tar -xzf jl-mixing-1.0.1-macos.tar.gz
+cd jl-mixing-1.0.1
 ./install.sh
 ```
 
@@ -75,7 +75,9 @@ new-studio
 ```
 
 Installation and workspace initialization are separate. Installing or upgrading
-JL Mixing never creates or changes client projects.
+JL Mixing never creates or changes client projects. New studios default to
+`~/Music/Mixes/`. Existing workspaces created at `~/Music/JL Mixing/` are not
+moved or renamed during an upgrade.
 
 ## Upgrade
 
@@ -102,7 +104,7 @@ Or from an extracted package:
 ```
 
 Uninstallation removes the application and its managed launchers. It never
-removes `~/Music/JL Mixing/` or another configured workspace.
+removes `~/Music/Mixes/` or another configured workspace.
 
 ## Troubleshooting
 

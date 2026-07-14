@@ -18,7 +18,7 @@ JL_CONFIG_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Return the configured workspace root or the product default.
 jl_config_default_root() {
-    printf '%s\n' "${JL_MIXING_ROOT:-$HOME/Music/JL Mixing}"
+    printf '%s\n' "${JL_MIXING_ROOT:-$HOME/Music/Mixes}"
 }
 
 # Build the studio.json path for a workspace root.

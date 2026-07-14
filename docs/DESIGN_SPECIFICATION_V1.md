@@ -21,12 +21,12 @@ audio projects. The DAW remains responsible for its own project contents.
 - Product name: **JL Mixing Automation**
 - Software and repository identifier: `jl-mixing`
 - Metadata string: `jl-mixing <version>`
-- Default workspace: `~/Music/JL Mixing`
+- Default workspace: `~/Music/Mixes`
 
 ## Studio workspace
 
 ```text
-~/Music/JL Mixing/
+~/Music/Mixes/
 ├── Clients/
 ├── DAWs/
 └── Studio/

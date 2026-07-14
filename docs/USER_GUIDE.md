@@ -31,7 +31,7 @@ complete-project
 new-studio
 ```
 
-Accepting all defaults creates `~/Music/JL Mixing`, configures Logic Pro, and
+Accepting all defaults creates `~/Music/Mixes`, configures Logic Pro, and
 creates `Studio/studio.json`.
 
 ## Create a client

@@ -54,6 +54,6 @@ jl-mixing-uninstall
 ```
 
 Uninstallation removes the application and managed launchers only. It never
-removes `~/Music/JL Mixing/` or another configured studio workspace.
+removes `~/Music/Mixes/` or another configured studio workspace.
 
 See `docs/USER_GUIDE.md` and `docs/INSTALLATION_GUIDE.md` for complete details.

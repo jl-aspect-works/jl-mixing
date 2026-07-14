@@ -37,8 +37,8 @@ The downloaded files normally appear in `~/Downloads`.
 ```bash
 cd ~/Downloads
 
-tar -xzf jl-mixing-1.0.0-macos.tar.gz
-cd jl-mixing-1.0.0
+tar -xzf jl-mixing-1.0.1-macos.tar.gz
+cd jl-mixing-1.0.1
 
 ./install.sh
 ```
@@ -75,15 +75,22 @@ Start by creating the studio workspace:
 new-studio
 ```
 
-Logic Pro is the Version 1.0 default DAW.
+The default workspace for a new installation is:
+
+```text
+~/Music/Mixes/
+```
+
+Logic Pro is the Version 1.0 default DAW. Existing workspaces created at
+`~/Music/JL Mixing/` are not moved or renamed during an upgrade.
 
 ### Linux installation
 
 ```bash
 cd ~/Downloads
 
-tar -xzf jl-mixing-1.0.0-linux.tar.gz
-cd jl-mixing-1.0.0
+tar -xzf jl-mixing-1.0.1-linux.tar.gz
+cd jl-mixing-1.0.1
 
 ./install.sh
 ```
@@ -100,8 +107,8 @@ source ~/.bashrc
 On macOS:
 
 ```bash
-shasum -a 256 jl-mixing-1.0.0-macos.tar.gz
-cat jl-mixing-1.0.0-macos.tar.gz.sha256
+shasum -a 256 jl-mixing-1.0.1-macos.tar.gz
+cat jl-mixing-1.0.1-macos.tar.gz.sha256
 ```
 
 The two SHA-256 values should match.
@@ -109,7 +116,7 @@ The two SHA-256 values should match.
 On Linux:
 
 ```bash
-sha256sum -c jl-mixing-1.0.0-linux.tar.gz.sha256
+sha256sum -c jl-mixing-1.0.1-linux.tar.gz.sha256
 ```
 
 ### Install to another location
@@ -136,7 +143,7 @@ jl-mixing-uninstall
 ```
 
 Uninstallation removes the application and managed command launchers. It does
-not remove the default studio workspace at `~/Music/JL Mixing/` or another
+not remove the default studio workspace at `~/Music/Mixes/` or another
 configured workspace.
 
 After a successful installation, the downloaded archive and extracted release

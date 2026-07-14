@@ -31,7 +31,7 @@ usage() {
 Usage: new-studio [options]
 
 Options:
-  --root PATH          Workspace root (default: ~/Music/JL Mixing)
+  --root PATH          Workspace root (default: ~/Music/Mixes)
   --name NAME          Studio name (default: Mixing Studio)
   --daw NAME           Default DAW (default: Logic Pro)
   --engineer NAME      Default mix engineer
@@ -44,7 +44,7 @@ Options:
 USAGE
 }
 
-root="${JL_MIXING_ROOT:-$HOME/Music/JL Mixing}"
+root="${JL_MIXING_ROOT:-$HOME/Music/Mixes}"
 studio_name="Mixing Studio"
 default_daw="Logic Pro"
 default_engineer=""
