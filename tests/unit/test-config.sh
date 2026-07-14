@@ -15,7 +15,7 @@ cp "$ROOT/examples/studio.json" "$tmp/Studio/studio.json"
 cp "$ROOT/examples/client.json" "$tmp/Clients/Acme/client.json"
 
 # Assert: verify observable behavior rather than internal implementation.
-default_root="$(HOME="$tmp/home" JL_MIXING_ROOT=jl_config_default_root)"
+default_root="$(HOME="$tmp/home" JL_MIXING_ROOT= jl_config_default_root)"
 assert_eq "$tmp/home/Music/Mixes" "$default_root" "default workspace root"
 assert_eq "$tmp/Studio/studio.json" "$(jl_config_file "$tmp")" "config path"
 assert_success "valid studio root" jl_config_validate_root "$tmp"
