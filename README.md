@@ -32,7 +32,10 @@ Version 1.0 release archive from the project's GitHub **Releases** page.
 
 ### macOS installation
 
-The downloaded files normally appear in `~/Downloads`.
+The release archive may be downloaded and extracted in `~/Downloads` or any
+other convenient temporary location. The extracted `jl-mixing-x.y.z` directory
+is **not** the permanent application location; it only contains the installation
+files used by `install.sh`.
 
 ```bash
 cd ~/Downloads
@@ -43,7 +46,9 @@ cd jl-mixing-x.y.z
 ./install.sh
 ```
 
-The default installation locations are:
+Running `install.sh` copies JL Mixing Automation to its permanent per-user
+installation directories:
+
 
 ```text
 Application files: ~/.local/share/jl-mixing/
@@ -86,6 +91,10 @@ Logic Pro is the Version 1.0 default DAW. Existing workspaces created at
 
 ### Linux installation
 
+As on macOS, the archive may be extracted in `~/Downloads` or another temporary
+directory. The installer copies the application to `~/.local/share/jl-mixing/`
+and the commands to `~/.local/bin/`.
+
 ```bash
 cd ~/Downloads
 
@@ -116,7 +125,7 @@ The two SHA-256 values should match.
 On Linux:
 
 ```bash
-sha256sum -c jl-mixing-1.0.1-linux.tar.gz.sha256
+sha256sum -c jl-mixing-x.y.z-linux.tar.gz.sha256
 ```
 
 ### Install to another location
@@ -146,8 +155,9 @@ Uninstallation removes the application and managed command launchers. It does
 not remove the default studio workspace at `~/Music/Mixes/` or another
 configured workspace.
 
-After a successful installation, the downloaded archive and extracted release
-directory may be deleted.
+After installation succeeds, you may delete both the downloaded archive and
+the temporary extracted `jl-mixing-x.y.z` directory. Removing those files does
+not uninstall the application.
 
 See `docs/USER_GUIDE.md` and `docs/INSTALLATION_GUIDE.md` for the complete user
 workflow and installation details.
