@@ -1,8 +1,8 @@
-# Batch 3 Code Documentation Pass
+# Code Documentation Notes
 
 ## Purpose
 
-This revision adds explanatory comments to the Batch 3 implementation without
+This revision adds explanatory comments to the implementation without
 changing its public behavior. Comments focus on:
 
 - File and module responsibilities

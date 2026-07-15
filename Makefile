@@ -56,7 +56,7 @@ install:
 uninstall:
 	@./uninstall.sh --prefix "$${PREFIX:-$$HOME/.local}"
 
-# Run only the Batch 4 installation and package lifecycle tests.
+# Run only the v1.1 installation and package lifecycle tests.
 install-test:
 	@JL_TEST_STRICT=1 tests/installation/test-installation.sh
 	@JL_TEST_STRICT=1 tests/installation/test-release-package.sh

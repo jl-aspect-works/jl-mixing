@@ -1,10 +1,10 @@
 # Build and publish JL Mixing Automation release packages.
 #
 # Normal use:
-#   Push an annotated tag such as v1.0.4.
+#   Push an annotated tag such as v1.1.0.
 #
 # Recovery use:
-#   Run this workflow manually and enter an existing tag, such as v1.0.3.
+#   Run this workflow manually and enter an existing tag, such as v1.1.0.
 #   This is useful when package builds succeeded but the publish job failed.
 
 name: Release
@@ -17,7 +17,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Existing release tag to build and publish, such as v1.0.3"
+        description: "Existing release tag to build and publish, such as v1.1.0"
         required: true
         type: string
 
@@ -169,6 +169,13 @@ jobs:
     needs: build
 
     steps:
+      - name: Check out release notes
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          sparse-checkout: docs/RELEASE_NOTES_V1.1.md
+          sparse-checkout-cone-mode: false
+
       # Download and merge the macOS and Linux workflow artifacts into one
       # directory. Their platform-specific filenames prevent collisions.
       - name: Download release assets
@@ -196,11 +203,9 @@ jobs:
               exit 1
           fi
 
-      # The publish job intentionally has no Git checkout. Supplying --repo
-      # tells the GitHub CLI exactly which repository owns the release.
-      #
-      # If a prior attempt already created the release, upload replaces its
-      # assets. Otherwise, create the release and generate release notes.
+      # Supplying --repo tells the GitHub CLI exactly which repository owns the
+      # release. A new release uses the reviewed v1.1 notes checked out above.
+      # If a prior attempt already created the release, upload replaces assets.
       - name: Create or update GitHub release
         shell: bash
         env:
@@ -237,5 +242,5 @@ jobs:
                   --repo "$GITHUB_REPOSITORY" \
                   --verify-tag \
                   --title "JL Mixing Automation ${tag#v}" \
-                  --generate-notes
+                  --notes-file docs/RELEASE_NOTES_V1.1.md
           fi

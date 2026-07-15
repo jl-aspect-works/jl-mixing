@@ -23,6 +23,29 @@ archive="$(find "$temp_root/dist" -name '*.tar.gz' -type f | head -n 1)"
 pass "release archive created"
 assert_file_exists "$archive.sha256"
 assert_file_exists "$archive.inventory.txt"
-assert_success "release archive verifies" "$ROOT/tools/verify-release-archive" "$archive"
+assert_contains "$(cat "$archive.inventory.txt")" 'tools/project-state.py' \
+    "project-state tool included in release archive"
+assert_contains "$(cat "$archive.inventory.txt")" 'schemas/client-profile-snapshot.schema.json' \
+    "snapshot schema included in release archive"
+assert_contains "$(cat "$archive.inventory.txt")" 'templates/Intake_Report.md' \
+    "canonical Markdown templates included in release archive"
+assert_contains "$(cat "$archive.inventory.txt")" 'bin/jl-mixing-shell-integration' \
+    "shell integration included in release archive"
+assert_contains "$(cat "$archive.inventory.txt")" 'tools/manage-shell-config.py' \
+    "shell configuration helper included in release archive"
+assert_contains "$(cat "$archive.inventory.txt")" 'CHANGELOG.md' \
+    "changelog included in release archive"
+assert_contains "$(cat "$archive.inventory.txt")" 'docs/RELEASE_NOTES_V1.1.md' \
+    "release notes included in release archive"
+assert_failure "obsolete complete-project omitted from release archive" \
+    grep -q 'bin/complete-project' "$archive.inventory.txt"
+verify_output="$(
+    "$ROOT/tools/verify-release-archive" "$archive" 2>&1
+)" || {
+    printf '%s\n' "$verify_output" >&2
+    fail "release archive verifies"
+}
 
+printf '%s\n' "$verify_output"
+pass "release archive verifies"
 echo "[OK] release package ($TEST_COUNT assertions)"

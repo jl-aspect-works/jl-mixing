@@ -27,14 +27,19 @@ for forbidden in .git .github tests examples .venv; do
     fi
 done
 
-for required in install.sh uninstall.sh VERSION LICENSE README.md RELEASE_MANIFEST.txt \
-    bin lib schemas templates docs tools/validate-json.py tools/build-intake-report.py \
-    packaging/requirements.txt; do
+for required in install.sh uninstall.sh VERSION LICENSE README.md CHANGELOG.md RELEASE_MANIFEST.txt \
+    bin lib schemas templates docs tools/validate-json.py tools/build-intake-report.py tools/project-state.py \
+    tools/import-project-source.py tools/import-revision-source.py tools/build-delivery.py \
+    tools/manage-shell-config.py packaging/requirements.txt; do
     [ -e "$package_root/$required" ] || {
         echo "Missing release content: $required" >&2
         exit 5
     }
 done
+
+[ ! -e "$package_root/bin/complete-project" ] || { echo "Obsolete complete-project command was packaged." >&2; exit 5; }
+[ ! -e "$package_root/schemas/legacy" ] || { echo "Legacy schemas were packaged." >&2; exit 5; }
+[ ! -e "$package_root/templates/project" ] || { echo "Obsolete project templates were packaged." >&2; exit 5; }
 
 [ -x "$package_root/install.sh" ] || { echo "install.sh is not executable." >&2; exit 5; }
 [ -x "$package_root/bin/new-studio" ] || { echo "commands are not executable." >&2; exit 5; }
@@ -43,21 +48,62 @@ done
 # isolated and install the pinned dependency normally.
 prefix="$work_dir/prefix"
 workspace="$work_dir/studio-workspace"
-JL_MIXING_TEST_SYSTEM_SITE_PACKAGES=1 "$package_root/install.sh" --prefix "$prefix" >/dev/null
-PATH="$prefix/bin:$PATH" new-studio --root "$workspace" --non-interactive >/dev/null
+fake_home="$work_dir/home"
+mkdir -p "$fake_home"
+HOME="$fake_home" SHELL=/bin/bash JL_MIXING_TEST_SYSTEM_SITE_PACKAGES=1 \
+    "$package_root/install.sh" --prefix "$prefix" >/dev/null
+[ -f "$fake_home/.bashrc" ] || { echo "Installer did not configure .bashrc." >&2; exit 5; }
+[ -f "$prefix/bin/jl-mixing-shell-integration" ] || { echo "Shell integration was not installed." >&2; exit 5; }
+PATH="$prefix/bin:$PATH" new-studio --root "$workspace" >/dev/null
 [ -f "$workspace/Studio/studio.json" ] || {
     echo "Installed command failed to create studio.json." >&2
     exit 5
 }
+[ ! -e "$prefix/bin/complete-project" ] || {
+    echo "Obsolete complete-project launcher was installed." >&2
+    exit 5
+}
+JL_MIXING_ROOT="$workspace" PATH="$prefix/bin:$PATH" \
+    new-client release-client \
+        --name "Release Client" \
+        --artist "Release Test Artist" >/dev/null
+client_root="$workspace/Clients/Release Client"
+
+stored_artist="$(jq -r '.defaults.artist // empty' "$client_root/client.json")"
+[ "$stored_artist" = "Release Test Artist" ] || {
+    echo "Installed new-client did not preserve the configured artist." >&2
+    exit 5
+}
+
+JL_MIXING_ROOT="$workspace" PATH="$prefix/bin:$PATH" \
+    new-mix \
+        --client release-client \
+        --project "Release Project" \
+        --artist "Release Test Artist" >/dev/null
+project_root="$client_root/Projects/Release Project"
+printf 'release notes\n' > "$project_root/01_Client_Files/Original_Delivery/Notes.txt"
+PATH="$prefix/bin:$PATH" validate-intake --project "$project_root" >/dev/null
+PATH="$prefix/bin:$PATH" new-revision --project "$project_root" \
+    --description "Release candidate" >/dev/null
+printf 'release mix\n' > "$project_root/04_Revisions/Revision_01/Release Main Mix.wav"
+PATH="$prefix/bin:$PATH" approve-mix --project "$project_root" \
+    --date 2030-01-01T12:00:00Z >/dev/null
+PATH="$prefix/bin:$PATH" create-delivery --project "$project_root" >/dev/null
+[ -f "$project_root/05_Final_Delivery/delivery-manifest.json" ] || {
+    echo "Installed workflow failed to create delivery manifest." >&2
+    exit 5
+}
 
 # Reinstall over the same prefix to exercise the transactional upgrade path.
-JL_MIXING_TEST_SYSTEM_SITE_PACKAGES=1 "$package_root/install.sh" --prefix "$prefix" >/dev/null
+HOME="$fake_home" SHELL=/bin/bash JL_MIXING_TEST_SYSTEM_SITE_PACKAGES=1 \
+    "$package_root/install.sh" --prefix "$prefix" >/dev/null
 [ -f "$workspace/Studio/studio.json" ] || {
     echo "Upgrade modified the studio workspace." >&2
     exit 5
 }
 
-"$prefix/bin/jl-mixing-uninstall" >/dev/null
+HOME="$fake_home" SHELL=/bin/bash "$prefix/bin/jl-mixing-uninstall" >/dev/null
+[ ! -e "$fake_home/.bashrc" ] || { echo "Uninstall left installer-created .bashrc." >&2; exit 5; }
 [ ! -e "$prefix/share/jl-mixing" ] || {
     echo "Application remained after uninstall." >&2
     exit 5

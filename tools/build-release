@@ -74,15 +74,24 @@ mkdir -p "$package_root"
 
 # Runtime directories are copied intact because command-relative paths are part
 # of the installed application contract.
-cp "$ROOT/VERSION" "$ROOT/LICENSE" "$ROOT/install.sh" "$ROOT/uninstall.sh" "$package_root/"
+cp "$ROOT/VERSION" "$ROOT/LICENSE" "$ROOT/CHANGELOG.md" \
+    "$ROOT/install.sh" "$ROOT/uninstall.sh" "$package_root/"
 cp "$ROOT/packaging/RELEASE_README.md" "$package_root/README.md"
 cp -R "$ROOT/bin" "$ROOT/lib" "$ROOT/schemas" "$ROOT/templates" "$ROOT/docs" "$package_root/"
 mkdir -p "$package_root/tools" "$package_root/packaging"
-cp "$ROOT/tools/validate-json.py" "$ROOT/tools/build-intake-report.py" "$package_root/tools/"
+cp "$ROOT/tools/validate-json.py" "$ROOT/tools/build-intake-report.py" \
+    "$ROOT/tools/project-state.py" "$ROOT/tools/import-project-source.py" \
+    "$ROOT/tools/import-revision-source.py" "$ROOT/tools/build-delivery.py" \
+    "$ROOT/tools/manage-shell-config.py" "$package_root/tools/"
 cp "$ROOT/packaging/requirements.txt" "$package_root/packaging/"
 
 chmod +x "$package_root/install.sh" "$package_root/uninstall.sh" "$package_root/bin/"* \
-    "$package_root/tools/validate-json.py" "$package_root/tools/build-intake-report.py"
+    "$package_root/tools/validate-json.py" "$package_root/tools/build-intake-report.py" \
+    "$package_root/tools/project-state.py" \
+    "$package_root/tools/import-project-source.py" \
+    "$package_root/tools/import-revision-source.py" \
+    "$package_root/tools/build-delivery.py" \
+    "$package_root/tools/manage-shell-config.py"
 
 # Record the exact release contents for human review and archive verification.
 (

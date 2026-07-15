@@ -1,95 +1,74 @@
-# JL Mixing Automation
-## Installation Guide v1.0
-
-## Distribution
-
-End users install from a versioned `.tar.gz` release archive. Git, a GitHub
-account, and repository configuration are not required.
-
-```text
-jl-mixing-x.y.z-macos.tar.gz
-jl-mixing-x.y.z-linux.tar.gz
-```
+# JL Mixing Automation v1.1 Installation Guide
 
 ## Requirements
 
+- macOS or Linux
 - Bash 3.2 or newer
-- Python 3.10 or newer
+- Python 3.10 or newer with `venv`
 - `jq`
+- Network access to install the pinned Python dependency unless the release
+  includes an offline wheelhouse
 
-Optional:
+`ffprobe` is optional and is checked only when `validate-intake` uses it.
 
-- `ffprobe` for enhanced audio intake inspection
+## Standard installation
 
-The installer creates and manages its own private Python environment. Users do
-not install `jsonschema` globally and do not activate the application venv.
-
-## Install
+Extract the release archive and run:
 
 ```bash
-tar -xzf jl-mixing-x.y.z-macos.tar.gz
-cd jl-mixing-x.y.z
 ./install.sh
 ```
 
 Default locations:
 
 ```text
-Application: ~/.local/share/jl-mixing/
-Commands:    ~/.local/bin/
+~/.local/share/jl-mixing/
+~/.local/bin/
 ```
 
-Use another prefix when needed:
+The installer builds and verifies the complete application in a staging area,
+then commits the application, launchers, and shell configuration together. A
+failed install restores the previous working version.
+
+## Automatic shell configuration
+
+By default, the installer detects bash or zsh and manages exactly one block in
+`.bashrc` or `.zshrc`:
+
+```text
+# >>> JL Mixing managed configuration >>>
+...
+# <<< JL Mixing managed configuration <<<
+```
+
+The block adds the single installed `bin` directory to `PATH` and sources the
+wrapper integration used by `--cd`. Existing startup-file content outside the
+block is preserved byte-for-byte. Open a new Terminal tab after installation.
+
+To avoid startup-file modification:
+
+```bash
+./install.sh --no-shell-integration
+```
+
+The commands still work; automatic directory changes fall back to a quoted
+copy-and-paste `cd` command.
+
+## Custom prefix
 
 ```bash
 ./install.sh --prefix "$HOME/Applications/jl-local"
 ```
 
-The installer verifies dependencies, stages application assets, creates the
-private Python environment, installs the pinned validator, and writes managed
-command launchers.
-
-## PATH
-
-If the command directory is not already in `PATH`, the installer prints the
-exact export line to add. It does not silently edit `.zshrc`, `.bashrc`, or
-another shell startup file.
-
-For the default prefix:
-
-```bash
-export PATH="$HOME/.local/bin:$PATH"
-```
-
-## Verify
-
-```bash
-new-studio --help
-new-client --help
-```
-
-## Initialize the workspace
-
-```bash
-new-studio
-```
-
-Installation and workspace initialization are separate. Installing or upgrading
-JL Mixing never creates or changes client projects. New studios default to
-`~/Music/Mixes/`. Existing workspaces created at `~/Music/JL Mixing/` are not
-moved or renamed during an upgrade.
+The environment variable `JL_MIXING_INSTALL_PREFIX` is also supported, but an
+explicit `--prefix` takes precedence.
 
 ## Upgrade
 
-Extract the new release and run its installer:
-
-```bash
-./install.sh
-```
-
-The installer replaces application files transactionally. If installation
-fails, the prior application is restored. The studio workspace is never part of
-the upgrade transaction.
+Extract the newer release and run its installer with the same prefix. Reinstall
+is idempotent: the single managed shell block is replaced in place and the
+active application is not changed until the staged version passes verification.
+Studio workspaces are never modified.
 
 ## Uninstall
 
@@ -97,36 +76,13 @@ the upgrade transaction.
 jl-mixing-uninstall
 ```
 
-Or from an extracted package:
+The uninstaller removes managed application files, launchers, and the exact
+managed shell block as one rollback-capable transaction. Studio workspaces,
+audio, and project data are never removed. Open a new Terminal tab afterward to
+clear already-loaded shell functions and PATH entries.
 
-```bash
-./uninstall.sh
-```
+## Fresh workspace requirement
 
-Uninstallation removes the application and its managed launchers. It never
-removes `~/Music/Mixes/` or another configured workspace.
-
-## Troubleshooting
-
-### `python3` is missing or too old
-
-Install Python 3.10 or newer, then rerun the installer.
-
-### `jq` is missing
-
-Install `jq`, then rerun the installer.
-
-### Python package installation fails
-
-Confirm that Python can reach its configured package index and that SSL
-certificates are installed correctly. A failed upgrade restores the prior
-application.
-
-### Command not found
-
-Add the installed command directory to `PATH`, open a new terminal, and retry.
-
-### Existing studio workspace
-
-`new-studio` intentionally refuses to overwrite an existing workspace. Use the
-existing configuration or choose another `--root`.
+v1.1 requires a newly created workspace. Installation or upgrade does not
+migrate v1.0 workspaces. Use a separate root when retaining a v1.0 workspace for
+reference.

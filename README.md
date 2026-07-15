@@ -1,210 +1,128 @@
 # JL Mixing Automation
 
-JL Mixing Automation standardizes project setup, intake validation, revision
-tracking, final delivery, and project completion for professional audio work.
+JL Mixing Automation v1.1 creates and manages a consistent filesystem workflow
+for professional mixing projects. It preserves original client files, tracks
+revision approvals, and builds verified final-delivery packages without taking
+ownership of the DAW session itself.
 
-This repository contains the complete **Version 1.0 implementation**:
+## v1.1 workflow
 
-- approved design documentation;
-- JSON Schemas and valid examples;
-- Markdown and JSON templates;
-- shared Bash libraries;
-- all eight user-facing commands;
-- unit and integration tests;
-- transactional installation and upgrades;
-- safe uninstallation;
-- release tarball construction and verification; and
-- intent-focused comments throughout the codebase.
+```text
+new-studio
+  → new-client
+  → new-mix
+  → validate-intake
+  → new-revision
+  → send the revision to the client manually
+  → approve-mix
+  → create-delivery
+```
 
-## End-user installation
+The default workspace is `~/Music/Mixes/`. Projects have stable paths beneath
+`Clients/<Client>/Projects/<Project>/`; there are no `Active/` or `Completed/`
+directories and no project-completion command.
 
-End users do **not** need to clone this Git repository. Download the appropriate
-Version 1.0 release archive from the project's GitHub **Releases** page.
-
-### Requirements
+## Requirements
 
 - macOS or Linux
 - Bash 3.2 or newer
 - Python 3.10 or newer
 - `jq`
+- `ffprobe` is optional and preserves the opportunistic intake inspection
+  available in v1.0.4
 
-`ffprobe` is optional in Version 1.0 and enables enhanced intake inspection.
-
-### macOS installation
-
-The release archive may be downloaded and extracted in `~/Downloads` or any
-other convenient temporary location. The extracted `jl-mixing-x.y.z` directory
-is **not** the permanent application location; it only contains the installation
-files used by `install.sh`.
+## Install a release archive
 
 ```bash
 cd ~/Downloads
-
-tar -xzf jl-mixing-x.y.z-macos.tar.gz
-cd jl-mixing-x.y.z
-
+tar -xzf jl-mixing-1.1.0-macos.tar.gz
+cd jl-mixing-1.1.0
 ./install.sh
 ```
 
-Running `install.sh` copies JL Mixing Automation to its permanent per-user
-installation directories:
-
+Use the `linux` archive name on Linux. The default installation is:
 
 ```text
-Application files: ~/.local/share/jl-mixing/
-Commands:          ~/.local/bin/
+Application: ~/.local/share/jl-mixing/
+Commands:    ~/.local/bin/
 ```
 
-The installer creates a private Python environment for JL Mixing Automation and
-installs its pinned JSON Schema dependency. End users do not need to activate or
-manage that environment.
+The installer adds one reversible managed block to `.zshrc` or `.bashrc`. That
+single block adds the command directory to `PATH` and loads the optional shell
+wrappers used by `--cd`. Open a new Terminal tab after installation, or source
+the startup file shown by the installer.
 
-If the installer reports that `~/.local/bin` is not in `PATH`, add it to the
-macOS Zsh configuration:
+To install without editing shell configuration:
 
 ```bash
-echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
-source ~/.zshrc
+./install.sh --no-shell-integration
 ```
 
-Verify the installation:
-
-```bash
-which new-studio
-new-studio --help
-```
-
-Start by creating the studio workspace:
-
-```bash
-new-studio
-```
-
-The default workspace for a new installation is:
-
-```text
-~/Music/Mixes/
-```
-
-Logic Pro is the Version 1.0 default DAW. Existing workspaces created at
-`~/Music/JL Mixing/` are not moved or renamed during an upgrade.
-
-### Linux installation
-
-As on macOS, the archive may be extracted in `~/Downloads` or another temporary
-directory. The installer copies the application to `~/.local/share/jl-mixing/`
-and the commands to `~/.local/bin/`.
-
-```bash
-cd ~/Downloads
-
-tar -xzf jl-mixing-x.y.z-linux.tar.gz
-cd jl-mixing-x.y.z
-
-./install.sh
-```
-
-If required, add the installed command directory to the shell configuration:
-
-```bash
-echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
-source ~/.bashrc
-```
-
-### Optional checksum verification
-
-On macOS:
-
-```bash
-shasum -a 256 jl-mixing-x.y.z-macos.tar.gz
-cat jl-mixing-x.y.z-macos.tar.gz.sha256
-```
-
-The two SHA-256 values should match.
-
-On Linux:
-
-```bash
-sha256sum -c jl-mixing-x.y.z-linux.tar.gz.sha256
-```
-
-### Install to another location
+To install under another prefix:
 
 ```bash
 ./install.sh --prefix "$HOME/Applications/jl-local"
 ```
 
-### Upgrade
-
-Download and extract the newer release archive, then run its installer:
+## Start
 
 ```bash
-./install.sh
+new-studio
+new-client acme --name "Acme Records"
+cd "$HOME/Music/Mixes/Clients/Acme Records"
+new-mix --project "Blue Sky"
 ```
 
-Application files are replaced transactionally. Existing studio workspaces and
-projects are not modified.
+Creation commands print a copy-and-paste `Next:` command. When shell integration
+is active, `new-client`, `new-mix`, and `new-revision` can change the current
+Terminal directory with `--cd`; the studio-wide default is configured by
+`new-studio --default-cd`.
 
-### Uninstall
+## Important v1.1 compatibility rule
+
+JL Mixing Automation v1.1 requires a newly created v1.1 workspace. It does not
+migrate, restructure, or modify v1.0 workspaces. Copy only user-owned material,
+such as original client deliveries or notes, into newly created v1.1 projects.
+Do not copy v1.0 JSON manifests or complete v1.0 project directories.
+
+## Delivery behavior
+
+`create-delivery` always packages the approved revision. Every selected regular
+file is eligible regardless of extension. Familiar filename phrases are
+classified on a best-effort basis; unmatched files are recorded as
+`unclassified` and are still delivered.
+
+`create-delivery --clean` is intentionally destructive: it replaces every item
+inside the resolved project's `05_Final_Delivery/` directory. Dry-run lists the
+planned deletions before any changes occur.
+
+## Upgrade and uninstall
+
+Running a newer release's `install.sh` upgrades the application transactionally
+without modifying studio workspaces.
 
 ```bash
 jl-mixing-uninstall
 ```
 
-Uninstallation removes the application and managed command launchers. It does
-not remove the default studio workspace at `~/Music/Mixes/` or another
-configured workspace.
+Uninstall removes the application, managed launchers, and the exact managed
+shell block. It never removes studio workspaces.
 
-After installation succeeds, you may delete both the downloaded archive and
-the temporary extracted `jl-mixing-x.y.z` directory. Removing those files does
-not uninstall the application.
-
-See `docs/USER_GUIDE.md` and `docs/INSTALLATION_GUIDE.md` for the complete user
-workflow and installation details.
-
-## Developer setup
-
-Clone the repository, then create a project-local Python environment:
+## Developer setup and quality gates
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r packaging/requirements.txt
-```
 
-The commands also require `jq`. ShellCheck is used by the development and CI
-quality gates.
-
-## Verify Version 1.0
-
-```bash
 make test
 make strict-test
 tools/shellcheck-all
 make release-check
 ```
 
-## Install from the source tree
+Release archives, checksums, and inventories are written to `dist/` by
+`make release`.
 
-For development or source-tree testing:
-
-```bash
-make install
-```
-
-Or install to another prefix:
-
-```bash
-PREFIX="$HOME/Applications/jl-local" make install
-```
-
-## Build the end-user package
-
-```bash
-make release
-```
-
-Release archives, checksums, and inventories are written under `dist/`.
-
-See `docs/DEVELOPER_GUIDE.md` and `docs/BATCH_4_IMPLEMENTATION.md` for developer
-and release-engineering details.
+See [docs/README.md](docs/README.md) for the full documentation index and
+[docs/RELEASE_NOTES_V1.1.md](docs/RELEASE_NOTES_V1.1.md) for release highlights.

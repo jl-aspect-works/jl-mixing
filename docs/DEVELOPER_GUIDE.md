@@ -1,108 +1,68 @@
-# JL Mixing Automation
-## Developer Guide v1.0
+# JL Mixing Automation v1.1 Developer Guide
 
 ## Repository architecture
 
 ```text
-bin/        Thin user-facing command wrappers
-lib/        Shared business logic
-schemas/    Draft 2020-12 JSON Schemas
-templates/  Generated Markdown and JSON source templates
-docs/       Approved product and developer documentation
-tests/      Unit, integration, and artifact tests
-tools/      Development and release utilities
-examples/   Valid example documents
-packaging/  Release dependency and packaging metadata
-```
-
-## Shared libraries
-
-```text
-common.sh
-config.sh
-context.sh
-filesystem.sh
-json.sh
-metadata.sh
-naming.sh
-platform.sh
-revision.sh
-templates.sh
-validation.sh
+bin/        User-facing Bash commands
+lib/        Shared Bash logic
+schemas/    Strict Draft 2020-12 v1.1 schemas
+templates/  Runtime JSON and Markdown templates
+docs/       User, design, and release documentation
+tests/      Unit, integration, installation, and package tests
+tools/      Python helpers and release utilities
+examples/   Canonical valid v1.1 JSON documents
+packaging/  Runtime dependency metadata
 ```
 
 ## Coding standards
 
-- Target Bash 3.2 compatibility on macOS.
-- Prefer readable functions over clever shell constructs.
+- Maintain Bash 3.2 compatibility on macOS.
+- Do not rely on empty-array expansion under `set -u`.
 - Quote expansions unless splitting is intentional.
-- Validate all external input.
-- Use atomic JSON updates.
-- Make errors explain what failed, why, and how to correct it.
-- Keep business logic out of `bin/`.
-- Tests must use isolated temporary workspaces.
+- Validate external input and reject symlinks at ownership boundaries.
+- Use same-filesystem staging and rollback-capable transactions.
+- Keep user-authored Markdown untouched outside explicitly managed markers.
+- Keep command orchestration in `bin/`; reusable logic belongs in `lib/` or a
+  focused local helper under `tools/`.
+- Tests must use isolated temporary homes, prefixes, and workspaces.
 
-## Validation strategy
+## Validation layers
 
-1. Parse JSON syntax.
-2. Validate Draft 2020-12 schema.
-3. Enforce business rules.
+1. JSON syntax
+2. Exact v1.1 schema identity and local Draft 2020-12 schema validation
+3. Cross-document identity and pointer validation
+4. Filesystem boundary and path validation
 
-Runtime schema validation uses a private virtual environment and the pinned
-`jsonschema` version in `packaging/requirements.txt`.
+Schemas are always loaded locally from the installed application. Runtime
+validation uses the private environment created by the installer.
 
-## Testing layers
-
-- Unit tests for shared libraries.
-- Integration tests for complete commands.
-- Packaging tests for clean install, upgrade, and uninstall.
-- Acceptance tests for the documented end-to-end lifecycle.
-
-## Design invariants
-
-- `Original_Delivery/` is immutable.
-- One active DAW project boundary exists per project.
-- JSON is authoritative machine state.
-- Human-authored Markdown is not silently rewritten.
-- Managed sections use explicit markers.
-- Commands remain thin wrappers.
-- Shared logic belongs in `lib/`.
-- `new-studio` never overwrites an existing workspace.
-- Installation never modifies projects.
-- Client snapshots are exact copies.
-- Completion requires approval and recorded delivery.
-
-## Development dependency behavior
-
-`make test` verifies all JSON syntax and performs Draft 2020-12 semantic
-validation when the optional `jsonschema` development package is available.
-It reports a clear skip when that package is absent, because the production
-private virtual environment is implemented in a later batch.
-
-Developers who require strict semantic validation can run:
+## Development setup
 
 ```bash
 python3 -m venv .venv
-.venv/bin/pip install -r packaging/requirements.txt
-PATH="$PWD/.venv/bin:$PATH" make schema-test
+source .venv/bin/activate
+python -m pip install -r packaging/requirements.txt
 ```
 
-## Batch 4 installation and release implementation
+Required developer tools include `jq` and ShellCheck.
 
-The installed application uses a stable `PREFIX/share/jl-mixing` path and
-managed launchers in `PREFIX/bin`. Launchers set both `JL_MIXING_HOME` and
-`JL_MIXING_PYTHON`, so commands resolve runtime assets and the private validator
-without user configuration.
-
-Release work uses:
+## Quality gates
 
 ```bash
-make install-test
-make release
+make test
+make strict-test
+tools/shellcheck-all
 make release-check
 ```
 
-The release check must prove installation, upgrade behavior, installed command
-execution, archive hygiene, and workspace-preserving uninstallation before a
-Version 1.0 package is published.
+`make strict-test` includes installation and archive lifecycle tests. Tests must
+cover transaction failure and rollback, not only happy paths.
 
+## Release process
+
+1. Complete work through feature PRs into `develop/v1.1`.
+2. Run all quality gates from a clean integration branch.
+3. Build and verify the archive with `make release-check`.
+4. Merge `develop/v1.1` to `main` through a protected PR.
+5. Tag the merge commit `v1.1.0` and publish the verified archive, checksum, and
+   release notes.

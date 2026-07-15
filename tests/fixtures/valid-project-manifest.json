@@ -1,21 +1,19 @@
 {
   "metadata": {
     "schema": "mixing-project",
-    "document_id": "33333333-3333-4333-8333-333333333333",
-    "created_by": "new-mix",
-    "schema_version": "1.0.0",
-    "created_with": "jl-mixing 1.0.0",
-    "created_at": "2026-07-13T12:00:00-04:00",
-    "last_modified_at": "2026-07-13T12:00:00-04:00"
+    "schema_version": "1.1.0",
+    "document_id": "44444444-4444-4444-8444-444444444444",
+    "created_with": "jl-mixing 1.1.0",
+    "created_at": "2026-07-14T20:10:00-04:00",
+    "last_modified_at": "2026-07-20T14:00:00-04:00"
   },
   "project_id": "blue-sky",
   "project_name": "Blue Sky",
-  "project_type": "mixing",
   "client": {
     "client_document_id": "22222222-2222-4222-8222-222222222222",
     "client_id": "acme"
   },
-  "artist": "Acme",
+  "artist": "The Example Band",
   "album": "",
   "producer": "",
   "mix_engineer": "Jake",
@@ -29,11 +27,6 @@
     "bit_depth": 24,
     "file_format": "WAV"
   },
-  "daw": {
-    "name": "Logic Pro",
-    "template": "",
-    "project_path": "03_DAW_Project/Project"
-  },
   "delivery": {
     "method": "Cloud transfer",
     "requested_deliverables": [
@@ -46,25 +39,40 @@
   },
   "creative_direction": "Keep the verses intimate and let the choruses open up.",
   "state": {
-    "status": "active",
-    "current_revision": 1,
-    "approved": true,
-    "approved_revision": 1,
-    "approved_at": "2026-07-18T14:30:00-04:00",
-    "approved_by": "Client",
-    "delivered": false,
-    "delivered_at": null,
-    "completed_at": null
+    "current_revision": 3,
+    "approved_revision": 3,
+    "delivered_revision": 3
   },
   "revisions": [
     {
       "number": 1,
-      "revision_id": "44444444-4444-4444-8444-444444444444",
+      "revision_id": "55555555-5555-4555-8555-555555555551",
       "created_at": "2026-07-17T10:00:00-04:00",
-      "created_by": "new-revision",
       "description": "Initial mix",
-      "status": "approved",
-      "folder": "04_Revisions/Revision_01"
+      "approval": {
+        "approved_at": null,
+        "approved_by": null
+      }
+    },
+    {
+      "number": 2,
+      "revision_id": "55555555-5555-4555-8555-555555555552",
+      "created_at": "2026-07-18T10:00:00-04:00",
+      "description": "Client notes addressed",
+      "approval": {
+        "approved_at": null,
+        "approved_by": null
+      }
+    },
+    {
+      "number": 3,
+      "revision_id": "55555555-5555-4555-8555-555555555553",
+      "created_at": "2026-07-20T11:00:00-04:00",
+      "description": "Final vocal balance",
+      "approval": {
+        "approved_at": "2026-07-20T14:00:00-04:00",
+        "approved_by": "Client"
+      }
     }
   ]
 }
