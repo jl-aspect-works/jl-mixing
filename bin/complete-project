@@ -95,7 +95,7 @@ jl_json_update "$manifest" \
      .state.completed_at = $timestamp |
      .metadata.last_modified_at = $timestamp' \
     --arg timestamp "$completion_date"
-if ! jl_json_validate_schema "$APP_ROOT/schemas/project-manifest.schema.json" "$manifest"; then
+if ! jl_json_validate_schema "$APP_ROOT/schemas/legacy/v1.0.4/project-manifest.schema.json" "$manifest"; then
     cp -p "$backup" "$manifest"
     rm -f "$backup"
     exit "$JL_EXIT_VALIDATION"

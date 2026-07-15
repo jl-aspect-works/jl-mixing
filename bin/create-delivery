@@ -320,7 +320,7 @@ if [ "$mark_only" -eq 0 ]; then
         }' > "$delivery_manifest"
 
     # Validate the package manifest before optional archive creation.
-    jl_json_validate_schema "$APP_ROOT/schemas/delivery-manifest.schema.json" "$delivery_manifest"
+    jl_json_validate_schema "$APP_ROOT/schemas/legacy/v1.0.4/delivery-manifest.schema.json" "$delivery_manifest"
 
     # Replace only the untouched system placeholder, preserving user edits.
     delivery_notes="$delivery_root/Delivery_Notes.md"
@@ -371,8 +371,8 @@ if [ "$mark_delivered" -eq 1 ]; then
          .state.delivered_at = $timestamp |
          .metadata.last_modified_at = $timestamp' \
         --arg timestamp "$timestamp" ||
-       ! jl_json_validate_schema "$APP_ROOT/schemas/delivery-manifest.schema.json" "$delivery_manifest" ||
-       ! jl_json_validate_schema "$APP_ROOT/schemas/project-manifest.schema.json" "$manifest"; then
+       ! jl_json_validate_schema "$APP_ROOT/schemas/legacy/v1.0.4/delivery-manifest.schema.json" "$delivery_manifest" ||
+       ! jl_json_validate_schema "$APP_ROOT/schemas/legacy/v1.0.4/project-manifest.schema.json" "$manifest"; then
         cp -p "$project_backup" "$manifest"
         cp -p "$delivery_backup" "$delivery_manifest"
         rm -f "$project_backup" "$delivery_backup"

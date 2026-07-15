@@ -20,7 +20,7 @@ assert_success "valid sample rate" jl_validate_sample_rate 48000
 assert_failure "invalid sample rate" jl_validate_sample_rate 12345
 assert_success "valid revision status" jl_validate_revision_status superseded
 assert_success "valid project type" jl_validate_project_type podcast
-cp "$ROOT/examples/project-manifest.json" "$tmp/project.json"
+cp "$ROOT/tests/fixtures/legacy-v1.0.4/project-manifest.json" "$tmp/project.json"
 assert_success "single approved revision" jl_validate_single_approved_revision "$tmp/project.json"
 entry='{"path":"Stems/","deliverable_type":"stems"}'
 assert_success "folder delivery entry" jl_validate_delivery_entry "$entry"

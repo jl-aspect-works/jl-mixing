@@ -1,15 +1,13 @@
 {
   "metadata": {
     "schema": "mixing-delivery",
-    "document_id": "55555555-5555-4555-8555-555555555555",
-    "created_by": "create-delivery",
-    "schema_version": "1.0.0",
-    "created_with": "jl-mixing 1.0.0",
-    "created_at": "2026-07-13T12:00:00-04:00",
-    "last_modified_at": "2026-07-13T12:00:00-04:00"
+    "schema_version": "1.1.0",
+    "document_id": "66666666-6666-4666-8666-666666666666",
+    "created_with": "jl-mixing 1.1.0",
+    "created_at": "2026-07-20T15:30:00-04:00"
   },
   "project": {
-    "project_document_id": "33333333-3333-4333-8333-333333333333",
+    "project_document_id": "44444444-4444-4444-8444-444444444444",
     "project_id": "blue-sky",
     "project_name": "Blue Sky"
   },
@@ -17,27 +15,36 @@
     "client_document_id": "22222222-2222-4222-8222-222222222222",
     "client_id": "acme"
   },
-  "approved_revision": 1,
+  "revision": {
+    "number": 3,
+    "revision_id": "55555555-5555-4555-8555-555555555553",
+    "description": "Final vocal balance",
+    "approval": {
+      "approved_at": "2026-07-20T14:00:00-04:00",
+      "approved_by": "Client"
+    }
+  },
   "delivery": {
-    "method": "Cloud transfer",
-    "delivered_at": null,
-    "delivered_by": "",
-    "notes": ""
+    "method": "Cloud transfer"
   },
   "files": [
     {
-      "path": "Acme - Blue Sky - Main Mix.wav",
+      "path": "Blue Sky Main Mix.wav",
       "deliverable_type": "main_mix",
-      "sample_rate": 48000,
-      "bit_depth": 24,
-      "file_format": "WAV",
-      "channels": 2,
-      "duration_seconds": 243.52,
-      "file_size_bytes": 70133760
+      "size_bytes": 104857600,
+      "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
     },
     {
-      "path": "Stems/",
-      "deliverable_type": "stems"
+      "path": "BlueSky_NoVox.wav",
+      "deliverable_type": "unclassified",
+      "size_bytes": 101234567,
+      "sha256": "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
+    },
+    {
+      "path": "Stems/Blue Sky Stem Drums.wav",
+      "deliverable_type": "stems",
+      "size_bytes": 53428800,
+      "sha256": "2222222222222222222222222222222222222222222222222222222222222222"
     }
   ]
 }

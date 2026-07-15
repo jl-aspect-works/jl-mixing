@@ -25,6 +25,9 @@ assert_file_exists "$prefix/share/jl-mixing/VERSION"
 assert_file_exists "$prefix/share/jl-mixing/.venv/bin/python"
 assert_file_exists "$prefix/bin/new-studio"
 assert_file_exists "$prefix/share/jl-mixing/tools/project-state.py"
+assert_file_exists "$prefix/share/jl-mixing/schemas/client-profile-snapshot.schema.json"
+assert_file_exists "$prefix/share/jl-mixing/templates/Intake_Report.md"
+assert_file_exists "$prefix/share/jl-mixing/templates/Revision_Notes.md"
 assert_success "installed help works" "$prefix/bin/new-studio" --help
 
 PATH="$prefix/bin:$PATH" new-studio --root "$workspace" --non-interactive >/dev/null

@@ -1,18 +1,15 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://schemas.jlaudio.local/jl-mixing/studio.schema.json",
-  "title": "JL Mixing Studio Configuration",
+  "$id": "https://schemas.jlaudio.local/jl-mixing/v1.1/studio.schema.json",
+  "title": "JL Mixing Studio Configuration v1.1",
   "type": "object",
   "required": [
     "metadata",
+    "studio_id",
     "studio_name",
-    "workspace_root",
-    "default_daw",
-    "default_mix_engineer",
-    "audio_defaults",
-    "delivery_defaults",
-    "naming",
-    "behavior"
+    "root_path",
+    "defaults",
+    "cli"
   ],
   "properties": {
     "metadata": {
@@ -21,7 +18,6 @@
         "schema",
         "schema_version",
         "document_id",
-        "created_by",
         "created_with",
         "created_at",
         "last_modified_at"
@@ -31,20 +27,15 @@
           "const": "mixing-studio"
         },
         "schema_version": {
-          "type": "string",
-          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+          "const": "1.1.0"
         },
         "document_id": {
           "type": "string",
           "format": "uuid"
         },
-        "created_by": {
-          "type": "string",
-          "minLength": 1
-        },
         "created_with": {
           "type": "string",
-          "pattern": "^jl-mixing [0-9]+\\.[0-9]+\\.[0-9]+$"
+          "pattern": "^jl-mixing 1\\.1\\.[0-9]+$"
         },
         "created_at": {
           "type": "string",
@@ -57,141 +48,107 @@
       },
       "additionalProperties": false
     },
+    "studio_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
     "studio_name": {
       "type": "string",
-      "minLength": 1
+      "pattern": "\\S"
     },
-    "workspace_root": {
+    "root_path": {
       "type": "string",
-      "minLength": 1
+      "pattern": "^/"
     },
-    "default_daw": {
-      "type": "string",
-      "minLength": 1
-    },
-    "default_mix_engineer": {
-      "type": "string"
-    },
-    "audio_defaults": {
+    "defaults": {
       "type": "object",
       "required": [
-        "sample_rate",
-        "bit_depth",
-        "file_format"
+        "mix_engineer",
+        "audio",
+        "delivery"
       ],
       "properties": {
-        "sample_rate": {
-          "type": "integer",
-          "enum": [
-            44100,
-            48000,
-            88200,
-            96000,
-            176400,
-            192000
-          ]
-        },
-        "bit_depth": {
-          "type": "integer",
-          "enum": [
-            16,
-            24,
-            32
-          ]
-        },
-        "file_format": {
-          "type": "string",
-          "enum": [
-            "WAV",
-            "AIFF"
-          ]
-        }
-      },
-      "additionalProperties": false
-    },
-    "delivery_defaults": {
-      "type": "object",
-      "required": [
-        "method",
-        "deliverables"
-      ],
-      "properties": {
-        "method": {
-          "type": "string",
-          "minLength": 1
-        },
-        "deliverables": {
-          "type": "array",
-          "minItems": 1,
-          "uniqueItems": true,
-          "items": {
-            "type": "string",
-            "enum": [
-              "main_mix",
-              "instrumental",
-              "acapella",
-              "tv_mix",
-              "performance_mix",
-              "stems",
-              "master"
-            ]
-          }
-        }
-      },
-      "additionalProperties": false
-    },
-    "naming": {
-      "type": "object",
-      "required": [
-        "revision_prefix",
-        "revision_padding",
-        "working_print_prefix",
-        "project_name_pattern",
-        "daw_project_name_pattern",
-        "deliverable_name_pattern"
-      ],
-      "properties": {
-        "revision_prefix": {
+        "mix_engineer": {
           "type": "string"
         },
-        "revision_padding": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 4
+        "audio": {
+          "type": "object",
+          "required": [
+            "sample_rate",
+            "bit_depth",
+            "file_format"
+          ],
+          "properties": {
+            "sample_rate": {
+              "type": "integer",
+              "enum": [
+                44100,
+                48000,
+                88200,
+                96000,
+                176400,
+                192000
+              ]
+            },
+            "bit_depth": {
+              "type": "integer",
+              "enum": [
+                16,
+                24,
+                32
+              ]
+            },
+            "file_format": {
+              "type": "string",
+              "enum": [
+                "WAV",
+                "AIFF"
+              ]
+            }
+          },
+          "additionalProperties": false
         },
-        "working_print_prefix": {
-          "type": "string"
-        },
-        "project_name_pattern": {
-          "type": "string",
-          "minLength": 1
-        },
-        "daw_project_name_pattern": {
-          "type": "string",
-          "minLength": 1
-        },
-        "deliverable_name_pattern": {
-          "type": "string",
-          "minLength": 1
+        "delivery": {
+          "type": "object",
+          "required": [
+            "method",
+            "requested_deliverables"
+          ],
+          "properties": {
+            "method": {
+              "type": "string",
+              "pattern": "\\S"
+            },
+            "requested_deliverables": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "enum": [
+                  "main_mix",
+                  "instrumental",
+                  "acapella",
+                  "tv_mix",
+                  "performance_mix",
+                  "stems",
+                  "master"
+                ]
+              }
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false
     },
-    "behavior": {
+    "cli": {
       "type": "object",
       "required": [
-        "open_created_folders",
-        "confirm_destructive_actions",
-        "non_interactive_defaults_allowed"
+        "change_directory_after_create"
       ],
       "properties": {
-        "open_created_folders": {
-          "type": "boolean"
-        },
-        "confirm_destructive_actions": {
-          "type": "boolean"
-        },
-        "non_interactive_defaults_allowed": {
+        "change_directory_after_create": {
           "type": "boolean"
         }
       },

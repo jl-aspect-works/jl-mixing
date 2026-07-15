@@ -109,7 +109,7 @@ jl_template_render "$APP_ROOT/templates/revision/Revision_Notes.md" "$revision_r
 
 # Append the machine-readable record only after the folder and notes exist.
 jl_revision_append "$manifest" "$description" "$number" "$timestamp" "$revision_id" "$prefix" "$padding"
-jl_json_validate_schema "$APP_ROOT/schemas/project-manifest.schema.json" "$manifest"
+jl_json_validate_schema "$APP_ROOT/schemas/legacy/v1.0.4/project-manifest.schema.json" "$manifest"
 
 cleanup=0
 rm -f "$backup"

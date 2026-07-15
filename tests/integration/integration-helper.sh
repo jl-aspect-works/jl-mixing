@@ -22,7 +22,7 @@ fixture_studio() {
         "$studio_root/DAWs/Logic Pro/Presets"
     jq --arg root "$studio_root" \
         '.workspace_root=$root | .default_mix_engineer="Jake"' \
-        "$ROOT/examples/studio.json" > "$studio_root/Studio/studio.json"
+        "$ROOT/tests/fixtures/legacy-v1.0.4/studio.json" > "$studio_root/Studio/studio.json"
 }
 
 # Create a valid Acme client beneath a fixture studio.
@@ -31,7 +31,7 @@ fixture_client() {
     studio_root="$1"
     client_root="$studio_root/Clients/Acme"
     mkdir -p "$client_root/Projects/Active" "$client_root/Projects/Completed"
-    cp "$ROOT/examples/client.json" "$client_root/client.json"
+    cp "$ROOT/tests/fixtures/legacy-v1.0.4/client.json" "$client_root/client.json"
     printf '%s\n' "$client_root"
 }
 
@@ -66,12 +66,12 @@ fixture_project() {
         fresh)
             jq '.state={status:"active",current_revision:0,approved:false,approved_revision:null,
                 approved_at:null,approved_by:"",delivered:false,delivered_at:null,completed_at:null} |
-                .revisions=[]' "$ROOT/examples/project-manifest.json" > "$manifest"
+                .revisions=[]' "$ROOT/tests/fixtures/legacy-v1.0.4/project-manifest.json" > "$manifest"
             ;;
         open1)
             jq '.state={status:"active",current_revision:1,approved:false,approved_revision:null,
                 approved_at:null,approved_by:"",delivered:false,delivered_at:null,completed_at:null} |
-                .revisions[0].status="open"' "$ROOT/examples/project-manifest.json" > "$manifest"
+                .revisions[0].status="open"' "$ROOT/tests/fixtures/legacy-v1.0.4/project-manifest.json" > "$manifest"
             mkdir -p "$project_root/04_Revisions/Revision_01/Prints"
             cp "$ROOT/templates/revision/Revision_Notes.md" "$project_root/04_Revisions/Revision_01/Revision_Notes.md"
             ;;
@@ -84,13 +84,13 @@ fixture_project() {
                     {number:2,revision_id:"66666666-6666-4666-8666-666666666666",
                      created_at:$timestamp,created_by:"new-revision",description:"Second mix",
                      status:"open",folder:"04_Revisions/Revision_02"}
-                ]' "$ROOT/examples/project-manifest.json" > "$manifest"
+                ]' "$ROOT/tests/fixtures/legacy-v1.0.4/project-manifest.json" > "$manifest"
             mkdir -p "$project_root/04_Revisions/Revision_01/Prints" "$project_root/04_Revisions/Revision_02/Prints"
             cp "$ROOT/templates/revision/Revision_Notes.md" "$project_root/04_Revisions/Revision_01/Revision_Notes.md"
             cp "$ROOT/templates/revision/Revision_Notes.md" "$project_root/04_Revisions/Revision_02/Revision_Notes.md"
             ;;
         approved1|delivered1)
-            cp "$ROOT/examples/project-manifest.json" "$manifest"
+            cp "$ROOT/tests/fixtures/legacy-v1.0.4/project-manifest.json" "$manifest"
             mkdir -p "$project_root/04_Revisions/Revision_01/Prints"
             cp "$ROOT/templates/revision/Revision_Notes.md" "$project_root/04_Revisions/Revision_01/Revision_Notes.md"
             if [ "$mode" = delivered1 ]; then

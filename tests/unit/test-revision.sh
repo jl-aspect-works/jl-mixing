@@ -10,7 +10,7 @@ require_test_command jq
 # Arrange: build an isolated temporary fixture.
 tmp="$(new_test_dir)"
 trap 'rm -rf "$tmp"' EXIT
-cp "$ROOT/examples/project-manifest.json" "$tmp/project.json"
+cp "$ROOT/tests/fixtures/legacy-v1.0.4/project-manifest.json" "$tmp/project.json"
 
 # Assert: verify observable behavior rather than internal implementation.
 assert_eq "2" "$(jl_revision_next_number "$tmp/project.json")" "next revision number"
