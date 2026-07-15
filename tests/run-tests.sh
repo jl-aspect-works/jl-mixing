@@ -72,6 +72,7 @@ tools/build-intake-report.py
 tools/project-state.py
 tools/import-project-source.py
 tools/import-revision-source.py
+tools/build-delivery.py
 tools/build-release
 tools/verify-release-archive'
 

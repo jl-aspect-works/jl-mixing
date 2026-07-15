@@ -172,3 +172,23 @@ fixture_v11_project() {
 
     printf '%s\n' "$project_root"
 }
+
+# Create a canonical v1.1 project with one approved flattened revision. Delivery
+# tests use this fixture to focus on package behavior without invoking the slower
+# revision and approval commands before every test file.
+fixture_v11_approved_project() {
+    local studio_root project_root manifest revision_root
+    studio_root="$1"
+    project_root="$(fixture_v11_project "$studio_root")"
+    manifest="$project_root/00_Admin/project-manifest.json"
+    revision_root="$project_root/04_Revisions/Revision_01"
+    mkdir -p "$revision_root"
+    printf '# Revision 1 Notes\n' > "$revision_root/Revision_Notes.md"
+    jq '.state={current_revision:1,approved_revision:1,delivered_revision:null} |
+        .revisions=[{number:1,revision_id:"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            created_at:"2029-12-31T12:00:00Z",description:"Final balance",
+            approval:{approved_at:"2030-01-01T12:00:00Z",approved_by:"Client"}}]' \
+        "$manifest" > "$manifest.tmp"
+    mv "$manifest.tmp" "$manifest"
+    printf '%s\n' "$project_root"
+}
