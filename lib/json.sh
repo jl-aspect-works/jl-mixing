@@ -148,6 +148,278 @@ jl_json_require_schema_identity() {
     fi
 }
 
+
+# Resolve one schema filename from the installed application's local schema set.
+# Callers pass a basename such as "project-manifest.schema.json"; path
+# separators are rejected so validation can never escape the trusted schema
+# directory.
+jl_json_schema_path() {
+    local schema_name schema_path
+    schema_name="$1"
+
+    case "$schema_name" in
+        ''|*/*|*'\'*)
+            jl_error "Invalid local schema name: $schema_name"
+            return "$JL_EXIT_ARGUMENTS"
+            ;;
+    esac
+
+    schema_path="$JL_JSON_REPO_ROOT/schemas/$schema_name"
+    if [ ! -f "$schema_path" ] || [ -L "$schema_path" ]; then
+        jl_error "Local JSON Schema not found: $schema_path"
+        return "$JL_EXIT_CONFIG"
+    fi
+
+    printf '%s
+' "$schema_path"
+}
+
+# Check a document's exact schema name and schema version. The older
+# major-version helper remains available while v1.0.4 commands are migrated one
+# feature branch at a time; v1.1 commands must use this exact helper.
+jl_json_require_exact_schema_identity() {
+    local file expected_schema expected_version actual_schema actual_version
+    file="$1"
+    expected_schema="$2"
+    expected_version="$3"
+
+    actual_schema="$(jl_json_get "$file" '.metadata.schema')" || {
+        jl_error "Missing or invalid metadata.schema in: $file"
+        return "$JL_EXIT_VALIDATION"
+    }
+    actual_version="$(jl_json_get "$file" '.metadata.schema_version')" || {
+        jl_error "Missing or invalid metadata.schema_version in: $file"
+        return "$JL_EXIT_VALIDATION"
+    }
+
+    if [ "$actual_schema" != "$expected_schema" ]; then
+        jl_error "Unexpected schema '$actual_schema'; expected '$expected_schema'."
+        return "$JL_EXIT_VALIDATION"
+    fi
+    if [ "$actual_version" != "$expected_version" ]; then
+        jl_error "Unsupported schema version '$actual_version'; expected '$expected_version'."
+        return "$JL_EXIT_VALIDATION"
+    fi
+}
+
+# Require created_with to identify a semantic jl-mixing release from the same
+# major/minor series as the supplied version (for example, 1.1.4 is compatible
+# with the expected 1.1.0 document contract).
+jl_json_require_created_with_series() {
+    local file expected_version created_with actual_version expected_series actual_series
+    file="$1"
+    expected_version="$2"
+
+    created_with="$(jl_json_get "$file" '.metadata.created_with')" || {
+        jl_error "Missing or invalid metadata.created_with in: $file"
+        return "$JL_EXIT_VALIDATION"
+    }
+
+    case "$created_with" in
+        'jl-mixing '[0-9]*.[0-9]*.[0-9]*) actual_version="${created_with#jl-mixing }" ;;
+        *)
+            jl_error "Invalid created_with value '$created_with' in: $file"
+            return "$JL_EXIT_VALIDATION"
+            ;;
+    esac
+
+    # Reject suffixes and malformed semantic versions instead of accepting the
+    # loose shell pattern above as sufficient validation.
+    if ! printf '%s
+' "$actual_version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+        jl_error "Invalid jl-mixing semantic version '$actual_version' in: $file"
+        return "$JL_EXIT_VALIDATION"
+    fi
+    if ! printf '%s
+' "$expected_version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+        jl_error "Invalid expected semantic version: $expected_version"
+        return "$JL_EXIT_ARGUMENTS"
+    fi
+
+    expected_series="$(printf '%s
+' "$expected_version" | awk -F. '{print $1 "." $2}')"
+    actual_series="$(printf '%s
+' "$actual_version" | awk -F. '{print $1 "." $2}')"
+    if [ "$actual_series" != "$expected_series" ]; then
+        jl_error "Incompatible created_with version '$actual_version'; expected jl-mixing $expected_series.x."
+        return "$JL_EXIT_VALIDATION"
+    fi
+}
+
+# Validate a document against one schema from the installed local schema set,
+# then enforce the exact v1.1 document identity and compatible creator series.
+jl_json_validate_local_document() {
+    local document_file schema_name expected_schema expected_version schema_file
+    document_file="$1"
+    schema_name="$2"
+    expected_schema="$3"
+    expected_version="$4"
+
+    schema_file="$(jl_json_schema_path "$schema_name")" || return $?
+    jl_json_validate_schema "$schema_file" "$document_file" || return $?
+    jl_json_require_exact_schema_identity "$document_file" "$expected_schema" "$expected_version" || return $?
+    jl_json_require_created_with_series "$document_file" "$expected_version"
+}
+
+# List governing JL Mixing JSON records at their canonical v1.1 locations
+# without descending into user-owned audio, DAW, notes, or recall content.
+jl_json_governing_files() {
+    local studio_root studio_file
+    studio_root="$1"
+
+    [ -d "$studio_root" ] || {
+        jl_error "Studio root not found: $studio_root"
+        return "$JL_EXIT_CONTEXT"
+    }
+
+    studio_file="$studio_root/Studio/studio.json"
+    if [ -f "$studio_file" ] && [ ! -L "$studio_file" ]; then
+        printf '%s\n' "$studio_file"
+    fi
+
+    [ -d "$studio_root/Clients" ] || return 0
+    find "$studio_root/Clients" -mindepth 2 -maxdepth 2 \
+        -type f -name client.json -print
+    find "$studio_root/Clients" -mindepth 5 -maxdepth 5 -type f \
+        \( -path '*/00_Admin/project-manifest.json' \
+           -o -path '*/00_Admin/client-profile-snapshot.json' \
+           -o -path '*/05_Final_Delivery/delivery-manifest.json' \) \
+        -print
+}
+
+# Verify that every governing metadata.document_id and revision_id is unique
+# across the studio. Structural schema validation reports missing/invalid UUIDs;
+# this helper enforces only the cross-document uniqueness invariant.
+jl_json_validate_unique_uuids() {
+    local studio_root python_command status
+    studio_root="$1"
+    python_command="$(jl_json_validator_python)" || {
+        jl_error "Python 3 is required for UUID validation."
+        return "$JL_EXIT_CONFIG"
+    }
+
+    if jl_json_governing_files "$studio_root" | "$python_command" -c '
+import json
+import sys
+from pathlib import Path
+
+seen = {}
+failed = False
+for raw in sys.stdin:
+    path = Path(raw.rstrip("\n"))
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        continue
+
+    values = []
+    document_id = document.get("metadata", {}).get("document_id")
+    if isinstance(document_id, str) and document_id:
+        values.append(("document_id", document_id))
+    for revision in document.get("revisions", []):
+        if isinstance(revision, dict):
+            revision_id = revision.get("revision_id")
+            if isinstance(revision_id, str) and revision_id:
+                values.append(("revision_id", revision_id))
+
+    for label, value in values:
+        key = value.casefold()
+        location = f"{path} ({label})"
+        if key in seen:
+            print(
+                f"Duplicate UUID {value}: {seen[key]} and {location}",
+                file=sys.stderr,
+            )
+            failed = True
+        else:
+            seen[key] = location
+raise SystemExit(5 if failed else 0)
+'; then
+        return 0
+    else
+        status=$?
+    fi
+
+    case "$status" in
+        5)
+            jl_error "Studio contains duplicate governing UUID values."
+            return "$JL_EXIT_VALIDATION"
+            ;;
+        *)
+            jl_error "Unable to validate studio UUIDs: $studio_root"
+            return "$JL_EXIT_GENERAL"
+            ;;
+    esac
+}
+
+# Backward-compatible descriptive alias for callers concerned only with the
+# document-ID rule. The implementation also catches revision-ID collisions.
+jl_json_validate_unique_document_ids() {
+    jl_json_validate_unique_uuids "$1"
+}
+
+# Check whether a proposed document or revision UUID is available before a new
+# governing record is committed. An optional path may be excluded during a
+# validated in-place replacement.
+jl_json_assert_uuid_available() {
+    local studio_root proposed_id exclude_path python_command status
+    studio_root="$1"
+    proposed_id="$2"
+    exclude_path="${3:-}"
+    python_command="$(jl_json_validator_python)" || {
+        jl_error "Python 3 is required for UUID validation."
+        return "$JL_EXIT_CONFIG"
+    }
+
+    if jl_json_governing_files "$studio_root" | "$python_command" -c '
+import json
+import os
+import sys
+from pathlib import Path
+
+proposed = sys.argv[1].casefold()
+exclude = os.path.realpath(sys.argv[2]) if sys.argv[2] else None
+for raw in sys.stdin:
+    path = Path(raw.rstrip("\n"))
+    if exclude and os.path.realpath(path) == exclude:
+        continue
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        continue
+
+    values = [document.get("metadata", {}).get("document_id")]
+    values.extend(
+        revision.get("revision_id")
+        for revision in document.get("revisions", [])
+        if isinstance(revision, dict)
+    )
+    if any(isinstance(value, str) and value.casefold() == proposed for value in values):
+        print(path, file=sys.stderr)
+        raise SystemExit(5)
+raise SystemExit(0)
+' "$proposed_id" "$exclude_path"; then
+        return 0
+    else
+        status=$?
+    fi
+
+    case "$status" in
+        5)
+            jl_error "UUID already exists in this studio: $proposed_id"
+            return "$JL_EXIT_VALIDATION"
+            ;;
+        *)
+            jl_error "Unable to check UUID availability: $proposed_id"
+            return "$JL_EXIT_GENERAL"
+            ;;
+    esac
+}
+
+jl_json_assert_document_id_available() {
+    jl_json_assert_uuid_available "$@"
+}
+
 # Choose the application/private Python interpreter used for schema validation.
 jl_json_validator_python() {
     if [ -n "${JL_MIXING_PYTHON:-}" ] && [ -x "$JL_MIXING_PYTHON" ]; then

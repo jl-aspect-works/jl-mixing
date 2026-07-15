@@ -51,6 +51,8 @@ lib/naming.sh
 lib/templates.sh
 lib/validation.sh
 lib/revision.sh
+lib/transaction.sh
+lib/project-state.sh
 bin/new-studio
 bin/new-client
 bin/new-mix
@@ -60,6 +62,7 @@ bin/approve-mix
 bin/create-delivery
 bin/complete-project
 tools/build-intake-report.py
+tools/project-state.py
 tools/build-release
 tools/verify-release-archive'
 

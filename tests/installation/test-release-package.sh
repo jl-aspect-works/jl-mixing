@@ -23,6 +23,8 @@ archive="$(find "$temp_root/dist" -name '*.tar.gz' -type f | head -n 1)"
 pass "release archive created"
 assert_file_exists "$archive.sha256"
 assert_file_exists "$archive.inventory.txt"
+assert_contains "$(cat "$archive.inventory.txt")" 'tools/project-state.py' \
+    "project-state tool included in release archive"
 assert_success "release archive verifies" "$ROOT/tools/verify-release-archive" "$archive"
 
 echo "[OK] release package ($TEST_COUNT assertions)"

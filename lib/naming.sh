@@ -105,3 +105,115 @@ jl_expand_naming_pattern() {
     result="$(printf '%s' "$result" | sed "s/{{DELIVERABLE}}/$(printf '%s' "$deliverable" | sed 's/[&|]/\\&/g')/g")"
     printf '%s\n' "$result"
 }
+
+# Return a Unicode-aware case-folded representation for deterministic
+# case-insensitive collision checks on both macOS and Linux.
+jl_name_casefold() {
+    local value
+    value="$1"
+    jl_require_command python3 "Python 3 is required for portable name handling." || return $?
+    python3 - "$value" <<'PY_CASEFOLD'
+import sys
+print(sys.argv[1].casefold())
+PY_CASEFOLD
+}
+
+# Return success when a component is a Windows-reserved device name. These
+# names are rejected on every supported platform so a workspace can be copied
+# safely between macOS, Linux, and Windows filesystems.
+jl_name_is_reserved_component() {
+    local value base upper
+    value="$1"
+    base="${value%%.*}"
+    upper="$(printf '%s' "$base" | tr '[:lower:]' '[:upper:]')"
+    case "$upper" in
+        CON|PRN|AUX|NUL|CLOCK\$|COM[1-9]|LPT[1-9]) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+# Convert a display name into a readable, cross-platform folder component.
+# Unsafe separators and control characters become a spaced hyphen, repeated
+# whitespace is collapsed, and trailing spaces/periods are removed.
+jl_sanitize_folder_name() {
+    local value result
+    value="$1"
+    jl_require_command python3 "Python 3 is required for portable folder-name sanitization." || return $?
+
+    result="$(python3 - "$value" <<'PY_FOLDER_NAME'
+import re
+import sys
+import unicodedata
+
+value = unicodedata.normalize("NFC", sys.argv[1])
+characters = []
+for character in value:
+    if ord(character) < 32 or ord(character) == 127:
+        characters.append(" ")
+    elif character in '/\\:*?"<>|':
+        characters.append(" - ")
+    else:
+        characters.append(character)
+result = "".join(characters)
+result = re.sub(r"\s+", " ", result).strip()
+result = re.sub(r"(?:\s*-\s*)+", " - ", result).strip()
+result = result.strip(" .-")
+print(result)
+PY_FOLDER_NAME
+)" || return $?
+
+    if [ -z "$result" ]; then
+        jl_error "Display name does not produce a usable folder name."
+        return "$JL_EXIT_VALIDATION"
+    fi
+    if [ "$result" = . ] || [ "$result" = .. ] || jl_name_is_reserved_component "$result"; then
+        jl_error "Reserved folder name is not allowed: $result"
+        return "$JL_EXIT_VALIDATION"
+    fi
+
+    printf '%s\n' "$result"
+}
+
+# Derive the default immutable project ID from a human-readable project name.
+# The result is deterministic and never receives an automatic numeric suffix.
+jl_project_id_from_name() {
+    local project_name project_id
+    project_name="$1"
+    project_id="$(jl_slugify "$project_name")"
+    if [ -z "$project_id" ]; then
+        jl_error "Project name does not produce a usable project ID."
+        return "$JL_EXIT_VALIDATION"
+    fi
+    printf '%s\n' "$project_id"
+}
+
+# Validate that a list of values is unique under Unicode case folding. Values
+# are supplied as positional arguments and are reported exactly as received.
+jl_name_assert_case_insensitive_unique() {
+    local status
+    jl_require_command python3 "Python 3 is required for portable collision checks." || return $?
+    if python3 - "$@" <<'PY_UNIQUE_NAMES'
+import sys
+
+seen = {}
+for value in sys.argv[1:]:
+    key = value.casefold()
+    if key in seen:
+        print(
+            f"Case-insensitive collision: {seen[key]!r} and {value!r}",
+            file=sys.stderr,
+        )
+        raise SystemExit(5)
+    seen[key] = value
+raise SystemExit(0)
+PY_UNIQUE_NAMES
+    then
+        return 0
+    else
+        status=$?
+    fi
+    case "$status" in
+        5) return "$JL_EXIT_VALIDATION" ;;
+        *) return "$JL_EXIT_GENERAL" ;;
+    esac
+}

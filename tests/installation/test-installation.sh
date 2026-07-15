@@ -24,6 +24,7 @@ JL_MIXING_TEST_SYSTEM_SITE_PACKAGES=1 "$ROOT/install.sh" --prefix "$prefix" >/de
 assert_file_exists "$prefix/share/jl-mixing/VERSION"
 assert_file_exists "$prefix/share/jl-mixing/.venv/bin/python"
 assert_file_exists "$prefix/bin/new-studio"
+assert_file_exists "$prefix/share/jl-mixing/tools/project-state.py"
 assert_success "installed help works" "$prefix/bin/new-studio" --help
 
 PATH="$prefix/bin:$PATH" new-studio --root "$workspace" --non-interactive >/dev/null

@@ -189,3 +189,253 @@ jl_fs_copy_directory_contents() {
         cp -Rp "$entry" "$destination/"
     done
 }
+
+# Return success only for a regular file that is not a symbolic link.
+# The ordinary -f test follows symlinks, so v1.1 commands use this stricter
+# helper whenever ownership boundaries require no-follow behavior.
+jl_fs_is_regular_file_no_symlink() {
+    [ -f "$1" ] && [ ! -L "$1" ]
+}
+
+# Return success only for a directory that is not itself a symbolic link.
+jl_fs_is_directory_no_symlink() {
+    [ -d "$1" ] && [ ! -L "$1" ]
+}
+
+# Validate a lexical absolute path before canonical resolution. Dot segments,
+# repeated separators, and backslashes are rejected so callers do not silently
+# reinterpret a user-supplied path.
+jl_path_validate_absolute() {
+    local absolute_path wrapped
+    absolute_path="$1"
+
+    case "$absolute_path" in
+        /*) ;;
+        *)
+            jl_error "Absolute path required: $absolute_path"
+            return "$JL_EXIT_VALIDATION"
+            ;;
+    esac
+    case "$absolute_path" in
+        *'\'*)
+            jl_error "Backslashes are not allowed in absolute paths: $absolute_path"
+            return "$JL_EXIT_VALIDATION"
+            ;;
+    esac
+
+    [ "$absolute_path" = / ] && return 0
+    wrapped="$absolute_path/"
+    case "$wrapped" in
+        *'//'*|*'/./'*|*'/../'*)
+            jl_error "Unsafe absolute path segments in: $absolute_path"
+            return "$JL_EXIT_VALIDATION"
+            ;;
+    esac
+}
+
+# Reject absolute paths and any empty, dot, or dot-dot path segment. Relative
+# paths accepted here use forward slashes so manifest paths remain portable.
+jl_path_validate_relative() {
+    local relative_path wrapped
+    relative_path="$1"
+
+    case "$relative_path" in
+        ''|/*|*'\'*)
+            jl_error "Unsafe relative path: $relative_path"
+            return "$JL_EXIT_VALIDATION"
+            ;;
+    esac
+
+    wrapped="/$relative_path/"
+    case "$wrapped" in
+        *'//'*|*'/./'*|*'/../'*)
+            jl_error "Unsafe relative path segments in: $relative_path"
+            return "$JL_EXIT_VALIDATION"
+            ;;
+    esac
+}
+
+# Resolve a validated relative path beneath one absolute root. This function
+# does not require the final path to exist and rejects any lexical escape.
+jl_path_resolve_under_root() {
+    local root relative_path resolved
+    root="$(jl_realpath "$1")" || return $?
+    relative_path="$2"
+    jl_path_validate_relative "$relative_path" || return $?
+    resolved="$(jl_abspath_allow_missing "$root/$relative_path")" || return $?
+
+    case "$resolved" in
+        "$root"/*) printf '%s\n' "$resolved" ;;
+        *)
+            jl_error "Resolved path escapes root '$root': $relative_path"
+            return "$JL_EXIT_UNSAFE"
+            ;;
+    esac
+}
+
+# Reject a path when any existing component from root through the destination
+# is a symbolic link. The final destination may be missing.
+jl_fs_assert_no_symlink_components() {
+    local root destination python_command status
+    [ ! -L "$1" ] || {
+        jl_error "Symlink root is not allowed: $1"
+        return "$JL_EXIT_UNSAFE"
+    }
+    root="$(jl_realpath "$1")" || return $?
+    python_command="$(command -v python3 2>/dev/null || true)"
+    if [ -z "$python_command" ]; then
+        jl_error "Python 3 is required for symlink-safe path validation."
+        return "$JL_EXIT_CONFIG"
+    fi
+
+    destination="$("$python_command" - "$2" <<'PY_LEXICAL_ABSPATH'
+import os
+import sys
+print(os.path.abspath(os.path.expanduser(sys.argv[1])))
+PY_LEXICAL_ABSPATH
+)" || return $?
+
+    if "$python_command" - "$root" "$destination" <<'PY_NO_SYMLINKS'
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+destination = Path(sys.argv[2])
+try:
+    destination.relative_to(root)
+except ValueError:
+    print(f"Path escapes root: {destination}", file=sys.stderr)
+    raise SystemExit(6)
+
+current = root
+if current.is_symlink():
+    print(f"Symbolic-link path component is not allowed: {current}", file=sys.stderr)
+    raise SystemExit(6)
+for part in destination.relative_to(root).parts:
+    current = current / part
+    if current.is_symlink():
+        print(f"Symbolic-link path component is not allowed: {current}", file=sys.stderr)
+        raise SystemExit(6)
+raise SystemExit(0)
+PY_NO_SYMLINKS
+    then
+        return 0
+    else
+        status=$?
+    fi
+    case "$status" in
+        0) return 0 ;;
+        6)
+            jl_error "Unsafe symbolic-link path: $destination"
+            return "$JL_EXIT_UNSAFE"
+            ;;
+        *)
+            jl_error "Unable to validate path safely: $destination"
+            return "$JL_EXIT_GENERAL"
+            ;;
+    esac
+}
+
+# Return success when two paths reside on the same filesystem. Missing final
+# components are checked through their nearest existing parent directory.
+jl_fs_same_filesystem() {
+    local first second first_existing second_existing
+    first="$1"
+    second="$2"
+
+    # Atomic rename depends on the source and destination parent directories,
+    # not on overlay-specific device metadata that a regular file may expose.
+    first_existing="$(dirname "$(jl_abspath_allow_missing "$first")")"
+    second_existing="$(dirname "$(jl_abspath_allow_missing "$second")")"
+
+    while [ ! -d "$first_existing" ] && [ "$first_existing" != / ]; do
+        first_existing="$(dirname "$first_existing")"
+    done
+    while [ ! -d "$second_existing" ] && [ "$second_existing" != / ]; do
+        second_existing="$(dirname "$second_existing")"
+    done
+
+    [ "$(jl_stat_device "$first_existing")" = "$(jl_stat_device "$second_existing")" ]
+}
+
+# Print the existing immediate child whose name collides case-insensitively
+# with a proposed basename. Symlink entries are considered collisions too.
+jl_fs_find_case_insensitive_child_collision() {
+    local parent proposed python_command
+    parent="$1"
+    proposed="$2"
+    python_command="$(command -v python3 2>/dev/null || true)"
+    [ -n "$python_command" ] || return "$JL_EXIT_CONFIG"
+    [ -d "$parent" ] || return 1
+
+    "$python_command" - "$parent" "$proposed" <<'PY_CHILD_COLLISION'
+import os
+import sys
+
+parent = sys.argv[1]
+proposed = sys.argv[2].casefold()
+for name in os.listdir(parent):
+    if name.casefold() == proposed:
+        print(os.path.join(parent, name))
+        raise SystemExit(0)
+raise SystemExit(1)
+PY_CHILD_COLLISION
+}
+
+# Fail when an immediate filesystem child would collide on a case-insensitive
+# platform. No numeric suffix is generated automatically.
+jl_fs_assert_no_case_insensitive_child_collision() {
+    local parent proposed collision status
+    parent="$1"
+    proposed="$2"
+
+    if collision="$(jl_fs_find_case_insensitive_child_collision "$parent" "$proposed" 2>/dev/null)"; then
+        jl_error "Case-insensitive path collision: $collision"
+        return "$JL_EXIT_VALIDATION"
+    else
+        status=$?
+    fi
+
+    # A status of 1 means the search completed and found no collision.
+    [ "$status" -eq 1 ] && return 0
+    jl_error "Unable to perform case-insensitive collision check: $parent"
+    return "$status"
+}
+
+# Remove one file, directory, or symlink entry without following symlinks.
+# This is suitable only after a caller has explicitly authorized cleanup.
+jl_fs_remove_entry_no_follow() {
+    local path
+    path="$1"
+    if [ -L "$path" ] || [ -f "$path" ]; then
+        rm -f -- "$path"
+    elif [ -d "$path" ]; then
+        rm -rf -- "$path"
+    elif [ -e "$path" ]; then
+        jl_error "Unsupported filesystem entry cannot be removed safely: $path"
+        return "$JL_EXIT_UNSAFE"
+    fi
+}
+
+# Identify content inside the opaque DAW project boundary.
+jl_fs_is_daw_project_path() {
+    local path
+    path="$(jl_abspath_allow_missing "$1")" || return $?
+    case "$path" in
+        */03_DAW_Project|*/03_DAW_Project/*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+# Reject writes into immutable or opaque user-owned boundaries. Creation
+# commands may create the boundary directories themselves, but subsequent
+# automation must not manage their contents.
+jl_fs_assert_automation_owned_path() {
+    local path
+    path="$1"
+    jl_fs_assert_mutable_path "$path" || return $?
+    if jl_fs_is_daw_project_path "$path"; then
+        jl_error "Unsafe operation prevented inside opaque 03_DAW_Project: $path"
+        return "$JL_EXIT_UNSAFE"
+    fi
+}
