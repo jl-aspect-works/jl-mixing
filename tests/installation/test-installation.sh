@@ -26,6 +26,7 @@ assert_file_exists "$prefix/share/jl-mixing/.venv/bin/python"
 assert_file_exists "$prefix/bin/new-studio"
 assert_file_exists "$prefix/bin/new-client"
 assert_file_exists "$prefix/share/jl-mixing/tools/project-state.py"
+assert_file_exists "$prefix/share/jl-mixing/tools/import-project-source.py"
 assert_file_exists "$prefix/share/jl-mixing/schemas/client-profile-snapshot.schema.json"
 assert_file_exists "$prefix/share/jl-mixing/templates/Intake_Report.md"
 assert_file_exists "$prefix/share/jl-mixing/templates/Revision_Notes.md"
@@ -45,6 +46,19 @@ assert_json_eq "1.1.0" "$installed_client" '.metadata.schema_version' \
     "installed new-client creates v1.1 schema"
 assert_dir_exists "$workspace/Clients/Installed Client/Projects"
 assert_path_not_exists "$workspace/Clients/Installed Client/Projects/Active"
+
+JL_MIXING_ROOT="$workspace" PATH="$prefix/bin:$PATH" \
+    new-mix --client installed-client --project "Installed Project" \
+    --artist "Installed Artist" >/dev/null
+installed_project="$workspace/Clients/Installed Client/Projects/Installed Project"
+installed_manifest="$installed_project/00_Admin/project-manifest.json"
+assert_file_exists "$installed_manifest"
+assert_file_exists "$installed_project/00_Admin/client-profile-snapshot.json"
+assert_json_eq "1.1.0" "$installed_manifest" '.metadata.schema_version' \
+    "installed new-mix creates v1.1 schema"
+assert_dir_exists "$installed_project/03_DAW_Project"
+assert_path_not_exists "$installed_project/03_DAW_Project/Project"
+assert_path_not_exists "$installed_project/05_Final_Delivery/delivery-manifest.json"
 
 # A sentinel in the application directory must disappear during upgrade, while
 # the independent studio workspace remains untouched.
