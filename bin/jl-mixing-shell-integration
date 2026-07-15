@@ -23,8 +23,21 @@ unset _jl_mixing_is_sourced
 export JL_MIXING_SHELL_INTEGRATION=1
 
 _jl_mixing_secure_result_file() {
-    local result_file
-    result_file="$(umask 077 && mktemp "${TMPDIR:-/tmp}/jl-mixing-cd.XXXXXX")" || return 1
+    local result_file temp_dir template
+
+    # macOS commonly exports TMPDIR with a trailing slash. Normalize it before
+    # constructing the result-file template so the path contains no empty
+    # segments that the command-side safety validator would reject.
+    temp_dir="${TMPDIR:-/tmp}"
+    while [ "$temp_dir" != "/" ] && [ "${temp_dir%/}" != "$temp_dir" ]; do
+        temp_dir="${temp_dir%/}"
+    done
+    case "$temp_dir" in
+        /) template="/jl-mixing-cd.XXXXXX" ;;
+        *) template="$temp_dir/jl-mixing-cd.XXXXXX" ;;
+    esac
+
+    result_file="$(umask 077 && mktemp "$template")" || return 1
     chmod 600 "$result_file" 2>/dev/null || {
         rm -f -- "$result_file"
         return 1
