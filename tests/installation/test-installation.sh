@@ -19,16 +19,28 @@ temp_root="$(new_test_dir)"
 trap 'rm -rf "$temp_root"' EXIT HUP INT TERM
 prefix="$temp_root/prefix"
 workspace="$temp_root/workspace"
+fake_home="$temp_root/home"
+mkdir -p "$fake_home"
+printf 'export USER_INSTALL_SETTING=1
+' > "$fake_home/.bashrc"
 
-JL_MIXING_TEST_SYSTEM_SITE_PACKAGES=1 "$ROOT/install.sh" --prefix "$prefix" >/dev/null
+HOME="$fake_home" SHELL=/bin/bash JL_MIXING_TEST_SYSTEM_SITE_PACKAGES=1 \
+    "$ROOT/install.sh" --prefix "$prefix" >/dev/null
 assert_file_exists "$prefix/share/jl-mixing/VERSION"
 assert_file_exists "$prefix/share/jl-mixing/.venv/bin/python"
 assert_file_exists "$prefix/bin/new-studio"
 assert_file_exists "$prefix/bin/new-client"
+assert_file_exists "$prefix/bin/jl-mixing-shell-integration"
+assert_file_exists "$prefix/bin/jl-mixing-uninstall"
+assert_path_not_exists "$prefix/bin/complete-project"
+assert_file_exists "$prefix/share/jl-mixing/install-state.json"
+assert_json_eq "true" "$prefix/share/jl-mixing/install-state.json"     '.shell_integration.enabled' "install state records shell integration"
+assert_contains "$(cat "$fake_home/.bashrc")"     "# >>> JL Mixing managed configuration >>>"     "installer adds one managed shell block"
 assert_file_exists "$prefix/share/jl-mixing/tools/project-state.py"
 assert_file_exists "$prefix/share/jl-mixing/tools/import-project-source.py"
 assert_file_exists "$prefix/share/jl-mixing/tools/import-revision-source.py"
 assert_file_exists "$prefix/share/jl-mixing/tools/build-delivery.py"
+assert_file_exists "$prefix/share/jl-mixing/tools/manage-shell-config.py"
 assert_file_exists "$prefix/share/jl-mixing/schemas/client-profile-snapshot.schema.json"
 assert_file_exists "$prefix/share/jl-mixing/templates/Intake_Report.md"
 assert_file_exists "$prefix/share/jl-mixing/templates/Revision_Notes.md"
@@ -80,13 +92,17 @@ assert_json_eq "1" "$installed_manifest" '.state.approved_revision' \
 # A sentinel in the application directory must disappear during upgrade, while
 # the independent studio workspace remains untouched.
 printf 'old application file\n' > "$prefix/share/jl-mixing/obsolete-sentinel"
-JL_MIXING_TEST_SYSTEM_SITE_PACKAGES=1 "$ROOT/install.sh" --prefix "$prefix" >/dev/null
+HOME="$fake_home" SHELL=/bin/bash JL_MIXING_TEST_SYSTEM_SITE_PACKAGES=1 \
+    "$ROOT/install.sh" --prefix "$prefix" >/dev/null
 assert_path_not_exists "$prefix/share/jl-mixing/obsolete-sentinel"
 assert_file_exists "$workspace/Studio/studio.json"
+assert_eq "1" "$(grep -c '^# >>> JL Mixing managed configuration >>>$' "$fake_home/.bashrc")"     "reinstall keeps one managed shell block"
 
-"$prefix/bin/jl-mixing-uninstall" >/dev/null
+HOME="$fake_home" SHELL=/bin/bash "$prefix/bin/jl-mixing-uninstall" >/dev/null
 assert_path_not_exists "$prefix/share/jl-mixing"
 assert_path_not_exists "$prefix/bin/new-studio"
+assert_path_not_exists "$prefix/bin/jl-mixing-shell-integration"
 assert_file_exists "$workspace/Studio/studio.json"
+assert_eq "export USER_INSTALL_SETTING=1" "$(cat "$fake_home/.bashrc")"     "uninstall preserves user shell content"
 
 echo "[OK] installation lifecycle ($TEST_COUNT assertions)"

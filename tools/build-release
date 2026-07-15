@@ -80,7 +80,8 @@ cp -R "$ROOT/bin" "$ROOT/lib" "$ROOT/schemas" "$ROOT/templates" "$ROOT/docs" "$p
 mkdir -p "$package_root/tools" "$package_root/packaging"
 cp "$ROOT/tools/validate-json.py" "$ROOT/tools/build-intake-report.py" \
     "$ROOT/tools/project-state.py" "$ROOT/tools/import-project-source.py" \
-    "$ROOT/tools/import-revision-source.py" "$ROOT/tools/build-delivery.py" "$package_root/tools/"
+    "$ROOT/tools/import-revision-source.py" "$ROOT/tools/build-delivery.py" \
+    "$ROOT/tools/manage-shell-config.py" "$package_root/tools/"
 cp "$ROOT/packaging/requirements.txt" "$package_root/packaging/"
 
 chmod +x "$package_root/install.sh" "$package_root/uninstall.sh" "$package_root/bin/"* \
@@ -88,7 +89,8 @@ chmod +x "$package_root/install.sh" "$package_root/uninstall.sh" "$package_root/
     "$package_root/tools/project-state.py" \
     "$package_root/tools/import-project-source.py" \
     "$package_root/tools/import-revision-source.py" \
-    "$package_root/tools/build-delivery.py"
+    "$package_root/tools/build-delivery.py" \
+    "$package_root/tools/manage-shell-config.py"
 
 # Record the exact release contents for human review and archive verification.
 (

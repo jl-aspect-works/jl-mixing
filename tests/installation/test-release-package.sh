@@ -29,6 +29,10 @@ assert_contains "$(cat "$archive.inventory.txt")" 'schemas/client-profile-snapsh
     "snapshot schema included in release archive"
 assert_contains "$(cat "$archive.inventory.txt")" 'templates/Intake_Report.md' \
     "canonical Markdown templates included in release archive"
+assert_contains "$(cat "$archive.inventory.txt")" 'bin/jl-mixing-shell-integration' \
+    "shell integration included in release archive"
+assert_contains "$(cat "$archive.inventory.txt")" 'tools/manage-shell-config.py' \
+    "shell configuration helper included in release archive"
 assert_success "release archive verifies" "$ROOT/tools/verify-release-archive" "$archive"
 
 echo "[OK] release package ($TEST_COUNT assertions)"
