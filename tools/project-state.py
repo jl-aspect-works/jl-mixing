@@ -184,7 +184,10 @@ def validate_delivery(project_root: Path, project: dict[str, Any]) -> None:
         (delivery.get("revision", {}).get("number"), delivered, "delivered revision number"),
         (delivery.get("revision", {}).get("revision_id"), revision.get("revision_id"), "revision ID"),
         (delivery.get("revision", {}).get("description"), revision.get("description"), "revision description"),
-        (delivery.get("revision", {}).get("approval"), revision.get("approval"), "revision approval"),
+        # Approval is an immutable package-time snapshot. A later reapproval of
+        # the same revision replaces the project record but must not rewrite or
+        # invalidate an existing delivery manifest. Its non-null structure is
+        # enforced by the delivery schema.
         (delivery.get("delivery", {}).get("method"), project.get("delivery", {}).get("method"), "delivery method"),
     ]
     for actual, expected, label in checks:

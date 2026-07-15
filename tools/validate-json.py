@@ -19,8 +19,8 @@ def parser() -> ArgumentParser:
     result = ArgumentParser(
         description="Validate JL Mixing JSON examples or one explicit document."
     )
-    result.add_argument("--schema", type=Path)
-    result.add_argument("--document", type=Path)
+    result.add_argument("--schema", type=Path, action="append")
+    result.add_argument("--document", type=Path, action="append")
     result.add_argument(
         "--strict",
         action="store_true",
@@ -142,8 +142,10 @@ def validate_rejections(pairs: Iterable[ValidationPair]) -> bool:
 def main() -> int:
     args = parser().parse_args()
     root = Path(__file__).resolve().parent.parent
-    if bool(args.schema) != bool(args.document):
-        print("--schema and --document must be supplied together.", file=sys.stderr)
+    schemas = args.schema or []
+    documents = args.document or []
+    if len(schemas) != len(documents):
+        print("--schema and --document must be supplied in matching pairs.", file=sys.stderr)
         return 2
 
     try:
@@ -160,8 +162,8 @@ def main() -> int:
         )
         return 0
 
-    if args.schema and args.document:
-        return 0 if validate_pairs([(args.schema, args.document)]) else 1
+    if schemas:
+        return 0 if validate_pairs(zip(schemas, documents)) else 1
 
     positive_ok = validate_pairs(default_pairs(root))
     negative_ok = validate_rejections(negative_pairs(root))

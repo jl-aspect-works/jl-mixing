@@ -127,3 +127,48 @@ with wave.open(str(path), "wb") as output:
     output.writeframes(silent_frame * 480)
 PY_WAV
 }
+
+# Create a complete canonical v1.1 project in Setup state without invoking the
+# slower project-creation command. Revision-workflow tests use this fixture to
+# focus on the commands under test while still validating every governing JSON
+# document and standard directory boundary.
+fixture_v11_project() {
+    local studio_root client_root project_root manifest
+    studio_root="$1"
+    client_root="$studio_root/Clients/Acme Records"
+    project_root="$client_root/Projects/Blue Sky"
+
+    mkdir -p \
+        "$studio_root/Studio" \
+        "$client_root/Projects" \
+        "$project_root/00_Admin" \
+        "$project_root/01_Client_Files/Original_Delivery" \
+        "$project_root/01_Client_Files/References" \
+        "$project_root/01_Client_Files/Documentation" \
+        "$project_root/02_Audio_Preparation/Working_Audio" \
+        "$project_root/02_Audio_Preparation/Rejected_Files" \
+        "$project_root/03_DAW_Project" \
+        "$project_root/04_Revisions" \
+        "$project_root/05_Final_Delivery/Stems" \
+        "$project_root/06_Recall/External_Files" \
+        "$project_root/06_Recall/Screenshots"
+
+    jq --arg root "$studio_root" '.root_path=$root' \
+        "$ROOT/examples/studio.json" > "$studio_root/Studio/studio.json"
+    cp "$ROOT/examples/client.json" "$client_root/client.json"
+    cp "$ROOT/examples/client-profile-snapshot.json" \
+        "$project_root/00_Admin/client-profile-snapshot.json"
+    manifest="$project_root/00_Admin/project-manifest.json"
+    jq '.state={current_revision:0,approved_revision:null,delivered_revision:null} |
+        .revisions=[]' "$ROOT/examples/project-manifest.json" > "$manifest"
+
+    cp "$ROOT/templates/Intake_Report.md" "$project_root/00_Admin/Intake_Report.md"
+    cp "$ROOT/templates/Project_Notes.md" "$project_root/00_Admin/Project_Notes.md"
+    cp "$ROOT/templates/Preparation_Report.md" \
+        "$project_root/02_Audio_Preparation/Preparation_Report.md"
+    cp "$ROOT/templates/Delivery_Notes.md" \
+        "$project_root/05_Final_Delivery/Delivery_Notes.md"
+    cp "$ROOT/templates/Recall_Sheet.md" "$project_root/06_Recall/Recall_Sheet.md"
+
+    printf '%s\n' "$project_root"
+}

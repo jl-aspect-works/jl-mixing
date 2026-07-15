@@ -57,50 +57,102 @@ jl_txn_stage_directory_near() {
     mktemp -d "$parent/.${base}.stage.XXXXXX"
 }
 
-# Reserve a nonexistent hidden backup path beside a destination. mktemp creates
-# the directory securely; removing that empty reservation leaves a unique name
-# for a later atomic rename.
-jl_txn_backup_path_near() {
-    local destination parent base reservation
+# Create a unique hidden backup container beside a destination. The original
+# entry is moved to the fixed child name ``original``. Keeping the container in
+# place avoids races and ambiguous ``mv`` behavior between files and
+# directories while a transaction is active.
+jl_txn_backup_container_near() {
+    local destination parent base
     destination="$1"
     parent="$(dirname "$destination")"
     base="$(basename "$destination")"
-    reservation="$(mktemp -d "$parent/.${base}.backup.XXXXXX")" || return $?
-    rmdir "$reservation" || return $?
-    printf '%s\n' "$reservation"
+    mktemp -d "$parent/.${base}.backup.XXXXXX"
 }
 
-# Move an existing entry to a unique sibling backup path. If the source does
-# not exist, print an empty line so callers can use one uniform rollback flow.
+# Move an existing entry into a unique sibling backup container. If the source
+# does not exist, print an empty line so callers can use one rollback flow.
 jl_txn_backup_existing() {
-    local source backup
+    local source container
     source="$1"
     if [ ! -e "$source" ] && [ ! -L "$source" ]; then
         printf '\n'
         return 0
     fi
 
-    backup="$(jl_txn_backup_path_near "$source")" || return $?
-    mv "$source" "$backup" || {
+    container="$(jl_txn_backup_container_near "$source")" || return $?
+    mv "$source" "$container/original" || {
+        rmdir "$container" 2>/dev/null || true
         jl_error "Unable to back up transaction target: $source"
         return "$JL_EXIT_GENERAL"
     }
-    printf '%s\n' "$backup"
+    printf '%s\n' "$container"
+}
+
+# Copy an existing regular file into a backup container while leaving the
+# authoritative path in place until the staged file atomically replaces it.
+# This avoids a transient missing-manifest window during file-only and
+# coordinated directory/file transactions.
+jl_txn_backup_existing_file() {
+    local source container
+    source="$1"
+    if [ ! -e "$source" ] && [ ! -L "$source" ]; then
+        printf '\n'
+        return 0
+    fi
+    jl_fs_is_regular_file_no_symlink "$source" || {
+        jl_error "Transaction file target is missing or unsafe: $source"
+        return "$JL_EXIT_UNSAFE"
+    }
+
+    container="$(jl_txn_backup_container_near "$source")" || return $?
+    cp -p "$source" "$container/original" || {
+        jl_fs_remove_entry_no_follow "$container" 2>/dev/null || true
+        jl_error "Unable to back up transaction file: $source"
+        return "$JL_EXIT_GENERAL"
+    }
+    printf '%s\n' "$container"
+}
+
+# Remove a completed backup container without following a symlink that might
+# have replaced it unexpectedly.
+jl_txn_discard_backup() {
+    local container
+    container="$1"
+    [ -n "$container" ] || return 0
+    if [ -L "$container" ] || [ ! -d "$container" ]; then
+        jl_error "Transaction backup container is missing or unsafe: $container"
+        return "$JL_EXIT_UNSAFE"
+    fi
+    jl_fs_remove_entry_no_follow "$container"
 }
 
 # Restore one backup, removing only the replacement entry created by the active
-# transaction. The backup path itself is never followed when it is a symlink.
+# transaction. The backup container itself is never followed when it is a
+# symlink.
 jl_txn_restore_backup() {
-    local backup destination
-    backup="$1"
+    local container destination original
+    container="$1"
     destination="$2"
 
     if [ -e "$destination" ] || [ -L "$destination" ]; then
         jl_fs_remove_entry_no_follow "$destination" || return $?
     fi
-    if [ -n "$backup" ] && { [ -e "$backup" ] || [ -L "$backup" ]; }; then
-        mv "$backup" "$destination" || {
+    if [ -n "$container" ]; then
+        if [ -L "$container" ] || [ ! -d "$container" ]; then
+            jl_error "Transaction backup container is missing or unsafe: $container"
+            return "$JL_EXIT_UNSAFE"
+        fi
+        original="$container/original"
+        if [ ! -e "$original" ] && [ ! -L "$original" ]; then
+            jl_error "Transaction backup entry is missing: $original"
+            return "$JL_EXIT_GENERAL"
+        fi
+        mv "$original" "$destination" || {
             jl_error "Unable to restore transaction backup: $destination"
+            return "$JL_EXIT_GENERAL"
+        }
+        rmdir "$container" || {
+            jl_error "Unable to remove restored backup container: $container"
             return "$JL_EXIT_GENERAL"
         }
     fi
@@ -174,7 +226,7 @@ jl_txn_replace_directory() {
     fi
 
     if [ "$status" -eq 0 ]; then
-        [ -z "$backup" ] || jl_fs_remove_entry_no_follow "$backup"
+        [ -z "$backup" ] || jl_txn_discard_backup "$backup"
         return 0
     fi
 
@@ -198,6 +250,7 @@ jl_txn_commit_directory_and_file() {
     destination_directory="$2"
     staged_file="$3"
     destination_file="$4"
+    shift 4
     directory_backup=""
     file_backup=""
 
@@ -219,7 +272,7 @@ jl_txn_commit_directory_and_file() {
     }
 
     directory_backup="$(jl_txn_backup_existing "$destination_directory")" || return $?
-    file_backup="$(jl_txn_backup_existing "$destination_file")" || {
+    file_backup="$(jl_txn_backup_existing_file "$destination_file")" || {
         jl_txn_restore_backup "$directory_backup" "$destination_directory" || true
         return "$JL_EXIT_GENERAL"
     }
@@ -238,10 +291,16 @@ jl_txn_commit_directory_and_file() {
     if [ "$status" -eq 0 ]; then
         jl_txn_fail_if_requested after-coordinated-file || status=$?
     fi
+    # Optional verifier commands run while both backups are still available.
+    # This lets callers validate committed cross-file state and still receive a
+    # complete rollback when verification fails.
+    if [ "$status" -eq 0 ] && [ "$#" -gt 0 ]; then
+        "$@" || status=$?
+    fi
 
     if [ "$status" -eq 0 ]; then
-        [ -z "$directory_backup" ] || jl_fs_remove_entry_no_follow "$directory_backup"
-        [ -z "$file_backup" ] || jl_fs_remove_entry_no_follow "$file_backup"
+        [ -z "$directory_backup" ] || jl_txn_discard_backup "$directory_backup"
+        [ -z "$file_backup" ] || jl_txn_discard_backup "$file_backup"
         return 0
     fi
 
@@ -250,6 +309,52 @@ jl_txn_commit_directory_and_file() {
     jl_txn_restore_backup "$directory_backup" "$destination_directory" || rollback_failed=1
     if [ "$rollback_failed" -ne 0 ]; then
         jl_error "Coordinated transaction failed and rollback was incomplete."
+        return "$JL_EXIT_GENERAL"
+    fi
+    return "$status"
+}
+
+# Atomically replace one staged file and retain the prior file until an optional
+# verifier succeeds. The staged file must be a sibling of the destination so
+# rename remains atomic.
+jl_txn_replace_file() {
+    local staged_file destination_file backup status rollback_status
+    staged_file="$1"
+    destination_file="$2"
+    shift 2
+    backup=""
+
+    jl_fs_is_regular_file_no_symlink "$staged_file" || {
+        jl_error "Staged file is missing or unsafe: $staged_file"
+        return "$JL_EXIT_VALIDATION"
+    }
+    jl_fs_same_filesystem "$staged_file" "$(dirname "$destination_file")" || {
+        jl_error "File staging is on a different filesystem."
+        return "$JL_EXIT_UNSAFE"
+    }
+
+    backup="$(jl_txn_backup_existing_file "$destination_file")" || return $?
+    status=0
+    jl_txn_fail_if_requested after-file-backup || status=$?
+    if [ "$status" -eq 0 ]; then
+        mv "$staged_file" "$destination_file" || status=$?
+    fi
+    if [ "$status" -eq 0 ]; then
+        jl_txn_fail_if_requested after-file-replacement || status=$?
+    fi
+    if [ "$status" -eq 0 ] && [ "$#" -gt 0 ]; then
+        "$@" || status=$?
+    fi
+
+    if [ "$status" -eq 0 ]; then
+        [ -z "$backup" ] || jl_txn_discard_backup "$backup"
+        return 0
+    fi
+
+    rollback_status=0
+    jl_txn_restore_backup "$backup" "$destination_file" || rollback_status=$?
+    if [ "$rollback_status" -ne 0 ]; then
+        jl_error "File replacement failed and rollback was incomplete: $destination_file"
         return "$JL_EXIT_GENERAL"
     fi
     return "$status"
