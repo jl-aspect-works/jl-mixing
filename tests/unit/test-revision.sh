@@ -48,9 +48,5 @@ assert_eq "Client" "$(jq -r '.revisions[1].approval.approved_by' "$manifest")" \
 assert_failure "approving current approved revision is rejected" \
     jl_revision_approve "$manifest" 1 Client 2026-07-22T12:00:00Z
 
-# Temporary legacy read compatibility remains until create-delivery is migrated.
-legacy="$tmp/legacy.json"
-cp "$ROOT/tests/fixtures/legacy-v1.0.4/project-manifest.json" "$legacy"
-assert_eq "approved" "$(jl_revision_status "$legacy" 1)" "legacy stored status remains readable"
 
 echo "[OK] revision.sh ($TEST_COUNT assertions)"

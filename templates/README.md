@@ -1,7 +1,17 @@
-# Template Layout During v1.1 Development
+# Runtime Templates
 
-The six Markdown files directly in this directory are the canonical v1.1
-project templates. Existing nested templates remain temporarily for commands
-that have not yet been migrated from v1.0.4. Each command feature branch will
-switch to the canonical files and remove obsolete nested templates when they
-are no longer referenced.
+JL Mixing Automation v1.1 ships six canonical Markdown templates:
+
+- `Intake_Report.md`
+- `Project_Notes.md`
+- `Preparation_Report.md`
+- `Revision_Notes.md`
+- `Delivery_Notes.md`
+- `Recall_Sheet.md`
+
+`Intake_Report.md` is the only shared managed document. `validate-intake`
+replaces only the text between its exact automated-section markers. All other
+Markdown files are fully user-owned after creation.
+
+The `studio/` and `client/` subdirectories contain the JSON construction
+templates used by `new-studio` and `new-client`.

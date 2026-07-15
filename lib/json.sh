@@ -174,9 +174,9 @@ jl_json_schema_path() {
 ' "$schema_path"
 }
 
-# Check a document's exact schema name and schema version. The older
-# major-version helper remains available while v1.0.4 commands are migrated one
-# feature branch at a time; v1.1 commands must use this exact helper.
+# Check a document's exact schema name and schema version. Generic utilities
+# may still inspect the schema major, but every v1.1 workflow mutation uses this
+# exact identity check.
 jl_json_require_exact_schema_identity() {
     local file expected_schema expected_version actual_schema actual_version
     file="$1"

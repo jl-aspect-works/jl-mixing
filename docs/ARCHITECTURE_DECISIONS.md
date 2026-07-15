@@ -1,18 +1,24 @@
 # Architecture Decisions
 
-This is a concise decision log rather than a formal ADR system.
-
 - Application installation and studio workspaces are separate.
-- Git is a developer dependency, not an end-user requirement.
-- Logic Pro is the low-friction default DAW, not an architectural limitation.
-- `03_DAW_Project/Project/` is an opaque DAW-owned boundary.
-- Client originals are immutable.
-- Routine revisions use one active DAW project.
+- The default workspace is `~/Music/Mixes/`.
+- Projects live directly beneath each client's `Projects/` directory and keep a
+  stable path.
+- Project lifecycle is derived from `current_revision`, `approved_revision`, and
+  `delivered_revision`; there is no completed-project state or command.
+- `03_DAW_Project/` is an opaque DAW/user-owned boundary. JL Mixing does not
+  manage DAW templates, presets, or project metadata.
+- Original client delivery files are immutable.
 - JSON contains machine-managed state; Markdown contains human documentation.
-- Intake reports use explicit managed-section markers.
-- Client profile snapshots are exact copies.
-- Revision statuses are `open`, `approved`, and `superseded`.
-- There is no `Superseded/` directory or `Revision_Log.md`.
-- Audio preparation is primarily manual in Version 1.0.
-- Delivery preparation and delivery recording are separate actions.
-- User-facing commands are thin wrappers around shared libraries.
+- Only the marked automated section in `Intake_Report.md` is rewritten.
+- Client profile snapshots are immutable historical records.
+- Revision status is derived, not stored.
+- `validate-intake` preserves v1.0.4's opportunistic `ffprobe` behavior without
+  expanding audio QC in v1.1.
+- Delivery file eligibility is not restricted by extension.
+- Delivery classification is best-effort; unmatched files are `unclassified`.
+- `create-delivery --clean` explicitly authorizes removal of every item inside
+  `05_Final_Delivery/` and remains rollback-capable.
+- Installation, upgrades, shell configuration, and uninstall are transactional.
+- User-facing commands are thin orchestration layers over shared libraries and
+  local helper tools.

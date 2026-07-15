@@ -1,228 +1,68 @@
-# JL Mixing Automation
-## Design Specification v1.0
+# JL Mixing Automation v1.1 Design Summary
 
-## Purpose
+The detailed approved design is in `V1.1_DESIGN_SPEC.md`,
+`V1.1_COMMAND_CONTRACTS.md`, and `V1.1_DATA_MODEL.md`. This document is the
+compact runtime-oriented summary.
 
-JL Mixing Automation manages the filesystem and workflow around professional
-audio projects. The DAW remains responsible for its own project contents.
-
-## Design principles
-
-- Pay-as-you-go complexity with useful defaults.
-- One authoritative source for each type of information.
-- Immutable client originals.
-- Safe, atomic, script-managed state changes.
-- Context-aware commands with explicit options taking precedence.
-- Thin command wrappers with reusable logic in `lib/`.
-- Human-authored Markdown remains under human control.
-
-## Product identity
-
-- Product name: **JL Mixing Automation**
-- Software and repository identifier: `jl-mixing`
-- Metadata string: `jl-mixing <version>`
-- Default workspace: `~/Music/Mixes`
-
-## Studio workspace
+## Workspace
 
 ```text
 ~/Music/Mixes/
-├── Clients/
-├── DAWs/
-└── Studio/
+├── Studio/studio.json
+└── Clients/<Client>/
+    ├── client.json
+    └── Projects/<Project>/
+        ├── 00_Admin/
+        ├── 01_Client_Files/
+        ├── 02_Audio_Preparation/
+        ├── 03_DAW_Project/
+        ├── 04_Revisions/
+        ├── 05_Final_Delivery/
+        └── 06_Recall/
 ```
 
-`new-studio` uses Logic Pro as the Version 1.0 built-in default DAW while the
-architecture remains DAW-agnostic.
+Project paths are stable. Lifecycle is represented by revision pointers, not by
+moving projects between directories.
 
-## Client structure
-
-```text
-Clients/<Client Name>/
-├── client.json
-└── Projects/
-    ├── Active/
-    └── Completed/
-```
-
-## Project structure
-
-```text
-<Project Name>/
-├── 00_Admin/
-│   ├── project-manifest.json
-│   ├── client-profile-snapshot.json
-│   ├── Intake_Report.md
-│   └── Project_Notes.md
-├── 01_Client_Files/
-│   ├── Original_Delivery/
-│   ├── References/
-│   └── Documentation/
-├── 02_Audio_Preparation/
-│   ├── Working_Audio/
-│   ├── Rejected_Files/
-│   └── Preparation_Report.md
-├── 03_DAW_Project/
-│   └── Project/
-├── 04_Revisions/
-│   └── Revision_XX/
-│       ├── Revision_Notes.md
-│       └── Prints/
-├── 05_Final_Delivery/
-│   ├── Stems/
-│   ├── Delivery_Notes.md
-│   └── delivery-manifest.json
-└── 06_Recall/
-    ├── Recall_Sheet.md
-    ├── External_Files/
-    └── Screenshots/
-```
-
-## Folder responsibilities
-
-### Client originals
-
-`01_Client_Files/Original_Delivery/` is immutable. Commands must not rename,
-convert, move, overwrite, or delete its contents.
-
-### Audio preparation
-
-Audio preparation is manual in Version 1.0. Engineers populate
-`02_Audio_Preparation/Working_Audio/` and maintain `Preparation_Report.md`.
-Rejected files may be copied into `Rejected_Files/`; originals remain intact.
-
-### DAW boundary
-
-`03_DAW_Project/Project/` is opaque DAW-owned content. Automation may create,
-copy, launch, or move this boundary but must not interpret its internals.
-
-### Revisions
-
-Revision folders are created only by `new-revision`. Status values are:
-
-```text
-open
-approved
-superseded
-```
-
-Approving a revision changes any previously approved revision to `superseded`.
-There is no `Superseded/` directory and no `Revision_Log.md`.
-
-### Delivery
-
-`create-delivery` prepares and validates the package.
-`create-delivery --mark-delivered` records that the package was actually sent.
-
-## Data ownership
-
-Machine-owned:
-
-- `studio.json`
-- `client.json`
-- `project-manifest.json`
-- `delivery-manifest.json`
-
-Human-owned after creation:
-
-- `Project_Notes.md`
-- `Revision_Notes.md`
-- `Preparation_Report.md`
-- `Delivery_Notes.md`
-- `Recall_Sheet.md`
-
-Mixed ownership:
-
-- `Intake_Report.md`, with an explicitly delimited managed section.
-
-## Project metadata
-
-All JSON documents include:
+## State model
 
 ```json
 {
-  "metadata": {
-    "schema": "<schema name>",
-    "schema_version": "1.0.0",
-    "document_id": "<UUID>",
-    "created_by": "<command>",
-    "created_with": "jl-mixing 1.0.0",
-    "created_at": "<ISO-8601 timestamp>",
-    "last_modified_at": "<ISO-8601 timestamp>"
-  }
+  "current_revision": 3,
+  "approved_revision": 2,
+  "delivered_revision": 2
 }
 ```
 
-Schema versions use semantic versioning. Unsupported major versions are rejected.
+- Setup: no revisions
+- In progress: current and approved revisions differ
+- Approved: current equals approved and is not the current delivery
+- Delivered: current, approved, and delivered pointers agree and the delivery
+  manifest is structurally valid
 
-## Project identity and type
+Revision status is derived as `open`, `approved`, or `superseded`; it is not
+stored in revision records.
 
-The canonical name field is `project_name`; command syntax uses:
+## Ownership boundaries
 
-```bash
-new-mix --project "Blue Sky"
-```
+- JL-managed: JSON manifests and generated delivery files
+- User-managed: project, preparation, revision, delivery, and recall Markdown
+- Shared: only the automated section in `Intake_Report.md`
+- Immutable: `Original_Delivery/`
+- Opaque: `03_DAW_Project/`
 
-Optional `project_type` values are:
+Automation never silently deletes user-owned content, except when the user
+explicitly authorizes the fully destructive `create-delivery --clean` operation
+within `05_Final_Delivery/`.
 
-```text
-mixing
-podcast
-audiobook
-dialogue_edit
-live_recording
-other
-```
+## Delivery
 
-## Naming tokens
+The approved revision is the only delivery source. Selected regular files are
+copied without extension restrictions, verified with SHA-256, and recorded in
+an immutable delivery manifest. Filename classification is optional and uses
+`unclassified` when no recognized phrase matches.
 
-All templates use `{{PROJECT_NAME}}`, never `{{SONG_TITLE}}`.
+## Compatibility
 
-## Core commands
-
-```text
-new-studio
-new-client
-new-mix
-validate-intake
-new-revision
-approve-mix
-create-delivery
-complete-project
-```
-
-## Validation
-
-Validation order:
-
-1. JSON syntax
-2. JSON Schema Draft 2020-12
-3. Business rules
-
-Version 1.0 uses Python 3 and an application-private virtual environment with a
-pinned `jsonschema` dependency. `ffprobe` is optional and enables enhanced audio
-inspection.
-
-## Installation and distribution
-
-End users install versioned `.tar.gz` packages. Git is not required.
-
-Default paths:
-
-```text
-~/.local/share/jl-mixing/
-~/.local/bin/
-```
-
-Installation never creates or modifies the studio workspace.
-
-## Deferred features
-
-- Billing and contracts
-- Automatic backups and cloud synchronization
-- Multi-user support
-- DAW parsing
-- Automatic destructive audio conversion
-- Database storage
-- Plug-in management
-- Advanced reporting
+v1.1 operates only on exact v1.1 schemas and rejects recognizable v1.0 layouts.
+There is no migration or automatic repair.

@@ -27,6 +27,7 @@ printf 'export USER_INSTALL_SETTING=1
 HOME="$fake_home" SHELL=/bin/bash JL_MIXING_TEST_SYSTEM_SITE_PACKAGES=1 \
     "$ROOT/install.sh" --prefix "$prefix" >/dev/null
 assert_file_exists "$prefix/share/jl-mixing/VERSION"
+assert_file_exists "$prefix/share/jl-mixing/CHANGELOG.md"
 assert_file_exists "$prefix/share/jl-mixing/.venv/bin/python"
 assert_file_exists "$prefix/bin/new-studio"
 assert_file_exists "$prefix/bin/new-client"
@@ -84,10 +85,16 @@ PATH="$prefix/bin:$PATH" new-revision --project "$installed_project" \
     --description "Installed revision" >/dev/null
 assert_file_exists "$installed_project/04_Revisions/Revision_01/Revision_Notes.md"
 assert_path_not_exists "$installed_project/04_Revisions/Revision_01/Prints"
+printf 'installed main mix\n' > \
+    "$installed_project/04_Revisions/Revision_01/Installed Main Mix.wav"
 PATH="$prefix/bin:$PATH" approve-mix --project "$installed_project" \
     --approved-by Client --date 2030-01-01T12:00:00Z >/dev/null
 assert_json_eq "1" "$installed_manifest" '.state.approved_revision' \
     "installed approve-mix records v1.1 approval"
+PATH="$prefix/bin:$PATH" create-delivery --project "$installed_project" >/dev/null
+assert_file_exists "$installed_project/05_Final_Delivery/delivery-manifest.json"
+assert_json_eq "1" "$installed_manifest" '.state.delivered_revision' \
+    "installed create-delivery records delivered revision"
 
 # A sentinel in the application directory must disappear during upgrade, while
 # the independent studio workspace remains untouched.

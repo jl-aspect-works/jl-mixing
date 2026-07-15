@@ -1,38 +1,31 @@
-# JL Mixing Automation
+# JL Mixing Automation v1.1
 
-JL Mixing Automation organizes professional audio mixing projects, preserves
-client originals, tracks revisions and approvals, assembles final delivery
-packages, and records project completion.
+JL Mixing Automation creates repeatable professional mixing project workspaces,
+tracks revision approval, and builds SHA-256-verified final-delivery packages.
 
-## Install
-
-Required before installation:
+## Requirements
 
 - Bash 3.2 or newer
 - Python 3.10 or newer
 - `jq`
+- Optional: `ffprobe` for enhanced intake reporting
 
-Extract the archive and run:
+## Install
 
 ```bash
 ./install.sh
 ```
 
-The default installation is:
+Default locations:
 
 ```text
 Application: ~/.local/share/jl-mixing/
 Commands:    ~/.local/bin/
 ```
 
-Use another prefix when needed:
-
-```bash
-./install.sh --prefix "$HOME/Applications/jl-local"
-```
-
-If the command directory is not already in `PATH`, the installer prints the
-exact line to add to the shell configuration.
+The installer configures one managed `.zshrc` or `.bashrc` block so no separate
+PATH or wrapper setup is required. Open a new Terminal tab after installation.
+Use `./install.sh --no-shell-integration` to opt out of startup-file changes.
 
 ## Start
 
@@ -40,20 +33,26 @@ exact line to add to the shell configuration.
 new-studio
 ```
 
-Logic Pro is the Version 1.0 default DAW. Use `new-studio --help` for options.
+The default workspace is `~/Music/Mixes/`. v1.1 requires a fresh workspace and
+does not migrate v1.0 workspaces.
 
-## Upgrade
+## Workflow
 
-Extract the newer release and run its `install.sh`. Application files are
-replaced transactionally. Studio workspaces are never modified.
+```text
+new-studio → new-client → new-mix → validate-intake → new-revision
+→ manual client review → approve-mix → create-delivery
+```
 
-## Uninstall
+`create-delivery --clean` deletes and replaces all contents inside the selected
+project's `05_Final_Delivery/` directory.
+
+## Upgrade and uninstall
+
+Run the new release's `install.sh` to upgrade transactionally. Workspaces are
+not modified.
 
 ```bash
 jl-mixing-uninstall
 ```
-
-Uninstallation removes the application and managed launchers only. It never
-removes `~/Music/Mixes/` or another configured studio workspace.
 
 See `docs/USER_GUIDE.md` and `docs/INSTALLATION_GUIDE.md` for complete details.
