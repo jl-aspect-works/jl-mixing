@@ -58,6 +58,15 @@ assert_eq "$destination" "$(printf '%s\n' "$output" | tail -n 1)" "wrapper chang
 assert_eq "0o600" "$(cat "$mode_file")" "result file uses user-only permissions"
 assert_eq "0" "$(find "$result_tmp" -type f | wc -l | tr -d ' ')" "result file cleaned after success"
 
+trailing_destination="$tmp/Trailing Slash TMPDIR Client"
+output="$(PATH="$fake_bin:$PATH" TMPDIR="$result_tmp/" \
+    JL_TEST_DESTINATION="$trailing_destination" JL_TEST_MODE_FILE="$mode_file" \
+    bash -c '. "$1"; new-client success; pwd' _ "$integration")"
+assert_eq "$trailing_destination" "$(printf '%s\n' "$output" | tail -n 1)" \
+    "trailing-slash TMPDIR supports automatic directory change"
+assert_eq "0" "$(find "$result_tmp" -type f | wc -l | tr -d ' ')" \
+    "trailing-slash TMPDIR result file cleaned"
+
 assert_success "no result leaves command successful" env PATH="$fake_bin:$PATH" TMPDIR="$result_tmp" \
     bash -c '. "$1"; before=$PWD; new-client no-result; test "$PWD" = "$before"' _ "$integration"
 
