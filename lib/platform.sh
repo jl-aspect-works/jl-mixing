@@ -117,6 +117,19 @@ jl_stat_mode() {
     fi
 }
 
+# Return the filesystem device identifier using BSD or GNU stat.
+# Comparing this value lets directory transactions reject cross-filesystem
+# staging, where rename would no longer be atomic.
+jl_stat_device() {
+    local path
+    path="$1"
+    if stat -f '%d' "$path" >/dev/null 2>&1; then
+        stat -f '%d' "$path"
+    else
+        stat -c '%d' "$path"
+    fi
+}
+
 # Calculate a SHA-256 digest using the available platform utility.
 jl_sha256() {
     local path
