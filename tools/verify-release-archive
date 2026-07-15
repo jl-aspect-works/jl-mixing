@@ -29,7 +29,7 @@ done
 
 for required in install.sh uninstall.sh VERSION LICENSE README.md RELEASE_MANIFEST.txt \
     bin lib schemas templates docs tools/validate-json.py tools/build-intake-report.py tools/project-state.py \
-    tools/import-project-source.py tools/import-revision-source.py packaging/requirements.txt; do
+    tools/import-project-source.py tools/import-revision-source.py tools/build-delivery.py packaging/requirements.txt; do
     [ -e "$package_root/$required" ] || {
         echo "Missing release content: $required" >&2
         exit 5

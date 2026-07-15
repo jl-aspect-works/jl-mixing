@@ -424,7 +424,7 @@ jl_context_delivery_root_v11() {
 # Validate the complete governing v1.1 context for a project before a workflow
 # mutation. JSON Schema handles each document; this helper enforces identity
 # relationships and project-state/filesystem invariants across the documents.
-jl_context_validate_project_v11() {
+jl_context_validate_project_documents_v11() {
     local project_root manifest snapshot client_root client_file studio_root studio_file
     local studio_schema client_schema project_schema snapshot_schema
     local client_document_id client_id
@@ -469,7 +469,29 @@ jl_context_validate_project_v11() {
         jl_error "Client profile snapshot does not match the owning client."
         return "$JL_EXIT_VALIDATION"
     fi
+}
 
+jl_context_validate_project_v11() {
+    local project_root studio_root
+    project_root="$1"
+    jl_context_validate_project_documents_v11 "$project_root" || return $?
+    studio_root="$(jl_context_studio_root_v11 "$project_root")" || return $?
     jl_project_validate_state "$project_root" || return $?
+    jl_json_validate_unique_uuids "$studio_root"
+}
+
+# Validate a project for an explicitly destructive delivery rebuild. This keeps
+# every governing document, identity, revision record, pointer, and revision
+# directory check, but deliberately ignores the current delivery package so
+# --clean can replace a missing or malformed prior package.
+jl_context_validate_project_v11_for_clean_delivery() {
+    local project_root studio_root manifest
+    project_root="$1"
+    manifest="$project_root/00_Admin/project-manifest.json"
+    jl_context_validate_project_documents_v11 "$project_root" || return $?
+    studio_root="$(jl_context_studio_root_v11 "$project_root")" || return $?
+    jl_project_validate_revision_records "$manifest" || return $?
+    jl_project_validate_state_pointers "$manifest" || return $?
+    jl_project_validate_revision_directories "$project_root" || return $?
     jl_json_validate_unique_uuids "$studio_root"
 }
