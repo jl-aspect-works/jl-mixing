@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://schemas.jlaudio.local/jl-mixing/delivery-manifest.schema.json",
-  "title": "JL Mixing Delivery Manifest",
+  "$id": "https://schemas.jlaudio.local/jl-mixing/v1.1/delivery-manifest.schema.json",
+  "title": "JL Mixing Delivery Manifest v1.1",
   "type": "object",
   "required": [
     "metadata",
     "project",
     "client",
-    "approved_revision",
+    "revision",
     "delivery",
     "files"
   ],
@@ -18,36 +18,25 @@
         "schema",
         "schema_version",
         "document_id",
-        "created_by",
         "created_with",
-        "created_at",
-        "last_modified_at"
+        "created_at"
       ],
       "properties": {
         "schema": {
           "const": "mixing-delivery"
         },
         "schema_version": {
-          "type": "string",
-          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+          "const": "1.1.0"
         },
         "document_id": {
           "type": "string",
           "format": "uuid"
         },
-        "created_by": {
-          "type": "string",
-          "minLength": 1
-        },
         "created_with": {
           "type": "string",
-          "pattern": "^jl-mixing [0-9]+\\.[0-9]+\\.[0-9]+$"
+          "pattern": "^jl-mixing 1\\.1\\.[0-9]+$"
         },
         "created_at": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "last_modified_at": {
           "type": "string",
           "format": "date-time"
         }
@@ -72,7 +61,7 @@
         },
         "project_name": {
           "type": "string",
-          "minLength": 1
+          "pattern": "\\S"
         }
       },
       "additionalProperties": false
@@ -95,35 +84,57 @@
       },
       "additionalProperties": false
     },
-    "approved_revision": {
-      "type": "integer",
-      "minimum": 1
+    "revision": {
+      "type": "object",
+      "required": [
+        "number",
+        "revision_id",
+        "description",
+        "approval"
+      ],
+      "properties": {
+        "number": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "revision_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "description": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "approval": {
+          "type": "object",
+          "required": [
+            "approved_at",
+            "approved_by"
+          ],
+          "properties": {
+            "approved_at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "approved_by": {
+              "type": "string",
+              "pattern": "\\S"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
     },
     "delivery": {
       "type": "object",
       "required": [
-        "method",
-        "delivered_at",
-        "delivered_by",
-        "notes"
+        "method"
       ],
       "properties": {
         "method": {
           "type": "string",
-          "minLength": 1
-        },
-        "delivered_at": {
-          "type": [
-            "string",
-            "null"
-          ],
-          "format": "date-time"
-        },
-        "delivered_by": {
-          "type": "string"
-        },
-        "notes": {
-          "type": "string"
+          "pattern": "\\S"
         }
       },
       "additionalProperties": false
@@ -135,94 +146,37 @@
         "type": "object",
         "required": [
           "path",
-          "deliverable_type"
+          "deliverable_type",
+          "size_bytes",
+          "sha256"
         ],
         "properties": {
           "path": {
             "type": "string",
-            "minLength": 1
+            "pattern": "^(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//).+$"
           },
           "deliverable_type": {
             "type": "string",
             "enum": [
-              "main_mix",
+              "stems",
               "instrumental",
               "acapella",
               "tv_mix",
               "performance_mix",
-              "stems",
               "master",
-              "other"
+              "main_mix",
+              "unclassified"
             ]
           },
-          "label": {
+          "size_bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sha256": {
             "type": "string",
-            "minLength": 1
-          },
-          "sample_rate": {
-            "type": "integer",
-            "minimum": 1
-          },
-          "bit_depth": {
-            "type": "integer",
-            "enum": [
-              16,
-              24,
-              32
-            ]
-          },
-          "file_format": {
-            "type": "string"
-          },
-          "channels": {
-            "type": "integer",
-            "minimum": 1
-          },
-          "duration_seconds": {
-            "type": "number",
-            "minimum": 0
-          },
-          "file_size_bytes": {
-            "type": "integer",
-            "minimum": 0
-          },
-          "checksum": {
-            "type": "object",
-            "required": [
-              "algorithm",
-              "value"
-            ],
-            "properties": {
-              "algorithm": {
-                "const": "sha256"
-              },
-              "value": {
-                "type": "string",
-                "pattern": "^[a-fA-F0-9]{64}$"
-              }
-            },
-            "additionalProperties": false
+            "pattern": "^[0-9a-f]{64}$"
           }
         },
-        "allOf": [
-          {
-            "if": {
-              "properties": {
-                "deliverable_type": {
-                  "const": "other"
-                }
-              },
-              "required": [
-                "deliverable_type"
-              ]
-            },
-            "then": {
-              "required": [
-                "label"
-              ]
-            }
-          }
-        ],
         "additionalProperties": false
       }
     }

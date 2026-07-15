@@ -182,7 +182,7 @@ jl_json_update "$client_root/client.json" \
     --argjson revision_limit "$revision_limit"
 
 # Schema validation is the commit point for client creation.
-jl_json_validate_schema "$APP_ROOT/schemas/client.schema.json" "$client_root/client.json"
+jl_json_validate_schema "$APP_ROOT/schemas/legacy/v1.0.4/client.schema.json" "$client_root/client.json"
 cleanup=0
 trap - EXIT HUP INT TERM
 

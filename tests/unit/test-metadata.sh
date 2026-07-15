@@ -15,7 +15,7 @@ metadata="$(jl_metadata_create mixing-client new-client 1.0.0 11111111-1111-4111
 assert_eq "mixing-client" "$(printf '%s' "$metadata" | jq -r '.schema')" "metadata schema"
 expected_version="$(sed -n '1p' "$ROOT/VERSION")"
 assert_eq "jl-mixing $expected_version" "$(printf '%s' "$metadata" | jq -r '.created_with')" "created_with version"
-cp "$ROOT/examples/client.json" "$tmp/client.json"
+cp "$ROOT/tests/fixtures/legacy-v1.0.4/client.json" "$tmp/client.json"
 jl_metadata_touch "$tmp/client.json" 2026-07-14T12:00:00Z
 assert_eq "2026-07-14T12:00:00Z" "$(jl_json_get "$tmp/client.json" '.metadata.last_modified_at')" "metadata touch"
 assert_success "metadata validation" jl_metadata_validate "$tmp/client.json" mixing-client

@@ -139,7 +139,7 @@ jl_json_update "$root/Studio/studio.json" \
     --arg file_format "$file_format"
 
 # Validate before releasing the rollback trap and reporting success.
-jl_json_validate_schema "$APP_ROOT/schemas/studio.schema.json" "$root/Studio/studio.json"
+jl_json_validate_schema "$APP_ROOT/schemas/legacy/v1.0.4/studio.schema.json" "$root/Studio/studio.json"
 cleanup=0
 trap - EXIT HUP INT TERM
 

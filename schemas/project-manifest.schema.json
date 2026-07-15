@@ -1,18 +1,22 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://schemas.jlaudio.local/jl-mixing/project-manifest.schema.json",
-  "title": "JL Mixing Project Manifest",
+  "$id": "https://schemas.jlaudio.local/jl-mixing/v1.1/project-manifest.schema.json",
+  "title": "JL Mixing Project Manifest v1.1",
   "type": "object",
   "required": [
     "metadata",
     "project_id",
     "project_name",
-    "project_type",
     "client",
     "artist",
+    "album",
+    "producer",
+    "mix_engineer",
+    "music",
     "audio",
-    "daw",
     "delivery",
+    "schedule",
+    "creative_direction",
     "state",
     "revisions"
   ],
@@ -23,7 +27,6 @@
         "schema",
         "schema_version",
         "document_id",
-        "created_by",
         "created_with",
         "created_at",
         "last_modified_at"
@@ -33,20 +36,15 @@
           "const": "mixing-project"
         },
         "schema_version": {
-          "type": "string",
-          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+          "const": "1.1.0"
         },
         "document_id": {
           "type": "string",
           "format": "uuid"
         },
-        "created_by": {
-          "type": "string",
-          "minLength": 1
-        },
         "created_with": {
           "type": "string",
-          "pattern": "^jl-mixing [0-9]+\\.[0-9]+\\.[0-9]+$"
+          "pattern": "^jl-mixing 1\\.1\\.[0-9]+$"
         },
         "created_at": {
           "type": "string",
@@ -65,18 +63,7 @@
     },
     "project_name": {
       "type": "string",
-      "minLength": 1
-    },
-    "project_type": {
-      "type": "string",
-      "enum": [
-        "mixing",
-        "podcast",
-        "audiobook",
-        "dialogue_edit",
-        "live_recording",
-        "other"
-      ]
+      "pattern": "\\S"
     },
     "client": {
       "type": "object",
@@ -98,7 +85,7 @@
     },
     "artist": {
       "type": "string",
-      "minLength": 1
+      "pattern": "\\S"
     },
     "album": {
       "type": "string"
@@ -111,13 +98,22 @@
     },
     "music": {
       "type": "object",
+      "required": [
+        "bpm",
+        "key",
+        "time_signature"
+      ],
       "properties": {
         "bpm": {
-          "type": [
-            "number",
-            "null"
-          ],
-          "exclusiveMinimum": 0
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          ]
         },
         "key": {
           "type": "string"
@@ -165,27 +161,6 @@
       },
       "additionalProperties": false
     },
-    "daw": {
-      "type": "object",
-      "required": [
-        "name",
-        "template",
-        "project_path"
-      ],
-      "properties": {
-        "name": {
-          "type": "string",
-          "minLength": 1
-        },
-        "template": {
-          "type": "string"
-        },
-        "project_path": {
-          "const": "03_DAW_Project/Project"
-        }
-      },
-      "additionalProperties": false
-    },
     "delivery": {
       "type": "object",
       "required": [
@@ -195,7 +170,7 @@
       "properties": {
         "method": {
           "type": "string",
-          "minLength": 1
+          "pattern": "\\S"
         },
         "requested_deliverables": {
           "type": "array",
@@ -219,13 +194,20 @@
     },
     "schedule": {
       "type": "object",
+      "required": [
+        "deadline"
+      ],
       "properties": {
         "deadline": {
-          "type": [
-            "string",
-            "null"
-          ],
-          "format": "date"
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "format": "date"
+            }
+          ]
         }
       },
       "additionalProperties": false
@@ -236,64 +218,36 @@
     "state": {
       "type": "object",
       "required": [
-        "status",
         "current_revision",
-        "approved",
         "approved_revision",
-        "approved_at",
-        "approved_by",
-        "delivered",
-        "delivered_at",
-        "completed_at"
+        "delivered_revision"
       ],
       "properties": {
-        "status": {
-          "type": "string",
-          "enum": [
-            "active",
-            "completed"
-          ]
-        },
         "current_revision": {
           "type": "integer",
           "minimum": 0
         },
-        "approved": {
-          "type": "boolean"
-        },
         "approved_revision": {
-          "type": [
-            "integer",
-            "null"
-          ],
-          "minimum": 1
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "integer",
+              "minimum": 1
+            }
+          ]
         },
-        "approved_at": {
-          "type": [
-            "string",
-            "null"
-          ],
-          "format": "date-time"
-        },
-        "approved_by": {
-          "type": "string"
-        },
-        "delivered": {
-          "type": "boolean"
-        },
-        "delivered_at": {
-          "type": [
-            "string",
-            "null"
-          ],
-          "format": "date-time"
-        },
-        "completed_at": {
-          "type": [
-            "string",
-            "null"
-          ],
-          "format": "date-time"
+        "delivered_revision": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "integer",
+              "minimum": 1
+            }
+          ]
         }
       },
       "additionalProperties": false
@@ -306,10 +260,8 @@
           "number",
           "revision_id",
           "created_at",
-          "created_by",
           "description",
-          "status",
-          "folder"
+          "approval"
         ],
         "properties": {
           "number": {
@@ -324,24 +276,47 @@
             "type": "string",
             "format": "date-time"
           },
-          "created_by": {
-            "const": "new-revision"
-          },
           "description": {
             "type": "string",
-            "minLength": 1
+            "pattern": "\\S"
           },
-          "status": {
-            "type": "string",
-            "enum": [
-              "open",
-              "approved",
-              "superseded"
+          "approval": {
+            "oneOf": [
+              {
+                "type": "object",
+                "required": [
+                  "approved_at",
+                  "approved_by"
+                ],
+                "properties": {
+                  "approved_at": {
+                    "type": "null"
+                  },
+                  "approved_by": {
+                    "type": "null"
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "required": [
+                  "approved_at",
+                  "approved_by"
+                ],
+                "properties": {
+                  "approved_at": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "approved_by": {
+                    "type": "string",
+                    "pattern": "\\S"
+                  }
+                },
+                "additionalProperties": false
+              }
             ]
-          },
-          "folder": {
-            "type": "string",
-            "pattern": "^04_Revisions/Revision_[0-9]+$"
           }
         },
         "additionalProperties": false

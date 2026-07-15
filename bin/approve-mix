@@ -104,7 +104,7 @@ trap rollback_on_failure EXIT HUP INT TERM
 
 # Update approval and superseding state in one jq transformation, then validate it.
 jl_revision_approve "$manifest" "$revision_number" "$approved_by" "$approval_date"
-jl_json_validate_schema "$APP_ROOT/schemas/project-manifest.schema.json" "$manifest"
+jl_json_validate_schema "$APP_ROOT/schemas/legacy/v1.0.4/project-manifest.schema.json" "$manifest"
 
 # Human approval notes are appended only after machine state validates.
 if [ -n "$notes" ]; then

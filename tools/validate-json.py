@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""Validate JSON documents against the project's Draft 2020-12 schemas.
+"""Validate canonical v1.1 examples and rejection fixtures.
 
-The basic test workflow treats a missing ``jsonschema`` package as a visible
-skip. Strict development/CI mode treats it as a failure. The eventual Batch 4
-installer provides a private pinned Python environment, so normal end users do
-not need to activate or manage a virtual environment themselves.
+The tool validates local Draft 2020-12 schemas only. Basic development mode
+may skip semantic validation when ``jsonschema`` is unavailable; strict/CI
+mode treats that missing dependency as a failure.
 """
 
 from argparse import ArgumentParser
@@ -13,13 +12,10 @@ from pathlib import Path
 import sys
 from typing import Iterable
 
-# A pair always represents (schema, instance document).
 ValidationPair = tuple[Path, Path]
 
 
 def parser() -> ArgumentParser:
-    """Build the CLI parser used by Makefile targets and direct validation."""
-
     result = ArgumentParser(
         description="Validate JL Mixing JSON examples or one explicit document."
     )
@@ -34,11 +30,15 @@ def parser() -> ArgumentParser:
 
 
 def default_pairs(root: Path) -> list[ValidationPair]:
-    """Return the four canonical schema/example pairs shipped by the project."""
+    """Return the five canonical v1.1 schema/example pairs."""
 
     return [
         (root / "schemas/studio.schema.json", root / "examples/studio.json"),
         (root / "schemas/client.schema.json", root / "examples/client.json"),
+        (
+            root / "schemas/client-profile-snapshot.schema.json",
+            root / "examples/client-profile-snapshot.json",
+        ),
         (
             root / "schemas/project-manifest.schema.json",
             root / "examples/project-manifest.json",
@@ -50,57 +50,104 @@ def default_pairs(root: Path) -> list[ValidationPair]:
     ]
 
 
-def validate_pairs(pairs: Iterable[ValidationPair]) -> bool:
-    """Validate every pair and return ``True`` only when all documents pass.
+def negative_pairs(root: Path) -> list[ValidationPair]:
+    """Return fixtures that each add one forbidden v1.0-era field."""
 
-    Schema validity is checked before instance validation so a broken contract
-    cannot produce misleading document errors.
-    """
+    return [
+        (root / "schemas/studio.schema.json", root / "tests/fixtures/invalid-studio.json"),
+        (root / "schemas/client.schema.json", root / "tests/fixtures/invalid-client.json"),
+        (
+            root / "schemas/client-profile-snapshot.schema.json",
+            root / "tests/fixtures/invalid-client-profile-snapshot.json",
+        ),
+        (
+            root / "schemas/project-manifest.schema.json",
+            root / "tests/fixtures/invalid-project-manifest.json",
+        ),
+        (
+            root / "schemas/delivery-manifest.schema.json",
+            root / "tests/fixtures/invalid-delivery-manifest.json",
+        ),
+        (
+            root / "schemas/studio.schema.json",
+            root / "tests/fixtures/invalid-studio-duplicate-deliverables.json",
+        ),
+        (
+            root / "schemas/project-manifest.schema.json",
+            root / "tests/fixtures/invalid-project-approval-pair.json",
+        ),
+        (
+            root / "schemas/project-manifest.schema.json",
+            root / "tests/fixtures/invalid-project-empty-artist.json",
+        ),
+        (
+            root / "schemas/project-manifest.schema.json",
+            root / "tests/fixtures/invalid-project-deadline.json",
+        ),
+        (
+            root / "schemas/delivery-manifest.schema.json",
+            root / "tests/fixtures/invalid-delivery-path.json",
+        ),
+        (
+            root / "schemas/delivery-manifest.schema.json",
+            root / "tests/fixtures/invalid-delivery-uppercase-hash.json",
+        ),
+    ]
 
+
+def validator_for(schema_path: Path):
     from jsonschema import Draft202012Validator, FormatChecker
 
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    Draft202012Validator.check_schema(schema)
+    return Draft202012Validator(schema, format_checker=FormatChecker())
+
+
+def validate_pairs(pairs: Iterable[ValidationPair]) -> bool:
     failed = False
     for schema_path, document_path in pairs:
-        schema = json.loads(schema_path.read_text())
-        Draft202012Validator.check_schema(schema)
-
-        document = json.loads(document_path.read_text())
-        validator = Draft202012Validator(schema, format_checker=FormatChecker())
-        errors = sorted(
-            validator.iter_errors(document),
-            key=lambda error: list(error.path),
-        )
-
+        validator = validator_for(schema_path)
+        document = json.loads(document_path.read_text(encoding="utf-8"))
+        errors = sorted(validator.iter_errors(document), key=lambda error: list(error.path))
         if errors:
             failed = True
             for error in errors:
-                location = ".".join(
-                    str(item) for item in error.absolute_path
-                ) or "<root>"
+                location = ".".join(str(item) for item in error.absolute_path) or "<root>"
                 print(
                     f"[FAIL] {document_path.name} at {location}: {error.message}",
                     file=sys.stderr,
                 )
         else:
             print(f"[OK] Schema: {document_path.name}")
+    return not failed
 
+
+def validate_rejections(pairs: Iterable[ValidationPair]) -> bool:
+    failed = False
+    for schema_path, document_path in pairs:
+        validator = validator_for(schema_path)
+        document = json.loads(document_path.read_text(encoding="utf-8"))
+        errors = list(validator.iter_errors(document))
+        if not errors:
+            failed = True
+            print(
+                f"[FAIL] Rejection fixture unexpectedly passed: {document_path.name}",
+                file=sys.stderr,
+            )
+        else:
+            print(f"[OK] Rejected invalid fixture: {document_path.name}")
     return not failed
 
 
 def main() -> int:
-    """Resolve validation inputs, dependency policy, and process exit status."""
-
     args = parser().parse_args()
     root = Path(__file__).resolve().parent.parent
-
-    # A caller must either provide both paths or neither; accepting half a pair
-    # would make it unclear which contract or document should be used.
     if bool(args.schema) != bool(args.document):
         print("--schema and --document must be supplied together.", file=sys.stderr)
         return 2
 
     try:
-        import jsonschema  # noqa: F401  # Imported here to support dependency-light tests.
+        import jsonschema  # noqa: F401
     except ModuleNotFoundError:
         message = "Python package 'jsonschema' is not installed."
         if args.strict:
@@ -113,13 +160,12 @@ def main() -> int:
         )
         return 0
 
-    pairs: list[ValidationPair]
     if args.schema and args.document:
-        pairs = [(args.schema, args.document)]
-    else:
-        pairs = default_pairs(root)
+        return 0 if validate_pairs([(args.schema, args.document)]) else 1
 
-    return 0 if validate_pairs(pairs) else 1
+    positive_ok = validate_pairs(default_pairs(root))
+    negative_ok = validate_rejections(negative_pairs(root))
+    return 0 if positive_ok and negative_ok else 1
 
 
 if __name__ == "__main__":

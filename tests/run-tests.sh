@@ -26,6 +26,7 @@ docs/SCOPE_FREEZE_V1.md
 docs/PROJECT_MAINTENANCE.md
 schemas/studio.schema.json
 schemas/client.schema.json
+schemas/client-profile-snapshot.schema.json
 schemas/project-manifest.schema.json
 schemas/delivery-manifest.schema.json
 templates/studio/studio.json.template
@@ -38,6 +39,12 @@ templates/project/Preparation_Report.md
 templates/project/Delivery_Notes.md
 templates/project/Recall_Sheet.md
 templates/revision/Revision_Notes.md
+templates/Intake_Report.md
+templates/Project_Notes.md
+templates/Preparation_Report.md
+templates/Revision_Notes.md
+templates/Delivery_Notes.md
+templates/Recall_Sheet.md
 packaging/requirements.txt
 packaging/RELEASE_README.md
 lib/common.sh
@@ -76,7 +83,7 @@ python3 - <<'PY'
 import json
 from pathlib import Path
 for directory in ('schemas', 'examples', 'tests/fixtures'):
-    for path in Path(directory).glob('*.json'):
+    for path in Path(directory).rglob('*.json'):
         json.loads(path.read_text())
 print('[OK] JSON syntax')
 PY

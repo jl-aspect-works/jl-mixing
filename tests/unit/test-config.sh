@@ -11,8 +11,8 @@ require_test_command jq
 tmp="$(new_test_dir)"
 trap 'rm -rf "$tmp"' EXIT
 mkdir -p "$tmp/Studio" "$tmp/Clients/Acme"
-cp "$ROOT/examples/studio.json" "$tmp/Studio/studio.json"
-cp "$ROOT/examples/client.json" "$tmp/Clients/Acme/client.json"
+cp "$ROOT/tests/fixtures/legacy-v1.0.4/studio.json" "$tmp/Studio/studio.json"
+cp "$ROOT/tests/fixtures/legacy-v1.0.4/client.json" "$tmp/Clients/Acme/client.json"
 
 # Assert: verify observable behavior rather than internal implementation.
 default_root="$(HOME="$tmp/home" JL_MIXING_ROOT='' jl_config_default_root)"

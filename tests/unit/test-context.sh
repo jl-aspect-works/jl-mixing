@@ -12,9 +12,9 @@ tmp="$(new_test_dir)"
 trap 'rm -rf "$tmp"' EXIT
 project="$tmp/Clients/Acme/Projects/Active/Blue Sky"
 mkdir -p "$tmp/Studio" "$tmp/Clients/Acme" "$project/00_Admin" "$project/04_Revisions/Revision_01/Prints"
-cp "$ROOT/examples/studio.json" "$tmp/Studio/studio.json"
-cp "$ROOT/examples/client.json" "$tmp/Clients/Acme/client.json"
-cp "$ROOT/examples/project-manifest.json" "$project/00_Admin/project-manifest.json"
+cp "$ROOT/tests/fixtures/legacy-v1.0.4/studio.json" "$tmp/Studio/studio.json"
+cp "$ROOT/tests/fixtures/legacy-v1.0.4/client.json" "$tmp/Clients/Acme/client.json"
+cp "$ROOT/tests/fixtures/legacy-v1.0.4/project-manifest.json" "$project/00_Admin/project-manifest.json"
 
 # Assert: verify observable behavior rather than internal implementation.
 assert_eq "$project" "$(jl_context_project_root "$project/04_Revisions/Revision_01/Prints")" "project context upward"

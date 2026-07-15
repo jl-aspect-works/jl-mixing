@@ -10,7 +10,7 @@ require_test_command jq
 # Arrange: build an isolated temporary fixture.
 tmp="$(new_test_dir)"
 trap 'rm -rf "$tmp"' EXIT
-cp "$ROOT/examples/client.json" "$tmp/client.json"
+cp "$ROOT/tests/fixtures/legacy-v1.0.4/client.json" "$tmp/client.json"
 
 # Assert: verify observable behavior rather than internal implementation.
 assert_success "valid JSON detected" jl_json_is_valid "$tmp/client.json"
