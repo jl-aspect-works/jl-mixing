@@ -141,6 +141,16 @@ assert_eq "In progress" "$(jl_project_state_derive "$project")" "newer work retu
 assert_eq "approved" "$(jl_project_revision_status "$manifest" 1)" "older approved revision remains approved"
 assert_eq "open" "$(jl_project_revision_status "$manifest" 2)" "new current revision is open"
 
+# Delivery approval is an immutable package-time snapshot. Reapproving the same
+# delivered revision may replace the project record without rewriting the
+# existing delivery manifest.
+jq '.revisions[0].approval = {approved_at:"2026-07-17T12:00:00Z", approved_by:"Label"}' \
+    "$manifest" > "$tmp/reapproved.json"
+mv "$tmp/reapproved.json" "$manifest"
+assert_eq "In progress" "$(jl_project_state_derive "$project")" \
+    "delivery approval snapshot may differ after reapproval"
+write_manifest "$revision_two" 2 1 1
+
 # Invalid state fixtures fail without silently repairing records or directories.
 jq '.revisions[1].number = 3' "$manifest" > "$tmp/noncontiguous.json"
 assert_failure "noncontiguous revisions rejected" \

@@ -27,6 +27,7 @@ assert_file_exists "$prefix/bin/new-studio"
 assert_file_exists "$prefix/bin/new-client"
 assert_file_exists "$prefix/share/jl-mixing/tools/project-state.py"
 assert_file_exists "$prefix/share/jl-mixing/tools/import-project-source.py"
+assert_file_exists "$prefix/share/jl-mixing/tools/import-revision-source.py"
 assert_file_exists "$prefix/share/jl-mixing/schemas/client-profile-snapshot.schema.json"
 assert_file_exists "$prefix/share/jl-mixing/templates/Intake_Report.md"
 assert_file_exists "$prefix/share/jl-mixing/templates/Revision_Notes.md"
@@ -59,6 +60,15 @@ assert_json_eq "1.1.0" "$installed_manifest" '.metadata.schema_version' \
 assert_dir_exists "$installed_project/03_DAW_Project"
 assert_path_not_exists "$installed_project/03_DAW_Project/Project"
 assert_path_not_exists "$installed_project/05_Final_Delivery/delivery-manifest.json"
+
+PATH="$prefix/bin:$PATH" new-revision --project "$installed_project" \
+    --description "Installed revision" >/dev/null
+assert_file_exists "$installed_project/04_Revisions/Revision_01/Revision_Notes.md"
+assert_path_not_exists "$installed_project/04_Revisions/Revision_01/Prints"
+PATH="$prefix/bin:$PATH" approve-mix --project "$installed_project" \
+    --approved-by Client --date 2030-01-01T12:00:00Z >/dev/null
+assert_json_eq "1" "$installed_manifest" '.state.approved_revision' \
+    "installed approve-mix records v1.1 approval"
 
 # A sentinel in the application directory must disappear during upgrade, while
 # the independent studio workspace remains untouched.

@@ -447,6 +447,31 @@ jl_json_validate_schema() {
         --strict --schema "$schema_file" --document "$document_file"
 }
 
+# Validate multiple schema/document pairs in one Python process. Starting the
+# pinned JSON Schema runtime once keeps project-context validation responsive
+# while preserving strict local-schema behavior for every document.
+jl_json_validate_schema_pairs() {
+    local python_command
+    local -a validator_args
+
+    if [ "$#" -eq 0 ] || [ $(( $# % 2 )) -ne 0 ]; then
+        jl_error "Schema validation requires SCHEMA DOCUMENT pairs."
+        return "$JL_EXIT_ARGUMENTS"
+    fi
+    python_command="$(jl_json_validator_python)" || {
+        jl_error "Python 3 is required for JSON Schema validation."
+        return "$JL_EXIT_CONFIG"
+    }
+
+    validator_args=(--strict)
+    while [ "$#" -gt 0 ]; do
+        validator_args+=(--schema "$1" --document "$2")
+        shift 2
+    done
+    "$python_command" "$JL_JSON_REPO_ROOT/tools/validate-json.py" \
+        "${validator_args[@]}"
+}
+
 # Convert a comma-separated string into a compact JSON string array.
 # Empty input becomes an empty array. Whitespace around entries is removed.
 # Convert a comma-separated string into a trimmed JSON string array.

@@ -19,6 +19,8 @@ JL_CONTEXT_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$JL_CONTEXT_LIB_DIR/config.sh"
 # shellcheck source=lib/naming.sh
 . "$JL_CONTEXT_LIB_DIR/naming.sh"
+# shellcheck source=lib/project-state.sh
+. "$JL_CONTEXT_LIB_DIR/project-state.sh"
 
 # Walk from a starting path toward / until a relative marker is found.
 jl_find_up() {
@@ -416,4 +418,58 @@ jl_context_delivery_root_v11() {
         return "$JL_EXIT_CONTEXT"
     fi
     printf '%s\n' "$delivery_root"
+}
+
+
+# Validate the complete governing v1.1 context for a project before a workflow
+# mutation. JSON Schema handles each document; this helper enforces identity
+# relationships and project-state/filesystem invariants across the documents.
+jl_context_validate_project_v11() {
+    local project_root manifest snapshot client_root client_file studio_root studio_file
+    local studio_schema client_schema project_schema snapshot_schema
+    local client_document_id client_id
+    project_root="$1"
+    manifest="$project_root/00_Admin/project-manifest.json"
+    snapshot="$project_root/00_Admin/client-profile-snapshot.json"
+
+    client_root="$(jl_context_client_root_v11 "$project_root")" || return $?
+    client_file="$client_root/client.json"
+    studio_root="$(jl_context_studio_root_v11 "$project_root")" || return $?
+    studio_file="$studio_root/Studio/studio.json"
+
+    studio_schema="$(jl_json_schema_path studio.schema.json)" || return $?
+    client_schema="$(jl_json_schema_path client.schema.json)" || return $?
+    project_schema="$(jl_json_schema_path project-manifest.schema.json)" || return $?
+    snapshot_schema="$(jl_json_schema_path client-profile-snapshot.schema.json)" || return $?
+    jl_json_validate_schema_pairs \
+        "$studio_schema" "$studio_file" \
+        "$client_schema" "$client_file" \
+        "$project_schema" "$manifest" \
+        "$snapshot_schema" "$snapshot" >/dev/null || return $?
+
+    jl_json_require_exact_schema_identity "$studio_file" mixing-studio 1.1.0 || return $?
+    jl_json_require_created_with_series "$studio_file" 1.1.0 || return $?
+    jl_json_require_exact_schema_identity "$client_file" mixing-client 1.1.0 || return $?
+    jl_json_require_created_with_series "$client_file" 1.1.0 || return $?
+    jl_json_require_exact_schema_identity "$manifest" mixing-project 1.1.0 || return $?
+    jl_json_require_created_with_series "$manifest" 1.1.0 || return $?
+    jl_json_require_exact_schema_identity \
+        "$snapshot" mixing-client-profile-snapshot 1.1.0 || return $?
+    jl_json_require_created_with_series "$snapshot" 1.1.0 || return $?
+
+    client_document_id="$(jl_json_get "$client_file" '.metadata.document_id')" || return $?
+    client_id="$(jl_json_get "$client_file" '.client_id')" || return $?
+    if [ "$(jl_json_get "$manifest" '.client.client_document_id')" != "$client_document_id" ] || \
+       [ "$(jl_json_get "$manifest" '.client.client_id')" != "$client_id" ]; then
+        jl_error "Project manifest client identity does not match the owning client."
+        return "$JL_EXIT_VALIDATION"
+    fi
+    if [ "$(jl_json_get "$snapshot" '.source_client.client_document_id')" != "$client_document_id" ] || \
+       [ "$(jl_json_get "$snapshot" '.source_client.client_id')" != "$client_id" ]; then
+        jl_error "Client profile snapshot does not match the owning client."
+        return "$JL_EXIT_VALIDATION"
+    fi
+
+    jl_project_validate_state "$project_root" || return $?
+    jl_json_validate_unique_uuids "$studio_root"
 }

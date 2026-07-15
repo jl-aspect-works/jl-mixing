@@ -77,6 +77,7 @@ tools/validate-json.py
 tools/build-intake-report.py
 tools/project-state.py
 tools/import-project-source.py
+tools/import-revision-source.py
 packaging/requirements.txt
 uninstall.sh'
 
@@ -139,7 +140,8 @@ cp -R "$SOURCE_ROOT/schemas/." "$stage_dir/schemas/"
 cp -R "$SOURCE_ROOT/templates/." "$stage_dir/templates/"
 cp -R "$SOURCE_ROOT/docs/." "$stage_dir/docs/"
 cp "$SOURCE_ROOT/tools/validate-json.py" "$SOURCE_ROOT/tools/build-intake-report.py" \
-    "$SOURCE_ROOT/tools/project-state.py" "$SOURCE_ROOT/tools/import-project-source.py" "$stage_dir/tools/"
+    "$SOURCE_ROOT/tools/project-state.py" "$SOURCE_ROOT/tools/import-project-source.py" \
+    "$SOURCE_ROOT/tools/import-revision-source.py" "$stage_dir/tools/"
 cp "$SOURCE_ROOT/packaging/requirements.txt" "$stage_dir/packaging/"
 cp "$SOURCE_ROOT/install.sh" "$SOURCE_ROOT/uninstall.sh" "$stage_dir/"
 
@@ -152,7 +154,8 @@ fi
 
 chmod +x "$stage_dir/install.sh" "$stage_dir/uninstall.sh" "$stage_dir/bin/"* \
     "$stage_dir/tools/validate-json.py" "$stage_dir/tools/build-intake-report.py" \
-    "$stage_dir/tools/project-state.py" "$stage_dir/tools/import-project-source.py"
+    "$stage_dir/tools/project-state.py" "$stage_dir/tools/import-project-source.py" \
+    "$stage_dir/tools/import-revision-source.py"
 
 if [ -d "$app_dir" ]; then
     backup_dir="$(mktemp -d "$share_dir/.jl-mixing-backup.XXXXXX")"

@@ -70,4 +70,35 @@ assert_file_exists "$tmp/project/05_Final_Delivery/stable.txt"
 assert_contains "$(cat "$tmp/project/00_Admin/project-manifest.json")" '"stable":true' \
     "coordinated rollback restored manifest"
 
+
+# Optional committed-state verification runs before backups are discarded.
+printf 'verified-old delivery' > "$tmp/project/05_Final_Delivery/value.txt"
+printf '{"verified_old":true}
+' > "$tmp/project/00_Admin/project-manifest.json"
+stage_dir="$(jl_txn_stage_directory_near "$tmp/project/05_Final_Delivery")"
+printf 'verified-new delivery' > "$stage_dir/value.txt"
+stage_file="$(jl_mktemp_file_near "$tmp/project/00_Admin/project-manifest.json")"
+printf '{"verified_new":true}
+' > "$stage_file"
+assert_failure "coordinated verifier failure rolls back both targets"     jl_txn_commit_directory_and_file         "$stage_dir" "$tmp/project/05_Final_Delivery"         "$stage_file" "$tmp/project/00_Admin/project-manifest.json" false
+assert_eq "verified-old delivery"     "$(cat "$tmp/project/05_Final_Delivery/value.txt")"     "verifier rollback restored directory"
+assert_contains "$(cat "$tmp/project/00_Admin/project-manifest.json")"     '"verified_old":true' "verifier rollback restored file"
+
+# File-only replacement supports the same rollback-capable verification flow.
+printf 'old file
+' > "$tmp/project/00_Admin/file-only.json"
+stage_file="$(jl_mktemp_file_near "$tmp/project/00_Admin/file-only.json")"
+printf 'new file
+' > "$stage_file"
+jl_txn_replace_file "$stage_file" "$tmp/project/00_Admin/file-only.json" true
+assert_eq "new file" "$(cat "$tmp/project/00_Admin/file-only.json")"     "file-only transaction committed"
+
+printf 'stable file
+' > "$tmp/project/00_Admin/file-only.json"
+stage_file="$(jl_mktemp_file_near "$tmp/project/00_Admin/file-only.json")"
+printf 'bad file
+' > "$stage_file"
+assert_failure "file verifier failure rolls back replacement"     jl_txn_replace_file "$stage_file" "$tmp/project/00_Admin/file-only.json" false
+assert_eq "stable file" "$(cat "$tmp/project/00_Admin/file-only.json")"     "file-only rollback restored prior content"
+
 echo "[OK] transaction.sh ($TEST_COUNT assertions)"
