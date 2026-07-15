@@ -24,6 +24,7 @@ JL_MIXING_TEST_SYSTEM_SITE_PACKAGES=1 "$ROOT/install.sh" --prefix "$prefix" >/de
 assert_file_exists "$prefix/share/jl-mixing/VERSION"
 assert_file_exists "$prefix/share/jl-mixing/.venv/bin/python"
 assert_file_exists "$prefix/bin/new-studio"
+assert_file_exists "$prefix/bin/new-client"
 assert_file_exists "$prefix/share/jl-mixing/tools/project-state.py"
 assert_file_exists "$prefix/share/jl-mixing/schemas/client-profile-snapshot.schema.json"
 assert_file_exists "$prefix/share/jl-mixing/templates/Intake_Report.md"
@@ -35,6 +36,15 @@ assert_file_exists "$workspace/Studio/studio.json"
 assert_json_eq "1.1.0" "$workspace/Studio/studio.json" \
     '.metadata.schema_version' "installed new-studio creates v1.1 schema"
 assert_path_not_exists "$workspace/DAWs"
+
+JL_MIXING_ROOT="$workspace" PATH="$prefix/bin:$PATH" \
+    new-client installed-client --name "Installed Client" >/dev/null
+installed_client="$workspace/Clients/Installed Client/client.json"
+assert_file_exists "$installed_client"
+assert_json_eq "1.1.0" "$installed_client" '.metadata.schema_version' \
+    "installed new-client creates v1.1 schema"
+assert_dir_exists "$workspace/Clients/Installed Client/Projects"
+assert_path_not_exists "$workspace/Clients/Installed Client/Projects/Active"
 
 # A sentinel in the application directory must disappear during upgrade, while
 # the independent studio workspace remains untouched.
