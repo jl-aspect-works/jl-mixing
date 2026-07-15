@@ -96,6 +96,7 @@ state_file="$app_dir/install-state.json"
 required_paths='VERSION
 LICENSE
 README.md
+CHANGELOG.md
 bin
 lib
 schemas
@@ -310,7 +311,8 @@ mkdir -p "$stage_app/bin" "$stage_app/lib" "$stage_app/schemas" \
     "$stage_app/templates" "$stage_app/docs" "$stage_app/tools" \
     "$stage_app/packaging" "$stage_bin"
 
-cp "$SOURCE_ROOT/VERSION" "$SOURCE_ROOT/LICENSE" "$SOURCE_ROOT/README.md" "$stage_app/"
+cp "$SOURCE_ROOT/VERSION" "$SOURCE_ROOT/LICENSE" "$SOURCE_ROOT/README.md" \
+    "$SOURCE_ROOT/CHANGELOG.md" "$stage_app/"
 cp -R "$SOURCE_ROOT/bin/." "$stage_app/bin/"
 cp -R "$SOURCE_ROOT/lib/." "$stage_app/lib/"
 cp -R "$SOURCE_ROOT/schemas/." "$stage_app/schemas/"

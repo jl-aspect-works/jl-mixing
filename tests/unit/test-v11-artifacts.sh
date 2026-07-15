@@ -84,6 +84,13 @@ for name, expected in expected_templates.items():
     actual = (root / "templates" / name).read_text(encoding="utf-8")
     assert actual == expected, f"unexpected canonical template content: {name}"
 
+actual_markdown = {path.name for path in (root / "templates").glob("*.md") if path.name != "README.md"}
+assert actual_markdown == set(expected_templates), "unexpected canonical Markdown template set"
+assert not (root / "templates/project").exists()
+assert not (root / "templates/revision").exists()
+assert not (root / "templates/delivery").exists()
+assert not (root / "schemas/legacy").exists()
+
 print("[OK] v1.1 schema and template artifacts")
 PY
 pass "canonical v1.1 artifacts are strict and complete"

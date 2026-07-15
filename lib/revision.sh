@@ -138,21 +138,13 @@ jl_revision_approve() {
         --arg approved_by "$approved_by"
 }
 
-# Return a revision status. v1.1 status is derived from pointers; the temporary
-# legacy branch keeps the old stored-status read so create-delivery remains
-# testable until its dedicated v1.1 migration branch.
+# Return a derived v1.1 revision status from the project pointers.
 jl_revision_status() {
-    local manifest number schema_version current approved exists
+    local manifest number current approved exists
     manifest="$1"
     number="$2"
-    schema_version="$(jl_json_get_optional "$manifest" '.metadata.schema_version' '')"
 
-    if [ "$schema_version" != 1.1.0 ]; then
-        jq -er --argjson number "$number" \
-            '.revisions[] | select(.number == $number) | .status' "$manifest"
-        return $?
-    fi
-
+    jl_json_require_exact_schema_identity "$manifest" mixing-project 1.1.0 || return $?
     exists="$(jq --argjson number "$number" \
         '[.revisions[] | select(.number == $number)] | length' "$manifest")" || return $?
     [ "$exists" -eq 1 ] || {

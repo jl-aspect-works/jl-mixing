@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Batch 4 test orchestrator.
+# v1.1 test orchestrator.
 #
 # Basic mode runs all available checks and visibly skips dependency-bound work.
 # Strict mode requires the complete runtime stack and adds installation/release
@@ -9,7 +9,7 @@ set -eu
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-echo "Verifying Batch 4 repository artifacts..."
+echo "Verifying v1.1 repository artifacts..."
 
 required='README.md
 VERSION
@@ -24,21 +24,16 @@ docs/DEVELOPER_GUIDE.md
 docs/ARCHITECTURE_DECISIONS.md
 docs/SCOPE_FREEZE_V1.md
 docs/PROJECT_MAINTENANCE.md
+docs/RELEASE_NOTES_V1.1.md
+CHANGELOG.md
 schemas/studio.schema.json
 schemas/client.schema.json
 schemas/client-profile-snapshot.schema.json
 schemas/project-manifest.schema.json
 schemas/delivery-manifest.schema.json
+templates/README.md
 templates/studio/studio.json.template
 templates/client/client.json.template
-templates/project/project-manifest.json.template
-templates/delivery/delivery-manifest.json.template
-templates/project/Project_Notes.md
-templates/project/Intake_Report.md
-templates/project/Preparation_Report.md
-templates/project/Delivery_Notes.md
-templates/project/Recall_Sheet.md
-templates/revision/Revision_Notes.md
 templates/Intake_Report.md
 templates/Project_Notes.md
 templates/Preparation_Report.md
@@ -67,7 +62,6 @@ bin/validate-intake
 bin/new-revision
 bin/approve-mix
 bin/create-delivery
-bin/complete-project
 bin/jl-mixing-shell-integration
 tools/build-intake-report.py
 tools/project-state.py
@@ -162,7 +156,7 @@ fi
 
 echo
 if [ "${JL_TEST_STRICT:-0}" = "1" ]; then
-    echo "[OK] Batch 4 strict verification passed"
+    echo "[OK] v1.1 strict verification passed"
 else
-    echo "[OK] Batch 4 verification passed"
+    echo "[OK] v1.1 verification passed"
 fi

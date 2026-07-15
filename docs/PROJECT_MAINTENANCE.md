@@ -9,7 +9,7 @@ It assumes the repository is located at:
 ~/Development/jlaudio/jl-mixing
 ```
 
-The examples use a protected `main` branch and feature branches merged through pull requests.
+The examples use protected `main` and `develop/v1.1` branches. v1.1 feature branches merge into `develop/v1.1`; the final release PR merges `develop/v1.1` into `main`.
 
 ---
 
@@ -365,13 +365,13 @@ Update `main` and create a release branch:
 ```bash
 git checkout main
 git pull origin main
-git checkout -b release/v1.0.4
+git checkout -b release/v1.1.0
 ```
 
 Update the application version:
 
 ```bash
-printf '1.0.4\n' > VERSION
+printf '1.1.0\n' > VERSION
 ```
 
 Search for unintended hard-coded version references:
@@ -381,7 +381,7 @@ grep -RIn \
   --exclude-dir=.git \
   --exclude-dir=.venv \
   --exclude='*.tar.gz' \
-  '1\.0\.3' .
+  '1\.0\.4' .
 ```
 
 Run the release checks:
@@ -399,8 +399,8 @@ Commit and push:
 
 ```bash
 git add .
-git commit -m "Prepare JL Mixing Automation v1.0.4"
-git push -u origin release/v1.0.4
+git commit -m "Prepare JL Mixing Automation v1.1.0"
+git push -u origin release/v1.1.0
 ```
 
 Merge only after all PR checks pass.
@@ -428,14 +428,14 @@ make release-check
 Create and push an annotated tag:
 
 ```bash
-git tag -a v1.0.4 -m "JL Mixing Automation v1.0.4"
-git push origin v1.0.4
+git tag -a v1.1.0 -m "JL Mixing Automation v1.1.0"
+git push origin v1.1.0
 ```
 
 Verify:
 
 ```bash
-git show v1.0.4 --no-patch
+git show v1.1.0 --no-patch
 ```
 
 Pushing the tag triggers `.github/workflows/release.yml`.
@@ -443,13 +443,13 @@ Pushing the tag triggers `.github/workflows/release.yml`.
 Expected custom assets:
 
 ```text
-jl-mixing-1.0.4-macos.tar.gz
-jl-mixing-1.0.4-macos.tar.gz.sha256
-jl-mixing-1.0.4-macos.tar.gz.inventory.txt
+jl-mixing-1.1.0-macos.tar.gz
+jl-mixing-1.1.0-macos.tar.gz.sha256
+jl-mixing-1.1.0-macos.tar.gz.inventory.txt
 
-jl-mixing-1.0.4-linux.tar.gz
-jl-mixing-1.0.4-linux.tar.gz.sha256
-jl-mixing-1.0.4-linux.tar.gz.inventory.txt
+jl-mixing-1.1.0-linux.tar.gz
+jl-mixing-1.1.0-linux.tar.gz.sha256
+jl-mixing-1.1.0-linux.tar.gz.inventory.txt
 ```
 
 GitHub also automatically adds:
@@ -476,7 +476,7 @@ Actions
 Enter an existing tag, for example:
 
 ```text
-v1.0.4
+v1.1.0
 ```
 
 This can recover from a publish-stage failure when the tagged source is correct.
@@ -570,14 +570,14 @@ Published tags are immutable.
 If a release needs correction, create a new patch version:
 
 ```text
-v1.0.3 → v1.0.4
+v1.1.0 → v1.1.1
 ```
 
 Do not move or reuse an existing published tag.
 
 ```bash
 git tag -l
-git show v1.0.4 --no-patch
+git show v1.1.0 --no-patch
 ```
 
 ---
@@ -587,8 +587,8 @@ git show v1.0.4 --no-patch
 ```bash
 cd ~/Development/jlaudio/jl-mixing
 
-git checkout main
-git pull origin main
+git checkout develop/v1.1
+git pull origin develop/v1.1
 
 git checkout -b feature/example-change
 
