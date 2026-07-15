@@ -30,8 +30,11 @@ assert_file_exists "$prefix/share/jl-mixing/templates/Intake_Report.md"
 assert_file_exists "$prefix/share/jl-mixing/templates/Revision_Notes.md"
 assert_success "installed help works" "$prefix/bin/new-studio" --help
 
-PATH="$prefix/bin:$PATH" new-studio --root "$workspace" --non-interactive >/dev/null
+PATH="$prefix/bin:$PATH" new-studio --root "$workspace" >/dev/null
 assert_file_exists "$workspace/Studio/studio.json"
+assert_json_eq "1.1.0" "$workspace/Studio/studio.json" \
+    '.metadata.schema_version' "installed new-studio creates v1.1 schema"
+assert_path_not_exists "$workspace/DAWs"
 
 # A sentinel in the application directory must disappear during upgrade, while
 # the independent studio workspace remains untouched.

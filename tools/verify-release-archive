@@ -44,7 +44,7 @@ done
 prefix="$work_dir/prefix"
 workspace="$work_dir/studio-workspace"
 JL_MIXING_TEST_SYSTEM_SITE_PACKAGES=1 "$package_root/install.sh" --prefix "$prefix" >/dev/null
-PATH="$prefix/bin:$PATH" new-studio --root "$workspace" --non-interactive >/dev/null
+PATH="$prefix/bin:$PATH" new-studio --root "$workspace" >/dev/null
 [ -f "$workspace/Studio/studio.json" ] || {
     echo "Installed command failed to create studio.json." >&2
     exit 5
