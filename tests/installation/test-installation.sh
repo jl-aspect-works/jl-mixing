@@ -61,6 +61,12 @@ assert_dir_exists "$installed_project/03_DAW_Project"
 assert_path_not_exists "$installed_project/03_DAW_Project/Project"
 assert_path_not_exists "$installed_project/05_Final_Delivery/delivery-manifest.json"
 
+printf 'installed notes\n' > "$installed_project/01_Client_Files/Original_Delivery/Notes.txt"
+PATH="$prefix/bin:$PATH" validate-intake --project "$installed_project" >/dev/null
+assert_contains "$(cat "$installed_project/00_Admin/Intake_Report.md")" \
+    "## Unsupported or Non-Audio Files" \
+    "installed validate-intake updates the v1.1 managed report"
+
 PATH="$prefix/bin:$PATH" new-revision --project "$installed_project" \
     --description "Installed revision" >/dev/null
 assert_file_exists "$installed_project/04_Revisions/Revision_01/Revision_Notes.md"
