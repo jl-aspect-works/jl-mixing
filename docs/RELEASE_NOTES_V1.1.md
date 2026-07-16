@@ -1,5 +1,23 @@
 # JL Mixing Automation v1.1.0 Release Notes
 
+
+## v1.1.1
+
+### Fixed
+
+- Fixed automatic directory changes on macOS when `TMPDIR` ends with `/`.
+- Prevented doubled-slash temporary paths such as `.../T//jl-mixing-cd...`.
+- Restored `--cd` behavior for `new-client`, `new-mix`, and `new-revision`.
+
+### Compatibility
+
+- No workspace-schema changes.
+- No command-interface changes.
+- Existing v1.1.0 workspaces remain compatible.
+
+
+## v1.1.0
+
 ## Highlights
 
 - Projects now live directly beneath `Clients/<Client>/Projects/` and retain a
