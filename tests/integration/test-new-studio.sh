@@ -6,6 +6,7 @@ set -eu
 # and transaction rollback.
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 . "$ROOT/tests/integration/integration-helper.sh"
+expected_created_with="jl-mixing $(cat "$ROOT/VERSION")"
 
 require_test_command jq
 require_test_command python3
@@ -52,7 +53,8 @@ assert_path_not_exists "$studio_root/DAWs"
 studio_json="$studio_root/Studio/studio.json"
 assert_json_eq "mixing-studio" "$studio_json" '.metadata.schema' "studio schema name"
 assert_json_eq "1.1.0" "$studio_json" '.metadata.schema_version' "studio schema version"
-assert_json_eq "jl-mixing 1.1.0" "$studio_json" '.metadata.created_with' "created_with version"
+assert_json_eq "$expected_created_with" "$studio_json" '.metadata.created_with' \
+    "created_with version"
 assert_json_eq "north-shore-mixing" "$studio_json" '.studio_id' "derived studio ID"
 assert_json_eq "North Shore Mixing" "$studio_json" '.studio_name' "trimmed studio name"
 assert_json_eq "$studio_root" "$studio_json" '.root_path' "absolute root path"
