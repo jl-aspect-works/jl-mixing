@@ -1,4 +1,4 @@
-# JL Mixing Automation v1.1 Developer Guide
+# JL Mixing Automation Developer Guide
 
 ## Repository architecture
 
@@ -60,9 +60,9 @@ cover transaction failure and rollback, not only happy paths.
 
 ## Release process
 
-1. Complete work through feature PRs into `develop/v1.1`.
+1. Complete work through feature PRs into `develop/v1.2`.
 2. Run all quality gates from a clean integration branch.
 3. Build and verify the archive with `make release-check`.
-4. Merge `develop/v1.1` to `main` through a protected PR.
-5. Tag the merge commit `v1.1.0` and publish the verified archive, checksum, and
-   release notes.
+4. Merge `develop/v1.2` to `main` through a protected PR.
+5. Tag the merge commit `v1.2.0` and publish the verified archive, checksum, and
+   v1.2 release notes.

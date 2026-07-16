@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -eu
 
-# Purpose: Exercise the complete v1.1 revision-creation contract.
+# Purpose: Exercise v1.1-project compatibility and v1.2 revision creation.
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 . "$ROOT/tests/integration/integration-helper.sh"
 . "$ROOT/lib/project-state.sh"
@@ -137,5 +137,19 @@ assert_failure "coordinated commit failure rolls back revision" \
         "$ROOT/bin/new-revision" --project "$project_root" --description 'Rollback revision'
 assert_same_bytes "$manifest_before" "$manifest"
 assert_path_not_exists "$project_root/04_Revisions/Revision_04"
+
+# A project created by v1.2 new-mix already owns Revision 1, so the unchanged
+# new-revision command must create Revision 2 without migration or special cases.
+JL_MIXING_ROOT="$studio_root" "$ROOT/bin/new-mix" --client acme \
+    'Created with Revision One' --no-cd >/dev/null
+v12_project="$studio_root/Clients/Acme Records/Projects/Created with Revision One"
+v12_manifest="$v12_project/00_Admin/project-manifest.json"
+assert_file_exists "$v12_project/04_Revisions/Revision_01/Revision_Notes.md"
+"$ROOT/bin/new-revision" --project "$v12_project" --no-cd >/dev/null
+assert_file_exists "$v12_project/04_Revisions/Revision_02/Revision_Notes.md"
+assert_json_eq '2' "$v12_manifest" '.state.current_revision' \
+    "new-revision advances a v1.2-created project to Revision 2"
+assert_json_eq 'Revision 2' "$v12_manifest" '.revisions[1].description' \
+    "v1.2-created project keeps the existing later-revision default"
 
 echo "[OK] new-revision ($TEST_COUNT assertions)"

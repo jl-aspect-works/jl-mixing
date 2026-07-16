@@ -158,9 +158,13 @@ assert_failure "noncontiguous revisions rejected" \
 jq '.revisions[1].approval.approved_at = "2026-07-16T12:00:00Z"' "$manifest" > "$tmp/unpaired.json"
 assert_failure "unpaired approval fields rejected" \
     jl_project_validate_revision_records "$tmp/unpaired.json"
-jq '.metadata.created_with = "jl-mixing 1.0.4"' "$manifest" > "$tmp/wrong-created-with.json"
+jq '.metadata.created_with = "jl-mixing 1.2.0"' "$manifest" > "$tmp/v12-created-with.json"
+cp "$tmp/v12-created-with.json" "$manifest"
+assert_success "project creator release is independent of schema version" \
+    jl_project_validate_state "$project"
+jq '.metadata.created_with = "jl-mixing 1.2"' "$manifest" > "$tmp/wrong-created-with.json"
 cp "$tmp/wrong-created-with.json" "$manifest"
-assert_failure "incompatible project creator series rejected" \
+assert_failure "malformed project creator release rejected" \
     jl_project_validate_state "$project"
 write_manifest "$revision_two" 2 1 1
 rm -f "$project/05_Final_Delivery/delivery-manifest.json"

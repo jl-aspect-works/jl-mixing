@@ -35,8 +35,8 @@ assert_contains "$(cat "$archive.inventory.txt")" 'tools/manage-shell-config.py'
     "shell configuration helper included in release archive"
 assert_contains "$(cat "$archive.inventory.txt")" 'CHANGELOG.md' \
     "changelog included in release archive"
-assert_contains "$(cat "$archive.inventory.txt")" 'docs/RELEASE_NOTES_V1.1.md' \
-    "release notes included in release archive"
+assert_contains "$(cat "$archive.inventory.txt")" 'docs/RELEASE_NOTES_V1.2.md' \
+    "v1.2 release notes included in release archive"
 assert_failure "obsolete complete-project omitted from release archive" \
     grep -q 'bin/complete-project' "$archive.inventory.txt"
 verify_output="$(

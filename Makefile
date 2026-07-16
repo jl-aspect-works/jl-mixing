@@ -56,7 +56,7 @@ install:
 uninstall:
 	@./uninstall.sh --prefix "$${PREFIX:-$$HOME/.local}"
 
-# Run only the v1.1 installation and package lifecycle tests.
+# Run only the current installation and package lifecycle tests.
 install-test:
 	@JL_TEST_STRICT=1 tests/installation/test-installation.sh
 	@JL_TEST_STRICT=1 tests/installation/test-release-package.sh

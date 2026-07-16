@@ -1,4 +1,4 @@
-# JL Mixing Automation v1.1 User Guide
+# JL Mixing Automation v1.2 User Guide
 
 ## 1. Create the workspace
 
@@ -17,20 +17,36 @@ new-client acme --name "Acme Records"
 ```
 
 A client contains `client.json` and a flattened `Projects/` directory. Audio and
-delivery defaults are inherited from `studio.json` unless overridden.
+delivery defaults are inherited from `studio.json` unless overridden. An artist
+default is optional.
 
-## 3. Create a project
+## 3. Create a project and Revision 1
 
 From the client directory:
 
 ```bash
-new-mix --project "Blue Sky" --artist "Example Artist"
+new-mix "Blue Sky"
 ```
+
+The equivalent explicit form remains supported:
+
+```bash
+new-mix --project "Blue Sky"
+```
+
+When `--artist` is omitted, the project uses the nonempty
+`client.defaults.artist` value and then the client's display name. An explicit
+nonempty `--artist` overrides both; an explicit empty value is rejected.
+
+`new-mix` creates `04_Revisions/Revision_01/Revision_Notes.md` with the
+description `Initial mix`. The new project starts in the existing `In progress`
+state with Revision 1 unapproved.
 
 Use `--source PATH` to copy an initial delivery into
 `01_Client_Files/Original_Delivery/`. The source is copied, never moved or
-modified. The project is created directly beneath the client's `Projects/`
-directory and keeps the same path for its entire lifetime.
+modified. It is not copied into Revision 1. The project is created directly
+beneath the client's `Projects/` directory and keeps the same path for its
+entire lifetime.
 
 ## 4. Validate intake
 
@@ -46,16 +62,24 @@ opportunistically when available. It updates only the managed section in
 Prepare accepted files manually in `02_Audio_Preparation/Working_Audio/` and
 record engineering decisions in `Preparation_Report.md`.
 
-## 5. Create a revision
+## 5. Work with revisions
+
+Place the initial mix prints directly in:
+
+```text
+04_Revisions/Revision_01/
+```
+
+Send those files to the client using the studio's normal review process. When a
+later revision is needed, run:
 
 ```bash
-new-revision --description "Initial mix"
+new-revision --description "Client notes addressed"
 ```
 
 Use `--source FILE_OR_DIRECTORY` to copy immediate mix-print files into the new
 `Revision_NN/` directory. Files can also be placed there manually after
-creation. Send the revision files to the client using the studio's normal review
-process; JL Mixing does not add a separate review-packaging command.
+creation. JL Mixing does not add a separate review-packaging command.
 
 ## 6. Record approval
 
@@ -91,6 +115,24 @@ Each copied file is verified by comparing source and staged SHA-256 values. The
 final manifest records the destination-relative path, classification, size, and
 SHA-256.
 
+### Create a ZIP with completed delivery notes
+
+Use this two-step workflow:
+
+```bash
+create-delivery
+# Edit 05_Final_Delivery/Delivery_Notes.md
+create-delivery --zip --overwrite
+```
+
+The first command creates an editable delivery folder. The second rebuilds the
+same delivery and creates a ZIP containing the edited `Delivery_Notes.md`.
+
+`--overwrite` requires the delivered path set to remain unchanged. File contents
+may change, but adding, removing, or renaming delivered paths causes overwrite
+to fail. A one-step `create-delivery --zip` contains the clean notes template
+because the ZIP is created before the user has an opportunity to edit it.
+
 ### Replacing a delivery
 
 ```bash
@@ -106,10 +148,8 @@ create-delivery --clean
 
 `--clean` is intentionally destructive. It replaces **every file and directory**
 inside the project's `05_Final_Delivery/`, including untracked and user-added
-content. Use `--dry-run --clean` to review the exact deletion plan first.
-
-Use `--zip` to create `<project-id>-delivery.zip`. The ZIP recursively includes
-the complete final-delivery directory except the ZIP itself.
+content. Preserve edited notes before using it. Use `--dry-run --clean` to review
+the exact deletion plan first.
 
 ## Directory layout
 
@@ -133,6 +173,6 @@ boundary but does not interpret, clean, or manage native DAW project files.
 
 ## v1.0 compatibility
 
-v1.1 does not migrate v1.0 workspaces. Create a new v1.1 workspace and copy only
-user-owned materials such as original client deliveries and notes. Commands stop
-before modifying a workspace that uses a v1.0 schema or recognizable v1.0 layout.
+v1.2 continues using v1.1 workspace schemas and supports valid v1.1 workspaces.
+It does not migrate v1.0 workspaces. Commands stop before modifying a workspace
+that uses a v1.0 schema or recognizable v1.0 layout.

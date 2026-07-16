@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Create a JL Mixing Automation v1.1 project workspace.
+# Create a JL Mixing Automation v1.2 project workspace.
 #
 # Project creation is transactional. The command resolves and validates the
-# owning v1.1 studio/client records, builds the complete project in a hidden
-# sibling staging directory, validates both governing JSON documents and the
-# initial workflow state, then atomically commits the finished project.
+# owning v1.1-schema studio/client records, builds the complete project plus its
+# initial revision in a hidden sibling staging directory, validates all
+# governing JSON and workflow state, then atomically commits the project.
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -23,6 +23,8 @@ APP_ROOT="${JL_MIXING_HOME:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 . "$APP_ROOT/lib/naming.sh"
 # shellcheck source=lib/project-state.sh
 . "$APP_ROOT/lib/project-state.sh"
+# shellcheck source=lib/revision.sh
+. "$APP_ROOT/lib/revision.sh"
 # shellcheck source=lib/templates.sh
 . "$APP_ROOT/lib/templates.sh"
 # shellcheck source=lib/transaction.sh
@@ -32,13 +34,15 @@ APP_ROOT="${JL_MIXING_HOME:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 
 usage() {
     cat <<'USAGE'
-Usage: new-mix --project PROJECT_NAME [options]
+Usage:
+  new-mix PROJECT_NAME [options]
+  new-mix --project PROJECT_NAME [options]
 
 Options:
   --client ID_OR_PATH      Client ID or client-directory path
-  --project NAME           Project display name (required)
+  --project NAME           Project display name; alternative to PROJECT_NAME
   --project-id ID          Stable project slug (default: derived from name)
-  --artist NAME            Artist or program name
+  --artist NAME            Artist or program name (default: client artist, then client name)
   --album TITLE            Album or collection title
   --producer NAME          Producer name
   --engineer NAME          Mix engineer
@@ -286,6 +290,7 @@ description=""
 source_path=""
 client_seen=0
 project_seen=0
+positional_project_seen=0
 project_id_seen=0
 artist_seen=0
 engineer_seen=0
@@ -308,6 +313,11 @@ while [ "$#" -gt 0 ]; do
             ;;
         --project)
             [ "$#" -ge 2 ] || jl_die "--project requires a value." "$JL_EXIT_ARGUMENTS" || exit $?
+            # A project name may use either supported form, but never both.
+            if [ "$positional_project_seen" -eq 1 ]; then
+                jl_die "Project name cannot be specified both positionally and with --project." "$JL_EXIT_ARGUMENTS"
+                exit $?
+            fi
             project_name="$2"
             project_seen=1
             shift 2
@@ -420,8 +430,19 @@ while [ "$#" -gt 0 ]; do
             exit $?
             ;;
         *)
-            jl_die "Unexpected positional argument: $1" "$JL_EXIT_ARGUMENTS"
-            exit $?
+            # Accept exactly one positional project name and feed it into the
+            # same validation and creation path used by --project.
+            if [ "$project_seen" -eq 1 ]; then
+                jl_die "Project name cannot be specified both positionally and with --project." "$JL_EXIT_ARGUMENTS"
+                exit $?
+            fi
+            if [ "$positional_project_seen" -eq 1 ]; then
+                jl_die "Unexpected positional argument: $1" "$JL_EXIT_ARGUMENTS"
+                exit $?
+            fi
+            project_name="$1"
+            positional_project_seen=1
+            shift
             ;;
     esac
 done
@@ -435,8 +456,8 @@ if [ "$dry_run" -eq 1 ] && { [ "$cd_enabled_seen" -eq 1 ] || [ "$cd_disabled_see
     exit "$JL_EXIT_ARGUMENTS"
 fi
 
-if [ "$project_seen" -eq 0 ]; then
-    jl_error "A --project name is required."
+if [ "$project_seen" -eq 0 ] && [ "$positional_project_seen" -eq 0 ]; then
+    jl_error "A project name is required. Supply it positionally or with --project."
     exit "$JL_EXIT_ARGUMENTS"
 fi
 project_name="$(jl_trim "$project_name")"
@@ -532,12 +553,16 @@ client_id="$(jl_json_get "$client_file" '.client_id')"
 client_document_id="$(jl_json_get "$client_file" '.metadata.document_id')"
 
 if [ "$artist_seen" -eq 0 ]; then
-    artist="$(jl_json_get_optional "$client_file" '.defaults.artist' '')"
-fi
-artist="$(jl_trim "$artist")"
-if [ -z "$artist" ]; then
-    jl_error "Artist is required. Supply --artist or configure client.defaults.artist."
-    exit "$JL_EXIT_VALIDATION"
+    artist="$(jl_trim "$(jl_json_get_optional "$client_file" '.defaults.artist' '')")"
+    # A client display name is the final safe default when the optional artist
+    # default was never configured. The client snapshot remains unchanged.
+    [ -n "$artist" ] || artist="$client_name"
+else
+    artist="$(jl_trim "$artist")"
+    if [ -z "$artist" ]; then
+        jl_error "Artist must not be empty when --artist is supplied."
+        exit "$JL_EXIT_VALIDATION"
+    fi
 fi
 if [ "$engineer_seen" -eq 0 ]; then
     engineer="$(jl_json_get_optional "$studio_file" '.defaults.mix_engineer' '')"
@@ -576,6 +601,10 @@ fi
 jl_validate_project_id_available "$client_root" "$project_id" || exit $?
 jl_fs_assert_no_case_insensitive_child_collision "$projects_root" "$project_folder_name" || exit $?
 project_root="$projects_root/$project_folder_name"
+initial_revision_number=1
+initial_revision_description="Initial mix"
+initial_revision_name="$(jl_revision_name "$initial_revision_number")"
+initial_revision_root="$project_root/04_Revisions/$initial_revision_name"
 if [ -e "$project_root" ] || [ -L "$project_root" ]; then
     jl_error "Project destination already exists: $project_root"
     exit "$JL_EXIT_UNSAFE"
@@ -648,8 +677,9 @@ print_summary() {
     printf 'Delivery method:            %s\n' "$delivery_method"
     printf 'Requested deliverables:     %s\n' "$(printf '%s' "$deliverables_json" | jq -r 'join(", ")')"
     printf 'Source:                     %s\n' "$source_display"
-    printf 'Initial state:              Setup\n'
-    printf 'Current revision:           0\n'
+    printf 'Initial state:              In progress\n'
+    printf 'Current revision:           %s\n' "$initial_revision_number"
+    printf 'Initial revision:           %s\n' "$initial_revision_root"
     if [ "$effective_cd" -eq 1 ]; then
         printf 'Automatic directory change: enabled\n'
     else
@@ -670,6 +700,8 @@ Would create:
   02_Audio_Preparation/Rejected_Files/
   03_DAW_Project/
   04_Revisions/
+  04_Revisions/Revision_01/
+  04_Revisions/Revision_01/Revision_Notes.md
   05_Final_Delivery/Stems/
   06_Recall/External_Files/
   06_Recall/Screenshots/
@@ -684,20 +716,15 @@ EOF_PLAN
     fi
     printf '\nAfter creation:\n  cd '
     shell_quote_path "$project_root"
-    printf '\n  new-revision --description "Initial mix"\n'
+    printf '\n  approve-mix\n'
     exit 0
 fi
 
 project_schema="$(jl_json_schema_path project-manifest.schema.json)" || exit $?
 snapshot_schema="$(jl_json_schema_path client-profile-snapshot.schema.json)" || exit $?
-software_version="$(jl_software_version)" || exit $?
-case "$software_version" in
-    1.1.*) ;;
-    *)
-        jl_error "new-mix requires a JL Mixing 1.1.x application version; found $software_version."
-        exit "$JL_EXIT_CONFIG"
-        ;;
-esac
+# Validate the application release version before creating transactional output.
+# Document schema compatibility is checked separately against schema_version.
+jl_software_version >/dev/null || exit $?
 
 stage_root="$(jl_txn_stage_directory_near "$project_root")" || exit $?
 chmod 755 "$stage_root"
@@ -709,7 +736,7 @@ mkdir -p \
     "$stage_root/02_Audio_Preparation/Working_Audio" \
     "$stage_root/02_Audio_Preparation/Rejected_Files" \
     "$stage_root/03_DAW_Project" \
-    "$stage_root/04_Revisions" \
+    "$stage_root/04_Revisions/$initial_revision_name" \
     "$stage_root/05_Final_Delivery/Stems" \
     "$stage_root/06_Recall/External_Files" \
     "$stage_root/06_Recall/Screenshots"
@@ -720,8 +747,13 @@ snapshot_document_id="$(jl_uuid)" || exit $?
 while [ "$snapshot_document_id" = "$project_document_id" ]; do
     snapshot_document_id="$(jl_uuid)" || exit $?
 done
+revision_id="$(jl_uuid)" || exit $?
+while [ "$revision_id" = "$project_document_id" ] || [ "$revision_id" = "$snapshot_document_id" ]; do
+    revision_id="$(jl_uuid)" || exit $?
+done
 jl_json_assert_document_id_available "$studio_root" "$project_document_id" || exit $?
 jl_json_assert_document_id_available "$studio_root" "$snapshot_document_id" || exit $?
+jl_json_assert_uuid_available "$studio_root" "$revision_id" || exit $?
 
 project_metadata="$(jl_metadata_create_v11_mutable \
     mixing-project 1.1.0 "$project_document_id" "$created_at")" || exit $?
@@ -795,6 +827,12 @@ jq -n \
     }' > "$staged_project_file" || exit $?
 chmod 644 "$staged_project_file"
 
+# Reuse the canonical revision helper so initial and later revisions share the
+# same manifest record structure and pointer update behavior.
+jl_revision_append \
+    "$staged_project_file" "$initial_revision_description" \
+    "$initial_revision_number" "$created_at" "$revision_id" || exit $?
+
 jq -n \
     --argjson metadata "$snapshot_metadata" \
     --arg client_document_id "$client_document_id" \
@@ -818,6 +856,10 @@ jl_template_render "$APP_ROOT/templates/Project_Notes.md" \
     "$stage_root/00_Admin/Project_Notes.md" || exit $?
 jl_template_render "$APP_ROOT/templates/Preparation_Report.md" \
     "$stage_root/02_Audio_Preparation/Preparation_Report.md" || exit $?
+jl_template_render "$APP_ROOT/templates/Revision_Notes.md" \
+    "$stage_root/04_Revisions/$initial_revision_name/Revision_Notes.md" \
+    REVISION_NUMBER "$initial_revision_number" \
+    REVISION_DESCRIPTION "$initial_revision_description" || exit $?
 jl_template_render "$APP_ROOT/templates/Delivery_Notes.md" \
     "$stage_root/05_Final_Delivery/Delivery_Notes.md" || exit $?
 jl_template_render "$APP_ROOT/templates/Recall_Sheet.md" \
@@ -882,4 +924,4 @@ if [ "$effective_cd" -eq 0 ] || [ "$result_written" -eq 0 ]; then
     shell_quote_path "$project_root"
     printf '\n'
 fi
-printf '  new-revision --description "Initial mix"\n'
+printf '  approve-mix\n'

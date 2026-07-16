@@ -1,19 +1,19 @@
 # JL Mixing Automation
 
-JL Mixing Automation v1.1 creates and manages a consistent filesystem workflow
+JL Mixing Automation v1.2 creates and manages a consistent filesystem workflow
 for professional mixing projects. It preserves original client files, tracks
 revision approvals, and builds verified final-delivery packages without taking
 ownership of the DAW session itself.
 
-## v1.1 workflow
+## v1.2 workflow
 
 ```text
 new-studio
   → new-client
-  → new-mix
+  → new-mix (creates Revision_01)
   → validate-intake
-  → new-revision
-  → send the revision to the client manually
+  → work in and send the current revision manually
+  → new-revision when another revision is needed
   → approve-mix
   → create-delivery
 ```
@@ -35,8 +35,8 @@ directories and no project-completion command.
 
 ```bash
 cd ~/Downloads
-tar -xzf jl-mixing-1.1.0-macos.tar.gz
-cd jl-mixing-1.1.0
+tar -xzf jl-mixing-1.2.0-macos.tar.gz
+cd jl-mixing-1.2.0
 ./install.sh
 ```
 
@@ -70,20 +70,25 @@ To install under another prefix:
 new-studio
 new-client acme --name "Acme Records"
 cd "$HOME/Music/Mixes/Clients/Acme Records"
-new-mix --project "Blue Sky"
+new-mix "Blue Sky"
 ```
 
-Creation commands print a copy-and-paste `Next:` command. When shell integration
-is active, `new-client`, `new-mix`, and `new-revision` can change the current
-Terminal directory with `--cd`; the studio-wide default is configured by
-`new-studio --default-cd`.
+`new-mix --project "Blue Sky"` remains fully supported. When `--artist` is
+omitted, `new-mix` uses the client's artist default and then the client display
+name. Creation commands print a copy-and-paste `Next:` command. When shell
+integration is active, `new-client`, `new-mix`, and `new-revision` can change the
+current Terminal directory with `--cd`; the studio-wide default is configured
+by `new-studio --default-cd`.
 
-## Important v1.1 compatibility rule
+## Compatibility rule
 
-JL Mixing Automation v1.1 requires a newly created v1.1 workspace. It does not
-migrate, restructure, or modify v1.0 workspaces. Copy only user-owned material,
-such as original client deliveries or notes, into newly created v1.1 projects.
-Do not copy v1.0 JSON manifests or complete v1.0 project directories.
+JL Mixing Automation v1.2 continues using the v1.1 workspace schemas and is
+compatible with valid v1.1 workspaces. Application provenance is independent:
+new records use `created_with: jl-mixing 1.2.0` while the unchanged document
+contract remains `schema_version: 1.1.0`. It does not migrate, restructure, or
+modify v1.0 workspaces. Copy only user-owned material, such as original client
+deliveries or notes, into newly created v1.1/v1.2 projects. Do not copy v1.0
+JSON manifests or complete v1.0 project directories.
 
 ## Delivery behavior
 
@@ -91,6 +96,18 @@ Do not copy v1.0 JSON manifests or complete v1.0 project directories.
 file is eligible regardless of extension. Familiar filename phrases are
 classified on a best-effort basis; unmatched files are recorded as
 `unclassified` and are still delivered.
+
+To create a ZIP containing completed delivery notes:
+
+```bash
+create-delivery
+# Edit 05_Final_Delivery/Delivery_Notes.md
+create-delivery --zip --overwrite
+```
+
+`--overwrite` preserves the edited notes when the delivered path set is
+unchanged. A one-step `create-delivery --zip` packages the clean notes template
+because it creates and zips the delivery before the user can edit the file.
 
 `create-delivery --clean` is intentionally destructive: it replaces every item
 inside the resolved project's `05_Final_Delivery/` directory. Dry-run lists the
@@ -125,4 +142,4 @@ Release archives, checksums, and inventories are written to `dist/` by
 `make release`.
 
 See [docs/README.md](docs/README.md) for the full documentation index and
-[docs/RELEASE_NOTES_V1.1.md](docs/RELEASE_NOTES_V1.1.md) for release highlights.
+[docs/RELEASE_NOTES_V1.2.md](docs/RELEASE_NOTES_V1.2.md) for release highlights.

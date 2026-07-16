@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -eu
 
-# Purpose: Verify JSON reads, atomic mutations, exact v1.1 identities, and UUID uniqueness.
+# Purpose: Verify JSON reads, atomic mutations, exact schema identities, independent creator provenance, and UUID uniqueness.
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 . "$ROOT/tests/test-helper.sh"
 require_test_command jq
@@ -27,11 +27,19 @@ assert_failure "v1.0 exact schema rejected" \
     jl_json_require_exact_schema_identity "$tmp/client-v10.json" mixing-client 1.1.0
 assert_failure "different exact v1.1 version rejected" \
     jl_json_require_exact_schema_identity "$tmp/client.json" mixing-client 1.1.1
-assert_success "created_with patch release accepted" \
-    jl_json_require_created_with_series "$tmp/client.json" 1.1.0
-jq '.metadata.created_with="jl-mixing 1.2.0"' "$tmp/client.json" > "$tmp/client-wrong-series.json"
-assert_failure "created_with different series rejected" \
-    jl_json_require_created_with_series "$tmp/client-wrong-series.json" 1.1.0
+assert_success "v1.1 created_with release accepted" \
+    jl_json_require_created_with_semver "$tmp/client.json"
+jq '.metadata.created_with="jl-mixing 1.2.0"' "$tmp/client.json" > "$tmp/client-v12.json"
+assert_success "creator release is independent of schema version" \
+    jl_json_require_created_with_semver "$tmp/client-v12.json"
+assert_success "legacy created_with validator alias remains compatible" \
+    jl_json_require_created_with_series "$tmp/client-v12.json" 1.1.0
+jq '.metadata.created_with="jl-mixing 1.2"' "$tmp/client.json" > "$tmp/client-bad-semver.json"
+assert_failure "malformed created_with semantic version rejected" \
+    jl_json_require_created_with_semver "$tmp/client-bad-semver.json"
+jq '.metadata.created_with="other-app 1.2.0"' "$tmp/client.json" > "$tmp/client-wrong-product.json"
+assert_failure "non-JL-Mixing creator rejected" \
+    jl_json_require_created_with_semver "$tmp/client-wrong-product.json"
 assert_eq "$ROOT/schemas/client.schema.json" \
     "$(jl_json_schema_path client.schema.json)" "local schema path resolved"
 assert_failure "schema path traversal rejected" jl_json_schema_path '../client.schema.json'
