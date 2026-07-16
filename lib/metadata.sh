@@ -24,12 +24,18 @@ jl_software_version() {
     fi
     first_line="$(sed -n '1p' "$version_file")"
     jl_assert_nonempty "$first_line" "software version" || return $?
+    if ! printf '%s\n' "$first_line" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+        jl_error "Invalid application version '$first_line' in: $version_file"
+        return "$JL_EXIT_CONFIG"
+    fi
     printf '%s\n' "$first_line"
 }
 
-# Build the standard created_with software identity string.
+# Build release-provenance metadata independently of schema_version.
 jl_created_with() {
-    printf 'jl-mixing %s\n' "$(jl_software_version)"
+    local software_version
+    software_version="$(jl_software_version)" || return $?
+    printf 'jl-mixing %s\n' "$software_version"
 }
 
 # Refresh only last_modified_at on an existing mutable v1.1 document.
@@ -43,18 +49,19 @@ jl_metadata_touch() {
 # Create the v1.1 metadata shape used by mutable studio, client, and project
 # documents. created_by was removed; last_modified_at starts equal to created_at.
 jl_metadata_create_v11_mutable() {
-    local schema_name schema_version document_id timestamp
+    local schema_name schema_version document_id timestamp created_with
     schema_name="$1"
     schema_version="${2:-1.1.0}"
     document_id="${3:-$(jl_uuid)}"
     timestamp="${4:-$(jl_now_iso8601)}"
+    created_with="$(jl_created_with)" || return $?
 
     jl_json_require_jq || return $?
     jq -n \
         --arg schema "$schema_name" \
         --arg schema_version "$schema_version" \
         --arg document_id "$document_id" \
-        --arg created_with "$(jl_created_with)" \
+        --arg created_with "$created_with" \
         --arg created_at "$timestamp" \
         '{
             schema: $schema,
@@ -69,18 +76,19 @@ jl_metadata_create_v11_mutable() {
 # Create the v1.1 metadata shape used by immutable snapshots and delivery
 # manifests. These records intentionally have no last_modified_at field.
 jl_metadata_create_v11_immutable() {
-    local schema_name schema_version document_id timestamp
+    local schema_name schema_version document_id timestamp created_with
     schema_name="$1"
     schema_version="${2:-1.1.0}"
     document_id="${3:-$(jl_uuid)}"
     timestamp="${4:-$(jl_now_iso8601)}"
+    created_with="$(jl_created_with)" || return $?
 
     jl_json_require_jq || return $?
     jq -n \
         --arg schema "$schema_name" \
         --arg schema_version "$schema_version" \
         --arg document_id "$document_id" \
-        --arg created_with "$(jl_created_with)" \
+        --arg created_with "$created_with" \
         --arg created_at "$timestamp" \
         '{
             schema: $schema,
@@ -91,7 +99,7 @@ jl_metadata_create_v11_immutable() {
         }'
 }
 
-# Validate the common v1.1 metadata contract before a command uses a governing
+# Validate the common v1.1 schema contract before a command uses a governing
 # document. The final argument is either mutable or immutable.
 jl_metadata_validate_v11() {
     local file expected_schema mutability field value
@@ -100,7 +108,7 @@ jl_metadata_validate_v11() {
     mutability="$3"
 
     jl_json_require_exact_schema_identity "$file" "$expected_schema" 1.1.0 || return $?
-    jl_json_require_created_with_series "$file" 1.1.0 || return $?
+    jl_json_require_created_with_semver "$file" || return $?
 
     for field in document_id created_with created_at; do
         value="$(jl_json_get_optional "$file" ".metadata.$field" '')"

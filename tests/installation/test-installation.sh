@@ -4,6 +4,7 @@ set -eu
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 . "$ROOT/tests/test-helper.sh"
+expected_created_with="jl-mixing $(cat "$ROOT/VERSION")"
 
 require_test_command python3
 require_test_command jq
@@ -51,6 +52,8 @@ PATH="$prefix/bin:$PATH" new-studio --root "$workspace" >/dev/null
 assert_file_exists "$workspace/Studio/studio.json"
 assert_json_eq "1.1.0" "$workspace/Studio/studio.json" \
     '.metadata.schema_version' "installed new-studio creates v1.1 schema"
+assert_json_eq "$expected_created_with" "$workspace/Studio/studio.json" \
+    '.metadata.created_with' "installed new-studio records application release"
 assert_path_not_exists "$workspace/DAWs"
 
 JL_MIXING_ROOT="$workspace" PATH="$prefix/bin:$PATH" \
@@ -59,6 +62,8 @@ installed_client="$workspace/Clients/Installed Client/client.json"
 assert_file_exists "$installed_client"
 assert_json_eq "1.1.0" "$installed_client" '.metadata.schema_version' \
     "installed new-client creates v1.1 schema"
+assert_json_eq "$expected_created_with" "$installed_client" '.metadata.created_with' \
+    "installed new-client records application release"
 assert_dir_exists "$workspace/Clients/Installed Client/Projects"
 assert_path_not_exists "$workspace/Clients/Installed Client/Projects/Active"
 
@@ -71,9 +76,14 @@ assert_file_exists "$installed_manifest"
 assert_file_exists "$installed_project/00_Admin/client-profile-snapshot.json"
 assert_json_eq "1.1.0" "$installed_manifest" '.metadata.schema_version' \
     "installed new-mix creates v1.1 schema"
+assert_json_eq "$expected_created_with" "$installed_manifest" '.metadata.created_with' \
+    "installed new-mix records application release"
 assert_dir_exists "$installed_project/03_DAW_Project"
 assert_path_not_exists "$installed_project/03_DAW_Project/Project"
 assert_path_not_exists "$installed_project/05_Final_Delivery/delivery-manifest.json"
+assert_file_exists "$installed_project/04_Revisions/Revision_01/Revision_Notes.md"
+assert_json_eq "1" "$installed_manifest" '.state.current_revision' \
+    "installed new-mix creates Revision 1"
 
 printf 'installed notes\n' > "$installed_project/01_Client_Files/Original_Delivery/Notes.txt"
 PATH="$prefix/bin:$PATH" validate-intake --project "$installed_project" >/dev/null
@@ -81,9 +91,6 @@ assert_contains "$(cat "$installed_project/00_Admin/Intake_Report.md")" \
     "## Unsupported or Non-Audio Files" \
     "installed validate-intake updates the v1.1 managed report"
 
-PATH="$prefix/bin:$PATH" new-revision --project "$installed_project" \
-    --description "Installed revision" >/dev/null
-assert_file_exists "$installed_project/04_Revisions/Revision_01/Revision_Notes.md"
 assert_path_not_exists "$installed_project/04_Revisions/Revision_01/Prints"
 printf 'installed main mix\n' > \
     "$installed_project/04_Revisions/Revision_01/Installed Main Mix.wav"
@@ -93,6 +100,9 @@ assert_json_eq "1" "$installed_manifest" '.state.approved_revision' \
     "installed approve-mix records v1.1 approval"
 PATH="$prefix/bin:$PATH" create-delivery --project "$installed_project" >/dev/null
 assert_file_exists "$installed_project/05_Final_Delivery/delivery-manifest.json"
+assert_json_eq "$expected_created_with" \
+    "$installed_project/05_Final_Delivery/delivery-manifest.json" \
+    '.metadata.created_with' "installed delivery records application release"
 assert_json_eq "1" "$installed_manifest" '.state.delivered_revision' \
     "installed create-delivery records delivered revision"
 

@@ -202,13 +202,12 @@ jl_json_require_exact_schema_identity() {
     fi
 }
 
-# Require created_with to identify a semantic jl-mixing release from the same
-# major/minor series as the supplied version (for example, 1.1.4 is compatible
-# with the expected 1.1.0 document contract).
-jl_json_require_created_with_series() {
-    local file expected_version created_with actual_version expected_series actual_series
+# Require created_with to identify the JL Mixing application release that
+# originally created the document. This is provenance metadata, so its release
+# version is intentionally independent of metadata.schema_version.
+jl_json_require_created_with_semver() {
+    local file created_with actual_version
     file="$1"
-    expected_version="$2"
 
     created_with="$(jl_json_get "$file" '.metadata.created_with')" || {
         jl_error "Missing or invalid metadata.created_with in: $file"
@@ -225,29 +224,23 @@ jl_json_require_created_with_series() {
 
     # Reject suffixes and malformed semantic versions instead of accepting the
     # loose shell pattern above as sufficient validation.
-    if ! printf '%s
-' "$actual_version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+    if ! printf '%s\n' "$actual_version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
         jl_error "Invalid jl-mixing semantic version '$actual_version' in: $file"
-        return "$JL_EXIT_VALIDATION"
-    fi
-    if ! printf '%s
-' "$expected_version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-        jl_error "Invalid expected semantic version: $expected_version"
-        return "$JL_EXIT_ARGUMENTS"
-    fi
-
-    expected_series="$(printf '%s
-' "$expected_version" | awk -F. '{print $1 "." $2}')"
-    actual_series="$(printf '%s
-' "$actual_version" | awk -F. '{print $1 "." $2}')"
-    if [ "$actual_series" != "$expected_series" ]; then
-        jl_error "Incompatible created_with version '$actual_version'; expected jl-mixing $expected_series.x."
         return "$JL_EXIT_VALIDATION"
     fi
 }
 
+# Compatibility alias for scripts that sourced the v1.1 library function.
+# The expected-version argument is accepted but intentionally ignored because
+# creator release provenance no longer determines schema compatibility.
+jl_json_require_created_with_series() {
+    local file
+    file="$1"
+    jl_json_require_created_with_semver "$file"
+}
+
 # Validate a document against one schema from the installed local schema set,
-# then enforce the exact v1.1 document identity and compatible creator series.
+# then enforce the exact document identity and valid creator release provenance.
 jl_json_validate_local_document() {
     local document_file schema_name expected_schema expected_version schema_file
     document_file="$1"
@@ -258,7 +251,7 @@ jl_json_validate_local_document() {
     schema_file="$(jl_json_schema_path "$schema_name")" || return $?
     jl_json_validate_schema "$schema_file" "$document_file" || return $?
     jl_json_require_exact_schema_identity "$document_file" "$expected_schema" "$expected_version" || return $?
-    jl_json_require_created_with_series "$document_file" "$expected_version"
+    jl_json_require_created_with_semver "$document_file"
 }
 
 # List governing JL Mixing JSON records at their canonical v1.1 locations

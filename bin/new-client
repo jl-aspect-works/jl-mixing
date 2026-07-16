@@ -404,14 +404,8 @@ EOF_PLAN
 fi
 
 schema_file="$(jl_json_schema_path client.schema.json)" || exit $?
+# Application release provenance is independent of the v1.1 schema version.
 software_version="$(jl_software_version)" || exit $?
-case "$software_version" in
-    1.1.*) ;;
-    *)
-        jl_error "new-client requires a JL Mixing 1.1.x application version; found $software_version."
-        exit "$JL_EXIT_CONFIG"
-        ;;
-esac
 
 stage_root=""
 cleanup_stage() {

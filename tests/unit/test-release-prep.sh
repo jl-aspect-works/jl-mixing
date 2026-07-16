@@ -32,9 +32,17 @@ done
 
 assert_file_exists "$ROOT/CHANGELOG.md"
 assert_file_exists "$ROOT/docs/RELEASE_NOTES_V1.1.md"
+assert_file_exists "$ROOT/docs/RELEASE_NOTES_V1.2.md"
+assert_file_exists "$ROOT/docs/SCOPE_FREEZE_V1.2.md"
+assert_eq "1.2.0" "$(sed -n '1p' "$ROOT/VERSION")" \
+    "v1.2 application release version"
+assert_contains "$(cat "$ROOT/.github/workflows/release.yml")" \
+    'docs/RELEASE_NOTES_V1.2.md' "release workflow publishes v1.2 notes"
 assert_contains "$(cat "$ROOT/docs/USER_GUIDE.md")" \
     'create-delivery --clean' "user guide documents destructive clean"
+assert_contains "$(cat "$ROOT/docs/USER_GUIDE.md")" \
+    'create-delivery --zip --overwrite' "user guide documents edited-notes ZIP workflow"
 assert_contains "$(cat "$ROOT/README.md")" \
-    'requires a newly created v1.1 workspace' "README documents fresh workspace"
+    'compatible with valid v1.1 workspaces' "README documents v1.1 workspace compatibility"
 
 echo "[OK] release preparation ($TEST_COUNT assertions)"

@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 set -eu
 
-# Purpose: Exercise the complete v1.1 project-creation contract.
+# Purpose: Exercise the complete v1.2 project-creation contract.
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 # shellcheck source=tests/integration/integration-helper.sh
 . "$ROOT/tests/integration/integration-helper.sh"
+expected_created_with="jl-mixing $(cat "$ROOT/VERSION")"
 
 require_test_command jq
 require_test_command python3
@@ -32,13 +33,13 @@ run_project() {
 }
 
 # A project created from client context uses readable flattened paths, strict
-# v1.1 manifests, minimal Markdown templates, and a recursive immutable source
-# import without creating a revision or delivery manifest.
+# v1.1-schema manifests, minimal Markdown templates, an initial revision, and a
+# recursive immutable source import without creating a delivery manifest.
 mkdir -p "$tmp/source/Audio/Drums" "$tmp/source/Documentation/Empty Folder"
 printf 'kick audio\n' > "$tmp/source/Audio/Drums/Kick.wav"
 printf 'session notes\n' > "$tmp/source/Documentation/notes.txt"
 output="$(cd "$client_root" && "$ROOT/bin/new-mix" \
-    --project 'Blue Sky / Radio Mix' \
+    'Blue Sky / Radio Mix' \
     --project-id blue-sky-radio \
     --album 'Blue Sky Album' \
     --producer 'Pat Producer' \
@@ -60,9 +61,13 @@ snapshot="$project_root/00_Admin/client-profile-snapshot.json"
 assert_dir_exists "$project_root"
 assert_dir_exists "$project_root/03_DAW_Project"
 assert_path_not_exists "$project_root/03_DAW_Project/Project"
-assert_dir_exists "$project_root/04_Revisions"
-assert_eq "" "$(find "$project_root/04_Revisions" -mindepth 1 -print -quit)" \
-    "no initial revision created"
+assert_dir_exists "$project_root/04_Revisions/Revision_01"
+assert_file_exists "$project_root/04_Revisions/Revision_01/Revision_Notes.md"
+assert_path_not_exists "$project_root/04_Revisions/Revision_01/Prints"
+assert_contains "$(cat "$project_root/04_Revisions/Revision_01/Revision_Notes.md")" \
+    '# Revision 1 Notes' "initial revision heading"
+assert_contains "$(cat "$project_root/04_Revisions/Revision_01/Revision_Notes.md")" \
+    'Description: Initial mix' "initial revision description"
 assert_dir_exists "$project_root/05_Final_Delivery/Stems"
 assert_path_not_exists "$project_root/05_Final_Delivery/delivery-manifest.json"
 assert_file_exists "$manifest"
@@ -86,6 +91,8 @@ assert_file_exists "$tmp/source/Audio/Drums/Kick.wav"
 
 assert_json_eq "mixing-project" "$manifest" '.metadata.schema' "project schema identity"
 assert_json_eq "1.1.0" "$manifest" '.metadata.schema_version' "project schema version"
+assert_json_eq "$expected_created_with" "$manifest" '.metadata.created_with' \
+    "project creator release"
 assert_json_eq "blue-sky-radio" "$manifest" '.project_id' "explicit project ID"
 assert_json_eq 'Blue Sky / Radio Mix' "$manifest" '.project_name' "display name preserved"
 assert_json_eq 'The Acmes' "$manifest" '.artist' "client artist default"
@@ -104,30 +111,55 @@ assert_eq '["stems","main_mix"]' \
 assert_json_eq '2026-12-31' "$manifest" '.schedule.deadline' "deadline override"
 assert_json_eq 'Wide, punchy, vocal-forward mix' "$manifest" '.creative_direction' \
     "creative direction"
-assert_eq '{"current_revision":0,"approved_revision":null,"delivered_revision":null}' \
+assert_eq '{"current_revision":1,"approved_revision":null,"delivered_revision":null}' \
     "$(jq -c '.state' "$manifest")" "initial three-pointer state"
-assert_eq '[]' "$(jq -c '.revisions' "$manifest")" "empty revision records"
+assert_eq '1' "$(jq -r '.revisions | length' "$manifest")" "one initial revision record"
+assert_json_eq '1' "$manifest" '.revisions[0].number' "initial revision number"
+assert_json_eq 'Initial mix' "$manifest" '.revisions[0].description' \
+    "initial revision description stored"
+assert_eq 'null' "$(jq -c '.revisions[0].approval.approved_at' "$manifest")" \
+    "initial revision approval date is null"
+assert_eq 'null' "$(jq -c '.revisions[0].approval.approved_by' "$manifest")" \
+    "initial revision approver is null"
 assert_eq "false" "$(jq -r 'has("project_type") or has("daw")' "$manifest")" \
     "removed project and DAW metadata absent"
 assert_json_eq 'mixing-client-profile-snapshot' "$snapshot" '.metadata.schema' \
     "snapshot schema identity"
+assert_json_eq "$expected_created_with" "$snapshot" '.metadata.created_with' \
+    "snapshot creator release"
 assert_eq "$(jq -c '.defaults' "$client_file")" "$(jq -c '.defaults' "$snapshot")" \
     "client defaults copied exactly into snapshot"
 assert_json_eq "$(jq -r '.metadata.document_id' "$client_file")" "$snapshot" \
     '.source_client.client_document_id' "snapshot client document reference"
-[ "$(jq -r '.metadata.document_id' "$manifest")" != \
-  "$(jq -r '.metadata.document_id' "$snapshot")" ] || fail "project and snapshot UUIDs must differ"
-pass "project and snapshot UUIDs are distinct"
+project_document_id="$(jq -r '.metadata.document_id' "$manifest")"
+snapshot_document_id="$(jq -r '.metadata.document_id' "$snapshot")"
+revision_id="$(jq -r '.revisions[0].revision_id' "$manifest")"
+[ "$project_document_id" != "$snapshot_document_id" ] || \
+    fail "project and snapshot UUIDs must differ"
+[ "$revision_id" != "$project_document_id" ] && [ "$revision_id" != "$snapshot_document_id" ] || \
+    fail "revision UUID must differ from document UUIDs"
+python3 - "$revision_id" <<'PY_UUID'
+from uuid import UUID
+import sys
+value = UUID(sys.argv[1])
+raise SystemExit(0 if value.version == 4 else 1)
+PY_UUID
+pass "project, snapshot, and initial revision UUIDs are valid and distinct"
 python3 "$ROOT/tools/validate-json.py" --strict \
     --schema "$ROOT/schemas/project-manifest.schema.json" --document "$manifest" >/dev/null
 pass "generated project validates against canonical schema"
 python3 "$ROOT/tools/validate-json.py" --strict \
     --schema "$ROOT/schemas/client-profile-snapshot.schema.json" --document "$snapshot" >/dev/null
 pass "generated snapshot validates against canonical schema"
-assert_eq 'Setup' "$(python3 "$ROOT/tools/project-state.py" derive "$project_root")" \
+assert_eq 'In progress' "$(python3 "$ROOT/tools/project-state.py" derive "$project_root")" \
     "initial derived state"
 assert_contains "$output" 'Project created successfully.' "success heading"
-assert_contains "$output" 'new-revision --description "Initial mix"' "next command"
+assert_contains "$output" 'Initial revision:' "initial revision summary"
+assert_contains "$output" 'approve-mix' "next approval command"
+case "$output" in
+    *'new-revision --description "Initial mix"'*) fail "obsolete next command was printed" ;;
+    *) pass "obsolete initial new-revision command omitted" ;;
+esac
 assert_contains "$output" "cd '$project_root'" "copy-and-paste cd"
 
 # Stable client-ID resolution and omitted project fields use the approved
@@ -148,6 +180,25 @@ assert_eq 'null' "$(jq -c '.schedule.deadline' "$default_manifest")" "default de
 assert_json_eq '' "$default_manifest" '.creative_direction' "default creative direction empty"
 assert_contains "$output" 'Default Project' "ID-resolved project output"
 
+# The positional project name may follow other options and uses the same project
+# creation path as --project.
+positional_after_output="$(run_project --client acme --artist 'Positional Artist' 'Positional After')"
+positional_after_root="$client_root/Projects/Positional After"
+assert_file_exists "$positional_after_root/00_Admin/project-manifest.json"
+assert_json_eq 'Positional After' \
+    "$positional_after_root/00_Admin/project-manifest.json" '.project_name' \
+    "positional project after options"
+assert_json_eq 'Positional Artist' \
+    "$positional_after_root/00_Admin/project-manifest.json" '.artist' \
+    "explicit artist overrides client defaults"
+assert_contains "$positional_after_output" 'Positional After' \
+    "positional-after-options output"
+help_output="$(run_project --help)"
+assert_contains "$help_output" 'new-mix PROJECT_NAME [options]' \
+    "help documents positional form"
+assert_contains "$help_output" 'new-mix --project PROJECT_NAME [options]' \
+    "help documents option form"
+
 # An explicit client path works from outside the workspace. Dry-run performs
 # source validation and reports the complete plan without creating a project.
 dry_output="$(cd "$tmp" && "$ROOT/bin/new-mix" \
@@ -156,8 +207,15 @@ dry_output="$(cd "$tmp" && "$ROOT/bin/new-mix" \
 assert_contains "$dry_output" 'Dry run — no changes made.' "dry-run heading"
 assert_contains "$dry_output" '03_DAW_Project/' "dry-run flattened DAW boundary"
 assert_contains "$dry_output" 'Audio/Drums/Kick.wav' "dry-run source plan"
-assert_contains "$dry_output" 'Initial state:              Setup' "dry-run state"
-assert_contains "$dry_output" 'new-revision --description "Initial mix"' "dry-run next step"
+assert_contains "$dry_output" 'Initial state:              In progress' "dry-run state"
+assert_contains "$dry_output" 'Current revision:           1' "dry-run revision pointer"
+assert_contains "$dry_output" '04_Revisions/Revision_01/Revision_Notes.md' \
+    "dry-run initial revision plan"
+assert_contains "$dry_output" 'approve-mix' "dry-run next step"
+case "$dry_output" in
+    *'new-revision --description "Initial mix"'*) fail "dry-run printed obsolete next command" ;;
+    *) pass "dry-run omits obsolete initial new-revision command" ;;
+esac
 assert_path_not_exists "$client_root/Projects/Dry Project"
 
 # Project IDs and readable destination folders are independently protected
@@ -169,8 +227,17 @@ assert_failure "case-insensitive project folder collision is protected" \
 assert_path_not_exists "$client_root/Projects/Different Name"
 
 # Explicit validation failures occur before any project filesystem mutation.
-assert_failure "missing project option rejected" run_project --client acme
-assert_failure "empty project name rejected" run_project --client acme --project ''
+assert_failure "missing project name rejected" run_project --client acme
+assert_failure "empty option project name rejected" run_project --client acme --project ''
+assert_failure "empty positional project name rejected" run_project --client acme ''
+assert_failure "positional then option project rejected" \
+    run_project 'Both Forms One' --client acme --project 'Both Forms Two'
+assert_failure "option then positional project rejected" \
+    run_project --client acme --project 'Both Forms One' 'Both Forms Two'
+assert_failure "additional positional argument rejected" \
+    run_project --client acme 'One Position' 'Two Position'
+assert_path_not_exists "$client_root/Projects/Both Forms One"
+assert_path_not_exists "$client_root/Projects/One Position"
 assert_failure "invalid explicit project ID rejected" \
     run_project --client acme --project Bad --project-id Bad_ID
 assert_failure "nonpositive BPM rejected" run_project --client acme --project BadBpm --bpm 0
@@ -220,14 +287,28 @@ else
 fi
 assert_path_not_exists "$client_root/Projects/CaseSource"
 
-# Empty client artist defaults are valid client metadata, but project creation
-# requires a resolved non-empty artist.
+# Empty client artist defaults fall back to the client display name without
+# rewriting the immutable client snapshot. Explicit empty overrides remain invalid.
 client_backup="$tmp/client-backup.json"
 cp "$client_file" "$client_backup"
 jq '.defaults.artist=""' "$client_file" > "$client_file.tmp"
 mv "$client_file.tmp" "$client_file"
-assert_failure "project requires a resolved artist" \
-    run_project --client acme --project MissingArtist
+fallback_output="$(run_project --client acme 'Client Name Artist')"
+fallback_root="$client_root/Projects/Client Name Artist"
+fallback_manifest="$fallback_root/00_Admin/project-manifest.json"
+fallback_snapshot="$fallback_root/00_Admin/client-profile-snapshot.json"
+assert_json_eq 'Acme Records' "$fallback_manifest" '.artist' \
+    "client name artist fallback"
+assert_json_eq '' "$fallback_snapshot" '.defaults.artist' \
+    "snapshot preserves empty client artist default"
+assert_contains "$fallback_output" 'Artist:                     Acme Records' \
+    "resolved fallback artist reported"
+fallback_dry_output="$(run_project --client acme 'Client Name Artist Dry' --dry-run)"
+assert_contains "$fallback_dry_output" 'Artist:                     Acme Records' \
+    "dry-run reports client name artist fallback"
+assert_failure "explicit empty artist rejected" \
+    run_project --client acme 'Explicit Empty Artist' --artist ''
+assert_path_not_exists "$client_root/Projects/Explicit Empty Artist"
 cp "$client_backup" "$client_file"
 
 # Directory-changing behavior uses the secure private result channel only

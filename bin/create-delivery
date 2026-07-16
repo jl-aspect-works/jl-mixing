@@ -156,10 +156,12 @@ document_id="$(jl_uuid)" || exit $?
 studio_root="$(jl_context_studio_root_v11 "$project_root")" || exit $?
 jl_json_assert_uuid_available "$studio_root" "$document_id" || exit $?
 timestamp="$(jl_now_iso8601)"
+# Capture validated application provenance separately from the v1.1 schema.
+created_with="$(jl_created_with)" || exit $?
 "$(jl_json_validator_python)" "$APP_ROOT/tools/build-delivery.py" build \
     --plan "$plan_file" --project-manifest "$manifest" --delivery-dir "$delivery_root" \
     --stage-dir "$stage_root" --delivery-notes-template "$APP_ROOT/templates/Delivery_Notes.md" \
-    --document-id "$document_id" --created-with "$(jl_created_with)" --created-at "$timestamp" \
+    --document-id "$document_id" --created-with "$created_with" --created-at "$timestamp" \
     --project-zip-name "$zip_name" || exit "$JL_EXIT_VALIDATION"
 
 delivery_schema="$(jl_json_schema_path delivery-manifest.schema.json)" || exit $?

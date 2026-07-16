@@ -1,4 +1,4 @@
-# JL Mixing Automation v1.1 Command Reference
+# JL Mixing Automation v1.2 Command Reference
 
 Every command supports `-h` and `--help`. Mutating commands validate governing
 JSON and filesystem boundaries before committing changes.
@@ -29,18 +29,26 @@ Creates `Clients/<Readable Name>/client.json` and `Projects/`.
 ## `new-mix`
 
 ```text
-new-mix --project NAME [--client ID_OR_PATH] [--project-id ID]
-        [--artist NAME] [--album TITLE] [--producer NAME]
-        [--engineer NAME] [--bpm NUMBER] [--key TEXT]
-        [--time-signature TEXT] [--sample-rate HZ]
-        [--bit-depth BITS] [--file-format WAV|AIFF]
-        [--deadline YYYY-MM-DD] [--deliverables LIST]
-        [--description TEXT] [--source PATH]
-        [--cd|--no-cd] [--dry-run]
+new-mix PROJECT_NAME [options]
+new-mix --project PROJECT_NAME [options]
+
+Options include:
+  --client ID_OR_PATH  --project-id ID  --artist NAME
+  --album TITLE        --producer NAME  --engineer NAME
+  --bpm NUMBER         --key TEXT       --time-signature TEXT
+  --sample-rate HZ     --bit-depth BITS --file-format WAV|AIFF
+  --deadline YYYY-MM-DD                  --deliverables LIST
+  --description TEXT   --source PATH    --cd|--no-cd  --dry-run
 ```
 
-Creates the complete flattened project tree, strict project manifest, and
-immutable client-profile snapshot. No initial revision is created.
+Exactly one project name is required. The positional form may appear before or
+after other valid options. Supplying both forms or additional positional
+arguments is rejected before filesystem mutation.
+
+Creates the complete flattened project tree, strict project manifest, immutable
+client-profile snapshot, and unapproved `Revision_01/Revision_Notes.md` in one
+atomic transaction. When `--artist` is omitted, artist precedence is client
+artist default, then client display name.
 
 ## `validate-intake`
 
@@ -51,8 +59,8 @@ validate-intake [--project PATH] [--source PATH]
                 [--no-duplicate-check] [--dry-run]
 ```
 
-Preserves v1.0.4 intake behavior while writing the clearer v1.1 managed report.
-`--no-duplicate-check` skips duplicate-basename detection only.
+Preserves v1.0.4 intake behavior while writing the clearer v1.1-schema managed
+report. `--no-duplicate-check` skips duplicate-basename detection only.
 
 ## `new-revision`
 
@@ -62,7 +70,8 @@ new-revision [--project PATH] [--description TEXT]
 ```
 
 Creates the next contiguous `Revision_NN/` directory and advances
-`state.current_revision` transactionally.
+`state.current_revision` transactionally. For v1.2-created projects, the first
+call creates Revision 2. Existing valid zero-revision projects remain supported.
 
 ## `approve-mix`
 
@@ -86,10 +95,13 @@ Packages the approved revision, verifies copied bytes with SHA-256, writes the
 strict delivery manifest, and updates `state.delivered_revision` as one
 rollback-capable transaction.
 
-`--clean` replaces all contents of `05_Final_Delivery/`, not only files listed by
-a prior manifest.
+To create a ZIP with completed notes, run `create-delivery`, edit
+`05_Final_Delivery/Delivery_Notes.md`, then run
+`create-delivery --zip --overwrite`. `--overwrite` requires an unchanged
+delivered path set. `--clean` replaces all contents of `05_Final_Delivery/`, not
+only files listed by a prior manifest.
 
 ## Removed v1.0 interface
 
-v1.1 has no project-completion command. Known v1.0 flags are rejected with
-specific diagnostics rather than silently ignored.
+v1.2 retains the v1.1 removal of the project-completion command. Known v1.0
+flags are rejected with specific diagnostics rather than silently ignored.

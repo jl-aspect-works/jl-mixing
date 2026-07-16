@@ -18,4 +18,4 @@ archive="$(find "$release_dir" -maxdepth 1 -name '*.tar.gz' -type f | head -n 1)
 [ -n "$archive" ] || { echo "Release archive was not created." >&2; exit 5; }
 tools/verify-release-archive "$archive"
 
-echo "[OK] v1.1 release check passed"
+echo "[OK] v$(cat VERSION) release check passed"

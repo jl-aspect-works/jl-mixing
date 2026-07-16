@@ -17,6 +17,8 @@ USAGE
 }
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=lib/metadata.sh
+. "$ROOT/lib/metadata.sh"
 output_dir="$ROOT/dist"
 platform=""
 
@@ -51,11 +53,8 @@ if [ -z "$platform" ]; then
     esac
 fi
 
-version="$(tr -d '[:space:]' < "$ROOT/VERSION")"
-[ -n "$version" ] || { echo "Error: VERSION is empty." >&2; exit 3; }
-case "$version" in
-    *[!0-9.]*|'') echo "Error: invalid semantic version: $version" >&2; exit 3 ;;
-esac
+# Use the same exact semantic-version validation as runtime provenance.
+version="$(jl_software_version)" || exit $?
 
 case "$output_dir" in
     /*) ;;

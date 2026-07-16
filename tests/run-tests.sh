@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# v1.1 test orchestrator.
+# v1.2 test orchestrator.
 #
 # Basic mode runs all available checks and visibly skips dependency-bound work.
 # Strict mode requires the complete runtime stack and adds installation/release
@@ -9,7 +9,7 @@ set -eu
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-echo "Verifying v1.1 repository artifacts..."
+echo "Verifying v1.2 repository artifacts..."
 
 required='README.md
 VERSION
@@ -23,8 +23,10 @@ docs/INSTALLATION_GUIDE.md
 docs/DEVELOPER_GUIDE.md
 docs/ARCHITECTURE_DECISIONS.md
 docs/SCOPE_FREEZE_V1.md
+docs/SCOPE_FREEZE_V1.2.md
 docs/PROJECT_MAINTENANCE.md
 docs/RELEASE_NOTES_V1.1.md
+docs/RELEASE_NOTES_V1.2.md
 CHANGELOG.md
 schemas/studio.schema.json
 schemas/client.schema.json

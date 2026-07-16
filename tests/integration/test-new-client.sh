@@ -4,6 +4,7 @@ set -eu
 # Purpose: Exercise the complete v1.1 client-creation contract.
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 . "$ROOT/tests/integration/integration-helper.sh"
+expected_created_with="jl-mixing $(cat "$ROOT/VERSION")"
 
 require_test_command jq
 require_test_command python3
@@ -54,6 +55,8 @@ assert_path_not_exists "$client_root/Projects/Completed"
 assert_file_exists "$client_file"
 assert_json_eq "mixing-client" "$client_file" '.metadata.schema' "client schema identity"
 assert_json_eq "1.1.0" "$client_file" '.metadata.schema_version' "client schema version"
+assert_json_eq "$expected_created_with" "$client_file" '.metadata.created_with' \
+    "client creator release"
 assert_json_eq "acme" "$client_file" '.client_id' "client ID"
 assert_json_eq "Acme Records" "$client_file" '.client_name' "client display name"
 assert_json_eq "The Acmes" "$client_file" '.defaults.artist' "artist default"

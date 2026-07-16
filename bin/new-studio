@@ -205,14 +205,8 @@ validation_python="$(jl_json_validator_python)" || {
 }
 [ -n "$validation_python" ] || exit "$JL_EXIT_CONFIG"
 
+# Application release provenance is independent of the v1.1 schema version.
 software_version="$(jl_software_version)" || exit $?
-case "$software_version" in
-    1.1.*) ;;
-    *)
-        jl_error "new-studio requires a JL Mixing 1.1.x application version; found $software_version."
-        exit "$JL_EXIT_CONFIG"
-        ;;
-esac
 
 shell_integration="not detected"
 if jl_is_truthy "${JL_MIXING_SHELL_INTEGRATION:-0}"; then

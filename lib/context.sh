@@ -260,7 +260,7 @@ jl_context_require_v11_workspace() {
     fi
 
     jl_json_require_exact_schema_identity "$config_file" mixing-studio 1.1.0 || return $?
-    jl_json_require_created_with_series "$config_file" 1.1.0 || return $?
+    jl_json_require_created_with_semver "$config_file" || return $?
     jl_context_reject_legacy_layout "$studio_root"
 }
 
@@ -448,14 +448,14 @@ jl_context_validate_project_documents_v11() {
         "$snapshot_schema" "$snapshot" >/dev/null || return $?
 
     jl_json_require_exact_schema_identity "$studio_file" mixing-studio 1.1.0 || return $?
-    jl_json_require_created_with_series "$studio_file" 1.1.0 || return $?
+    jl_json_require_created_with_semver "$studio_file" || return $?
     jl_json_require_exact_schema_identity "$client_file" mixing-client 1.1.0 || return $?
-    jl_json_require_created_with_series "$client_file" 1.1.0 || return $?
+    jl_json_require_created_with_semver "$client_file" || return $?
     jl_json_require_exact_schema_identity "$manifest" mixing-project 1.1.0 || return $?
-    jl_json_require_created_with_series "$manifest" 1.1.0 || return $?
+    jl_json_require_created_with_semver "$manifest" || return $?
     jl_json_require_exact_schema_identity \
         "$snapshot" mixing-client-profile-snapshot 1.1.0 || return $?
-    jl_json_require_created_with_series "$snapshot" 1.1.0 || return $?
+    jl_json_require_created_with_semver "$snapshot" || return $?
 
     client_document_id="$(jl_json_get "$client_file" '.metadata.document_id')" || return $?
     client_id="$(jl_json_get "$client_file" '.client_id')" || return $?
