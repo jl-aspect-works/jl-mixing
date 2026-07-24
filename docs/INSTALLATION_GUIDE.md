@@ -1,4 +1,4 @@
-# JL Mixing Automation v1.2 Installation Guide
+# JL Mixing Automation v1.3 Installation Guide
 
 ## Requirements
 
@@ -83,6 +83,6 @@ clear already-loaded shell functions and PATH entries.
 
 ## Fresh workspace requirement
 
-v1.2 supports valid v1.1 workspaces. Installation or upgrade does not migrate
+v1.3 supports valid v1.1 workspaces. Installation or upgrade does not migrate
 v1.0 workspaces. Use a separate root when retaining a v1.0 workspace for
 reference.

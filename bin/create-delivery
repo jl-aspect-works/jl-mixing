@@ -24,7 +24,7 @@ Options:
   --working-prefix TEXT   Exclude files beginning with this prefix (default: WORK )
   --overwrite             Replace a prior package with the same delivered paths
   --clean                 Destructively replace all contents of 05_Final_Delivery
-  --zip                   Create <project-id>-delivery.zip
+  --zip                   Create <project-id>-rev-<NN>-<UTC timestamp>.zip
   --dry-run               Show the planned package without creating it
   -h, --help              Show this help
 USAGE
@@ -81,7 +81,11 @@ case "$approved_revision" in ''|*[!0-9]*|0) jl_error "Approved revision number i
 revision_root="$project_root/04_Revisions/$(printf 'Revision_%02d' "$approved_revision")"
 jl_fs_is_directory_no_symlink "$revision_root" || { jl_error "Approved revision directory is missing or unsafe: $revision_root"; exit "$JL_EXIT_VALIDATION"; }
 project_id="$(jl_json_get "$manifest" '.project_id')"
-zip_name="${project_id}-delivery.zip"
+# Capture one UTC creation timestamp for both metadata and the archive name so
+# the package identity is stable throughout planning, staging, and reporting.
+timestamp="$(jl_now_iso8601)"
+zip_timestamp="$(printf '%s' "$timestamp" | tr -d -- '-:TZ')"
+zip_name="${project_id}-rev-$(printf '%02d' "$approved_revision")-${zip_timestamp}.zip"
 mode=default
 [ "$overwrite" -eq 0 ] || mode=overwrite
 [ "$clean" -eq 0 ] || mode=clean
@@ -155,7 +159,6 @@ stage_root="$(jl_txn_stage_directory_near "$delivery_root")" || exit $?
 document_id="$(jl_uuid)" || exit $?
 studio_root="$(jl_context_studio_root_v11 "$project_root")" || exit $?
 jl_json_assert_uuid_available "$studio_root" "$document_id" || exit $?
-timestamp="$(jl_now_iso8601)"
 # Capture validated application provenance separately from the v1.1 schema.
 created_with="$(jl_created_with)" || exit $?
 "$(jl_json_validator_python)" "$APP_ROOT/tools/build-delivery.py" build \
@@ -169,7 +172,13 @@ project_schema="$(jl_json_schema_path project-manifest.schema.json)" || exit $?
 jl_json_validate_schema "$delivery_schema" "$stage_root/delivery-manifest.json" >/dev/null || exit $?
 if [ "$make_zip" -eq 1 ]; then
     jl_require_command zip "Install zip to use create-delivery --zip." || exit $?
-    (cd "$stage_root" && zip -qr "$zip_name" . -x "$zip_name") || { jl_error "Unable to create delivery ZIP."; exit "$JL_EXIT_GENERAL"; }
+    # Historical generated archives remain beside the current package but are
+    # never nested inside a later archive.
+    (cd "$stage_root" && zip -qr "$zip_name" . \
+        -x "$zip_name" "${project_id}-rev-??-??????????????.zip") || {
+        jl_error "Unable to create delivery ZIP."
+        exit "$JL_EXIT_GENERAL"
+    }
 fi
 staged_manifest="$(jl_mktemp_file_near "$manifest")" || exit $?
 jq --argjson revision "$approved_revision" --arg timestamp "$timestamp" \

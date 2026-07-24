@@ -20,7 +20,6 @@ revision="$project_root/04_Revisions/Revision_01"
 delivery="$project_root/05_Final_Delivery"
 dm="$delivery/delivery-manifest.json"
 project_manifest="$project_root/00_Admin/project-manifest.json"
-zip_file="$delivery/blue-sky-delivery.zip"
 printf 'main\n' > "$revision/Blue Sky Main Mix.wav"
 printf 'user attachment\n' > "$delivery/client-reference.pdf"
 
@@ -28,9 +27,17 @@ printf 'user attachment\n' > "$delivery/client-reference.pdf"
 # edit Delivery_Notes.md, then rebuild the same package with ZIP output.
 (cd "$project_root" && "$ROOT/bin/create-delivery" >/dev/null)
 printf '\nFinal client notes\n' >> "$delivery/Delivery_Notes.md"
-(cd "$project_root" && "$ROOT/bin/create-delivery" --zip --overwrite >/dev/null)
+zip_output="$(cd "$project_root" && "$ROOT/bin/create-delivery" --zip --overwrite)"
+zip_name="$(printf '%s\n' "$zip_output" | sed -n 's/^ZIP:[[:space:]]*//p')"
+zip_file="$delivery/$zip_name"
 
 assert_file_exists "$zip_file"
+case "$zip_name" in
+    blue-sky-rev-01-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9].zip)
+        pass 'ZIP name includes project, revision, and UTC timestamp'
+        ;;
+    *) fail "unexpected timestamped ZIP name: $zip_name" ;;
+esac
 assert_file_exists "$delivery/Blue Sky Main Mix.wav"
 assert_json_eq "$expected_created_with" "$dm" '.metadata.created_with' \
     'delivery creator release'
@@ -57,6 +64,10 @@ assert_contains "$zip_inventory" 'Delivery_Notes.md' 'ZIP contains delivery note
 assert_contains "$zip_inventory" 'Blue Sky Main Mix.wav' 'ZIP contains selected audio'
 assert_contains "$zip_inventory" 'client-reference.pdf' \
     'ZIP preserves broad current-content behavior'
+case "$zip_inventory" in
+    *'-rev-'*.zip*) fail 'ZIP must not contain a prior generated ZIP' ;;
+    *) pass 'ZIP excludes generated delivery archives' ;;
+esac
 zip_notes="$(python3 - "$zip_file" <<'PY_ZIP_NOTES'
 from pathlib import Path
 from zipfile import ZipFile

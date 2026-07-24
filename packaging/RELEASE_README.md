@@ -1,4 +1,4 @@
-# JL Mixing Automation v1.2
+# JL Mixing Automation v1.3
 
 JL Mixing Automation creates repeatable professional mixing project workspaces,
 tracks revision approval, and builds SHA-256-verified final-delivery packages.
@@ -33,9 +33,9 @@ Use `./install.sh --no-shell-integration` to opt out of startup-file changes.
 new-studio
 ```
 
-The default workspace is `~/Music/Mixes/`. v1.2 supports valid v1.1 workspaces
+The default workspace is `~/Music/Mixes/`. v1.3 supports valid v1.1 workspaces
 and does not migrate v1.0 workspaces. New records retain the v1.1.0 metadata
-schema while recording the v1.2 application release in `created_with`.
+schema while recording the v1.3 application release in `created_with`.
 
 ## Workflow
 
@@ -54,6 +54,10 @@ create-delivery
 edit 05_Final_Delivery/Delivery_Notes.md
 create-delivery --zip --overwrite
 ```
+
+Generated ZIPs use
+`<project-id>-rev-<NN>-<YYYYMMDDHHMMSS>.zip`, with a zero-padded revision and
+UTC timestamp.
 
 `create-delivery --clean` deletes and replaces all contents inside the selected
 project's `05_Final_Delivery/` directory.

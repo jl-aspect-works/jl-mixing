@@ -60,9 +60,9 @@ cover transaction failure and rollback, not only happy paths.
 
 ## Release process
 
-1. Complete work through feature PRs into `develop/v1.2`.
+1. Complete work through feature PRs into `develop/v1.3`.
 2. Run all quality gates from a clean integration branch.
 3. Build and verify the archive with `make release-check`.
-4. Merge `develop/v1.2` to `main` through a protected PR.
-5. Tag the merge commit `v1.2.0` and publish the verified archive, checksum, and
-   v1.2 release notes.
+4. Merge `develop/v1.3` to `main` through a protected PR.
+5. Tag the merge commit `v1.3.0` and publish the verified archive, checksum, and
+   v1.3 release notes.

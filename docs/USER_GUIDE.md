@@ -1,4 +1,4 @@
-# JL Mixing Automation v1.2 User Guide
+# JL Mixing Automation v1.3 User Guide
 
 ## 1. Create the workspace
 
@@ -127,6 +127,16 @@ create-delivery --zip --overwrite
 
 The first command creates an editable delivery folder. The second rebuilds the
 same delivery and creates a ZIP containing the edited `Delivery_Notes.md`.
+
+ZIP filenames identify the delivered revision and creation time:
+
+```text
+<project-id>-rev-<NN>-<YYYYMMDDHHMMSS>.zip
+```
+
+The revision is zero-padded and the timestamp is UTC. For example:
+`blue-sky-rev-01-20260724153045.zip`. Each generated archive has a unique,
+traceable name; earlier generated archives are not nested inside later ones.
 
 `--overwrite` requires the delivered path set to remain unchanged. File contents
 may change, but adding, removing, or renaming delivered paths causes overwrite
