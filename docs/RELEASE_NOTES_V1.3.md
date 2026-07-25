@@ -8,8 +8,8 @@ It preserves the v1.1 workspace schemas and existing project lifecycle.
 - Delivery ZIPs use
   `<project-id>-rev-<NN>-<YYYYMMDDHHMMSS>.zip`.
 - The revision is the approved revision being delivered and is zero-padded.
-- The timestamp is UTC and is captured once for the delivery manifest and ZIP
-  filename.
+- The ZIP timestamp uses the computer's local timezone. Schema-governed manifest
+  timestamps remain in UTC.
 - Earlier generated ZIPs may remain in `05_Final_Delivery`, but they are never
   nested inside a later archive.
 
