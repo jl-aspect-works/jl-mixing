@@ -57,7 +57,7 @@ create-delivery --zip --overwrite
 
 Generated ZIPs use
 `<project-id>-rev-<NN>-<YYYYMMDDHHMMSS>.zip`, with a zero-padded revision and
-UTC timestamp.
+local timestamp.
 
 `create-delivery --clean` deletes and replaces all contents inside the selected
 project's `05_Final_Delivery/` directory.
