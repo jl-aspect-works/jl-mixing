@@ -134,7 +134,7 @@ ZIP filenames identify the delivered revision and creation time:
 <project-id>-rev-<NN>-<YYYYMMDDHHMMSS>.zip
 ```
 
-The revision is zero-padded and the timestamp is UTC. For example:
+The revision is zero-padded and the timestamp uses the computer's local timezone. For example:
 `blue-sky-rev-01-20260724153045.zip`. Each generated archive has a unique,
 traceable name; earlier generated archives are not nested inside later ones.
 
