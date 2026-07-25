@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.0
+
+- Name delivery ZIPs with the project ID, zero-padded delivered revision, and
+  local creation timestamp: `<project-id>-rev-<NN>-<YYYYMMDDHHMMSS>.zip`.
+- Preserve earlier generated archives without nesting them inside later ZIPs.
+
 ## 1.2.0
 
 - Added positional project-name support to `new-mix` while preserving `--project`.

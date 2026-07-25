@@ -1,4 +1,4 @@
-# JL Mixing Automation v1.2 Command Reference
+# JL Mixing Automation v1.3 Command Reference
 
 Every command supports `-h` and `--help`. Mutating commands validate governing
 JSON and filesystem boundaries before committing changes.
@@ -101,7 +101,11 @@ To create a ZIP with completed notes, run `create-delivery`, edit
 delivered path set. `--clean` replaces all contents of `05_Final_Delivery/`, not
 only files listed by a prior manifest.
 
+`--zip` creates
+`<project-id>-rev-<NN>-<YYYYMMDDHHMMSS>.zip`, using the delivered revision and
+a local creation timestamp.
+
 ## Removed v1.0 interface
 
-v1.2 retains the v1.1 removal of the project-completion command. Known v1.0
+v1.3 retains the v1.1 removal of the project-completion command. Known v1.0
 flags are rejected with specific diagnostics rather than silently ignored.
