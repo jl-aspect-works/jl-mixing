@@ -103,7 +103,7 @@ only files listed by a prior manifest.
 
 `--zip` creates
 `<project-id>-rev-<NN>-<YYYYMMDDHHMMSS>.zip`, using the delivered revision and
-a UTC creation timestamp.
+a local creation timestamp.
 
 ## Removed v1.0 interface
 
