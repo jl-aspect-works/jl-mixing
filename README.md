@@ -111,7 +111,7 @@ because it creates and zips the delivery before the user can edit the file.
 
 Generated ZIPs use
 `<project-id>-rev-<NN>-<YYYYMMDDHHMMSS>.zip`, with a zero-padded revision and
-UTC timestamp.
+local timestamp.
 
 `create-delivery --clean` is intentionally destructive: it replaces every item
 inside the resolved project's `05_Final_Delivery/` directory. Dry-run lists the
