@@ -3,6 +3,10 @@ set -eu
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 . "$ROOT/tests/integration/integration-helper.sh"
 expected_created_with="jl-mixing $(cat "$ROOT/VERSION")"
+# Use a portable non-UTC POSIX timezone so the filename test proves that the
+# archive uses local wall-clock time rather than the UTC manifest timestamp.
+TZ=EST5EDT
+export TZ
 require_test_command jq
 require_test_command python3
 if ! command -v zip >/dev/null 2>&1; then
@@ -27,6 +31,7 @@ printf 'user attachment\n' > "$delivery/client-reference.pdf"
 # edit Delivery_Notes.md, then rebuild the same package with ZIP output.
 (cd "$project_root" && "$ROOT/bin/create-delivery" >/dev/null)
 printf '\nFinal client notes\n' >> "$delivery/Delivery_Notes.md"
+expected_local_hour="$(date '+%Y%m%d%H')"
 zip_output="$(cd "$project_root" && "$ROOT/bin/create-delivery" --zip --overwrite)"
 zip_name="$(printf '%s\n' "$zip_output" | sed -n 's/^ZIP:[[:space:]]*//p')"
 zip_file="$delivery/$zip_name"
@@ -34,10 +39,13 @@ zip_file="$delivery/$zip_name"
 assert_file_exists "$zip_file"
 case "$zip_name" in
     blue-sky-rev-01-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9].zip)
-        pass 'ZIP name includes project, revision, and UTC timestamp'
+        pass 'ZIP name includes project, revision, and local timestamp'
         ;;
     *) fail "unexpected timestamped ZIP name: $zip_name" ;;
 esac
+zip_local_hour="$(printf '%s\n' "$zip_name" | sed -n 's/^blue-sky-rev-01-\([0-9][0-9]*\)\.zip$/\1/p' | cut -c 1-10)"
+assert_eq "$expected_local_hour" "$zip_local_hour" \
+    'ZIP timestamp uses the configured local timezone'
 assert_file_exists "$delivery/Blue Sky Main Mix.wav"
 assert_json_eq "$expected_created_with" "$dm" '.metadata.created_with' \
     'delivery creator release'
