@@ -24,7 +24,7 @@ Options:
   --working-prefix TEXT   Exclude files beginning with this prefix (default: WORK )
   --overwrite             Replace a prior package with the same delivered paths
   --clean                 Destructively replace all contents of 05_Final_Delivery
-  --zip                   Create <project-id>-rev-<NN>-<UTC timestamp>.zip
+  --zip                   Create <project-id>-rev-<NN>-<local timestamp>.zip
   --dry-run               Show the planned package without creating it
   -h, --help              Show this help
 USAGE
@@ -81,10 +81,10 @@ case "$approved_revision" in ''|*[!0-9]*|0) jl_error "Approved revision number i
 revision_root="$project_root/04_Revisions/$(printf 'Revision_%02d' "$approved_revision")"
 jl_fs_is_directory_no_symlink "$revision_root" || { jl_error "Approved revision directory is missing or unsafe: $revision_root"; exit "$JL_EXIT_VALIDATION"; }
 project_id="$(jl_json_get "$manifest" '.project_id')"
-# Capture one UTC creation timestamp for both metadata and the archive name so
-# the package identity is stable throughout planning, staging, and reporting.
+# Keep schema-governed manifest metadata in UTC while naming the human-facing
+# archive with the workstation's local wall-clock time.
 timestamp="$(jl_now_iso8601)"
-zip_timestamp="$(printf '%s' "$timestamp" | tr -d -- '-:TZ')"
+zip_timestamp="$(date '+%Y%m%d%H%M%S')"
 zip_name="${project_id}-rev-$(printf '%02d' "$approved_revision")-${zip_timestamp}.zip"
 mode=default
 [ "$overwrite" -eq 0 ] || mode=overwrite
