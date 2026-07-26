@@ -15,6 +15,11 @@ jl_template_render "$tmp/template.txt" "$tmp/output.txt" NAME Jake PLACE Studio
 assert_eq "Hello Jake from Studio" "$(cat "$tmp/output.txt")" "render literal tokens"
 assert_failure "unresolved token rejected" jl_template_render "$tmp/template.txt" "$tmp/bad.txt" NAME Jake
 
+# Monterey ships a Python version where Path.write_text() does not accept the
+# newline keyword. Keep template rendering on the older-compatible Path.open API.
+assert_failure "unsupported Path.write_text newline API is absent" \
+    grep -F 'write_text(text, encoding="utf-8", newline=' "$ROOT/lib/templates.sh"
+
 printf '{"name":"{{NAME}}","pattern":"{{PROJECT_NAME}}"}\n' > "$tmp/template.json"
 JL_TEMPLATE_ALLOW_UNRESOLVED=1 jl_template_render_json \
     "$tmp/template.json" "$tmp/output.json" NAME 'Jake "Mix"'
