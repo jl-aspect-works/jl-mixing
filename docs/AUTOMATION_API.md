@@ -86,6 +86,26 @@ Errors use stable machine codes and human-readable messages:
 
 Clients must branch on `code`, not message text.
 
+## Exit-code contract
+
+Automation API 1.0 preserves the existing JL Mixing Automation exit-code contract:
+
+| Exit code | Meaning | JSON status |
+|---:|---|---|
+| `0` | Successful operation or valid dry-run preview | `success` or `planned` |
+| `1` | General or internal failure | `error` |
+| `2` | Invalid arguments or request | `error` |
+| `3` | Configuration or required-tool problem | `error` |
+| `4` | Workspace, client, project, or execution-context problem | `error` |
+| `5` | Validation completed with blocking findings | `blocked` |
+| `6` | Unsafe operation rejected | `blocked` |
+
+The JSON `status` describes the broad outcome, while stable machine error codes describe the specific reason. Clients should branch primarily on JSON status and machine codes and use the process exit code as a secondary integrity check and for shell compatibility.
+
+A valid dry run returns `status: planned` with exit `0`. Intake validation that completes and writes a valid report but finds blocking issues returns `status: blocked` with exit `5`. Safety guardrail rejections return `status: blocked` with exit `6`.
+
+Failures outside the running API contract retain operating-system conventions. A missing executable may produce shell exit `127`, and signal termination may produce `128 + signal`. Missing or malformed JSON is always treated by clients as an Automation transport or protocol failure regardless of process exit code.
+
 ## Compatibility rules
 
 Within API major version 1:
@@ -123,7 +143,7 @@ Mutating operations that support preview return `status: planned` and a structur
 - Human diagnostics and progress may use standard error only when documented.
 - Commands remain non-interactive in JSON mode.
 - Paths are returned as explicit fields, never embedded only in prose.
-- Exit codes remain documented per operation and must agree with the JSON status.
+- Exit codes must agree with the JSON status and the approved mapping.
 - Secrets and unrestricted command strings are never returned.
 
 ## Contract testing
@@ -140,12 +160,12 @@ API releases shall include:
 ## Approved design decisions
 
 1. `jl-mixing` is the canonical machine-facing API dispatcher. Existing human-facing commands remain supported and share the same underlying implementation.
+2. API 1.0 preserves existing exit codes `0` through `6`: exit `0` maps to `success` or `planned`; exits `1` through `4` map to `error`; exits `5` and `6` map to `blocked`. Stable JSON machine codes provide the specific reason.
 
 ## Open design decisions
 
 Before implementation, approve:
 
-1. exact exit-code mapping;
-2. progress-event behavior for long operations;
-3. whether read-only query operations ship in API 1.0 or a later 1.x addition;
-4. JSON Schema publication and location.
+1. progress-event behavior for long operations;
+2. whether read-only query operations ship in API 1.0 or a later 1.x addition;
+3. JSON Schema publication and location.
