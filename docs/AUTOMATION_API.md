@@ -11,9 +11,13 @@ The Automation API is the stable machine contract used by JL Mixing Studio and f
 
 JL Mixing Studio 1.0 depends on the exact JL Mixing Automation 1.3.0 command contract. API 1.0 will be introduced explicitly; no current command output should be described as API 1.0 until implementation and contract tests are released.
 
-## Version discovery
+## Dispatcher and version discovery
 
-Automation shall provide a machine-readable discovery operation. The final command name is an implementation decision; the preferred shape is:
+`jl-mixing` is the canonical machine-facing Automation API dispatcher. JL Mixing Studio and future supported API clients invoke only this executable with allowlisted subcommands and arguments.
+
+Existing human-facing commands such as `new-client`, `new-mix`, `validate-intake`, `new-revision`, `approve-mix`, and `create-delivery` remain supported. The dispatcher and existing commands share the same underlying implementation; the dispatcher must not invoke the existing commands as subprocesses or create a competing implementation of workflow rules.
+
+Machine-readable discovery uses:
 
 ```bash
 jl-mixing system-info --json
@@ -130,14 +134,18 @@ API releases shall include:
 - golden success, planned, blocked, and error examples;
 - compatibility tests proving older API 1.x clients can ignore newly added optional fields;
 - tests for paths containing spaces and non-destructive dry-run behavior;
-- exact tests for operation identifiers, machine error codes, and exit-code mapping.
+- exact tests for operation identifiers, machine error codes, and exit-code mapping;
+- parity tests proving dispatcher operations and corresponding human-facing commands use the same workflow rules and produce equivalent authoritative state.
+
+## Approved design decisions
+
+1. `jl-mixing` is the canonical machine-facing API dispatcher. Existing human-facing commands remain supported and share the same underlying implementation.
 
 ## Open design decisions
 
 Before implementation, approve:
 
-1. whether `jl-mixing` becomes a dispatcher executable or discovery remains a dedicated command;
-2. exact exit-code mapping;
-3. progress-event behavior for long operations;
-4. whether read-only query operations ship in API 1.0 or a later 1.x addition;
-5. JSON Schema publication and location.
+1. exact exit-code mapping;
+2. progress-event behavior for long operations;
+3. whether read-only query operations ship in API 1.0 or a later 1.x addition;
+4. JSON Schema publication and location.
