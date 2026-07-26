@@ -137,6 +137,14 @@ Capability names use stable dotted identifiers. Initial candidates include:
 
 Mutating operations that support preview return `status: planned` and a structured plan. The confirmed operation must identify the same logical request. Clients must still re-read authoritative workspace state after success; JSON output does not replace post-operation reconciliation.
 
+## Read-only query scope
+
+Automation API 1.0 includes system and capability discovery but does not include general read-only workspace, client, project, revision, report, or delivery query operations.
+
+General read-only queries are targeted for a backward-compatible API 1.1 addition after their normalized response models, partial-failure behavior, filtering and ordering rules, path-exposure policy, and Studio migration plan are designed. The first design should evaluate a normalized workspace snapshot operation before introducing many small query commands.
+
+Until Studio adopts those future capabilities, it may continue reading and validating authoritative workspace files directly.
+
 ## Progress-event contract
 
 Long-running API operations may support opt-in machine-readable progress through:
@@ -200,10 +208,10 @@ API releases shall include:
 1. `jl-mixing` is the canonical machine-facing API dispatcher. Existing human-facing commands remain supported and share the same underlying implementation.
 2. API 1.0 preserves existing exit codes `0` through `6`: exit `0` maps to `success` or `planned`; exits `1` through `4` map to `error`; exits `5` and `6` map to `blocked`. Stable JSON machine codes provide the specific reason.
 3. API 1.0 supports opt-in progress events through `--progress=json`. Events are newline-delimited JSON on standard error, while standard output remains one final response. Progress is advisory and does not replace final-response or authoritative-state reconciliation.
+4. API 1.0 does not include general read-only queries beyond system and capability discovery. General workspace and domain queries are targeted for a backward-compatible API 1.1 addition after their contracts and Studio migration plan are designed.
 
 ## Open design decisions
 
 Before implementation, approve:
 
-1. whether read-only query operations ship in API 1.0 or a later 1.x addition;
-2. JSON Schema publication and location.
+1. JSON Schema publication and location.
