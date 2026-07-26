@@ -137,10 +137,47 @@ Capability names use stable dotted identifiers. Initial candidates include:
 
 Mutating operations that support preview return `status: planned` and a structured plan. The confirmed operation must identify the same logical request. Clients must still re-read authoritative workspace state after success; JSON output does not replace post-operation reconciliation.
 
+## Progress-event contract
+
+Long-running API operations may support opt-in machine-readable progress through:
+
+```bash
+jl-mixing intake validate --json --progress=json
+```
+
+The streams have separate contracts:
+
+- standard output contains exactly one final Automation API response;
+- standard error contains zero or more newline-delimited JSON progress-event objects.
+
+When `--progress=json` is enabled, every non-empty standard-error line must be a valid progress event. Human-formatted diagnostics must not be mixed into that stream.
+
+Example progress event:
+
+```json
+{
+  "api_version": "1.0",
+  "event": "progress",
+  "operation": "intake.validate",
+  "phase": "inspection",
+  "completed": 3,
+  "total": 12,
+  "unit": "files",
+  "message": "Inspecting audio files."
+}
+```
+
+Progress is advisory. Events do not prove that a mutation committed, a report was written, or authoritative state matches the request. The final response, exit code, and client reconciliation remain authoritative.
+
+Operations report `completed`, `total`, and `unit` only when the total is known reliably. Clients use indeterminate progress when these values are absent. Published phase identifiers become stable API values; initial candidates include `discovery`, `validation`, `inspection`, `copy`, `verification`, `archive`, `report`, and `commit`.
+
+Progress support is optional by capability and operation. Cancellation semantics are not part of API 1.0 and require a separate design.
+
 ## Output and process rules
 
 - JSON mode writes only the response object to standard output.
-- Human diagnostics and progress may use standard error only when documented.
+- Human diagnostics may use standard error when progress JSON mode is not enabled and the behavior is documented.
+- When `--progress=json` is enabled, standard error contains only newline-delimited JSON progress events.
 - Commands remain non-interactive in JSON mode.
 - Paths are returned as explicit fields, never embedded only in prose.
 - Exit codes must agree with the JSON status and the approved mapping.
@@ -155,17 +192,18 @@ API releases shall include:
 - compatibility tests proving older API 1.x clients can ignore newly added optional fields;
 - tests for paths containing spaces and non-destructive dry-run behavior;
 - exact tests for operation identifiers, machine error codes, and exit-code mapping;
+- progress tests proving stdout remains a single final object and progress-mode stderr contains only valid newline-delimited event objects;
 - parity tests proving dispatcher operations and corresponding human-facing commands use the same workflow rules and produce equivalent authoritative state.
 
 ## Approved design decisions
 
 1. `jl-mixing` is the canonical machine-facing API dispatcher. Existing human-facing commands remain supported and share the same underlying implementation.
 2. API 1.0 preserves existing exit codes `0` through `6`: exit `0` maps to `success` or `planned`; exits `1` through `4` map to `error`; exits `5` and `6` map to `blocked`. Stable JSON machine codes provide the specific reason.
+3. API 1.0 supports opt-in progress events through `--progress=json`. Events are newline-delimited JSON on standard error, while standard output remains one final response. Progress is advisory and does not replace final-response or authoritative-state reconciliation.
 
 ## Open design decisions
 
 Before implementation, approve:
 
-1. progress-event behavior for long operations;
-2. whether read-only query operations ship in API 1.0 or a later 1.x addition;
-3. JSON Schema publication and location.
+1. whether read-only query operations ship in API 1.0 or a later 1.x addition;
+2. JSON Schema publication and location.
