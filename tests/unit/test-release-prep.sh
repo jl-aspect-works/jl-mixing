@@ -35,7 +35,7 @@ assert_file_exists "$ROOT/docs/RELEASE_NOTES_V1.1.md"
 assert_file_exists "$ROOT/docs/RELEASE_NOTES_V1.2.md"
 assert_file_exists "$ROOT/docs/RELEASE_NOTES_V1.3.md"
 assert_file_exists "$ROOT/docs/SCOPE_FREEZE_V1.2.md"
-assert_eq "1.3.0" "$(sed -n '1p' "$ROOT/VERSION")" \
+assert_eq "1.3.1" "$(sed -n '1p' "$ROOT/VERSION")" \
     "v1.3 application release version"
 assert_contains "$(cat "$ROOT/.github/workflows/release.yml")" \
     'docs/RELEASE_NOTES_V1.3.md' "release workflow publishes v1.3 notes"
