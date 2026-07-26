@@ -60,7 +60,8 @@ if unresolved and not allow_unresolved:
 
 if not text.endswith("\n"):
     text += "\n"
-output_path.write_text(text, encoding="utf-8", newline="\n")
+with output_path.open("w", encoding="utf-8", newline="\n") as output_file:
+    output_file.write(text)
 PY_TEMPLATE
     then
         rm -f "$temp_file"
@@ -254,7 +255,8 @@ if unresolved and not allow_unresolved:
 json.loads(text)
 if not text.endswith("\n"):
     text += "\n"
-output_path.write_text(text, encoding="utf-8", newline="\n")
+with output_path.open("w", encoding="utf-8", newline="\n") as output_file:
+    output_file.write(text)
 PY_JSON_TEMPLATE
     then
         rm -f "$temp_file"
