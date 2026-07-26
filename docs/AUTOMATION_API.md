@@ -1,6 +1,6 @@
 # JL Mixing Automation API
 
-**Status:** Proposed design; not yet implemented  
+**Status:** Approved design; not yet implemented  
 **Initial target:** API 1.0
 
 ## Purpose
@@ -181,6 +181,44 @@ Operations report `completed`, `total`, and `unit` only when the total is known 
 
 Progress support is optional by capability and operation. Cancellation semantics are not part of API 1.0 and require a separate design.
 
+## JSON Schema publication
+
+Automation API schemas use JSON Schema Draft 2020-12 and remain distinct from persisted workspace metadata schemas.
+
+The authoritative development layout is:
+
+```text
+api/
+├── schemas/
+│   └── v1.0/
+│       ├── response-envelope.schema.json
+│       ├── error.schema.json
+│       ├── warning.schema.json
+│       ├── progress-event.schema.json
+│       ├── system-info.schema.json
+│       └── operations/
+└── examples/
+    └── v1.0/
+        ├── success/
+        ├── planned/
+        ├── blocked/
+        └── error/
+```
+
+Schemas and golden examples in the JL Mixing Automation repository are the reviewed source of truth. Every Automation release supporting API 1.0 bundles the applicable schemas and examples for offline use under its installed shared-data directory. `system-info` reports the installed schema location explicitly.
+
+Released schemas are also published at immutable API-versioned GitHub Pages URLs such as:
+
+```text
+https://jlaudio.github.io/jl-mixing/api/v1.0/schemas/response-envelope.schema.json
+```
+
+Those public URLs are the canonical `$id` values. They contain the Automation API version, not the Automation application release version.
+
+Published API-version directories must not be replaced with incompatible content. New backward-compatible capabilities may add schema files within API 1.x; incompatible contract changes require a new API major version.
+
+JL Mixing Studio vendors or pins the supported schemas at build time and must not depend on downloading them at runtime.
+
 ## Output and process rules
 
 - JSON mode writes only the response object to standard output.
@@ -195,12 +233,14 @@ Progress support is optional by capability and operation. Cancellation semantics
 
 API releases shall include:
 
-- JSON Schema or equivalent fixtures for every response type;
+- JSON Schema validation for every response and progress-event type;
 - golden success, planned, blocked, and error examples;
 - compatibility tests proving older API 1.x clients can ignore newly added optional fields;
 - tests for paths containing spaces and non-destructive dry-run behavior;
 - exact tests for operation identifiers, machine error codes, and exit-code mapping;
 - progress tests proving stdout remains a single final object and progress-mode stderr contains only valid newline-delimited event objects;
+- packaging tests proving the released schemas and examples are installed with Automation;
+- publication checks proving each released schema `$id` matches its immutable API-versioned public URL;
 - parity tests proving dispatcher operations and corresponding human-facing commands use the same workflow rules and produce equivalent authoritative state.
 
 ## Approved design decisions
@@ -209,9 +249,6 @@ API releases shall include:
 2. API 1.0 preserves existing exit codes `0` through `6`: exit `0` maps to `success` or `planned`; exits `1` through `4` map to `error`; exits `5` and `6` map to `blocked`. Stable JSON machine codes provide the specific reason.
 3. API 1.0 supports opt-in progress events through `--progress=json`. Events are newline-delimited JSON on standard error, while standard output remains one final response. Progress is advisory and does not replace final-response or authoritative-state reconciliation.
 4. API 1.0 does not include general read-only queries beyond system and capability discovery. General workspace and domain queries are targeted for a backward-compatible API 1.1 addition after their contracts and Studio migration plan are designed.
+5. API schemas use JSON Schema Draft 2020-12, live under `api/schemas/<api-version>/`, ship with Automation releases for offline use, and are published at immutable API-versioned GitHub Pages URLs used as canonical `$id` values. Studio vendors or pins schemas at build time and does not download them at runtime.
 
-## Open design decisions
-
-Before implementation, approve:
-
-1. JSON Schema publication and location.
+All API 1.0 design decisions required by this document are approved. Implementation scope still requires a separate release plan and approved implementation issues.
