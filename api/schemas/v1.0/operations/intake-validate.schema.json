@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jlaudio.github.io/jl-mixing/api/v1.0/schemas/operations/intake-validate.schema.json",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["api_version", "operation", "status", "data", "warnings", "errors"],
+  "properties": {
+    "api_version": {"const": "1.0"},
+    "operation": {"const": "intake.validate"},
+    "status": {"enum": ["success", "planned", "blocked", "error"]},
+    "data": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "project": {
+          "type": "object",
+          "required": ["id", "path"],
+          "properties": {
+            "id": {"type": "string"},
+            "path": {"type": "string", "minLength": 1}
+          }
+        },
+        "manifest_path": {"type": "string", "minLength": 1},
+        "intake_report_path": {"type": "string", "minLength": 1},
+        "workspace_path": {"type": "string", "minLength": 1},
+        "source_path": {"type": "string", "minLength": 1},
+        "summary": {
+          "type": "object",
+          "required": ["files_discovered", "blocking_errors", "warnings", "ffprobe_available"],
+          "properties": {
+            "files_discovered": {"type": "integer", "minimum": 0},
+            "blocking_errors": {"type": "integer", "minimum": 0},
+            "warnings": {"type": "integer", "minimum": 0},
+            "ffprobe_available": {"type": ["boolean", "null"]}
+          }
+        },
+        "would_update": {"type": "array", "items": {"type": "string", "minLength": 1}}
+      }
+    },
+    "warnings": {"type": "array"},
+    "errors": {"type": "array"}
+  }
+}
