@@ -4,7 +4,7 @@ on:
   pull_request:
 
 jobs:
-  focused-macos:
+  strict-macos:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -15,22 +15,12 @@ jobs:
         run: |
           command -v jq >/dev/null 2>&1 || brew install jq
           python -m pip install -r packaging/requirements.txt
-      - name: Run focused API tests
+      - name: Capture strict suite
         env:
           JL_MIXING_PYTHON: ${{ env.pythonLocation }}/bin/python
         run: |
           set +e
-          {
-            echo '=== unit ==='
-            bash -x tests/unit/test-api-project-create.sh
-            unit_status=$?
-            echo "unit_status=$unit_status"
-            echo '=== parity ==='
-            bash -x tests/integration/test-api-project-create-parity.sh
-            parity_status=$?
-            echo "parity_status=$parity_status"
-            exit $(( unit_status != 0 || parity_status != 0 ))
-          } > pr51-diagnostic.log 2>&1
+          make strict-test > pr51-diagnostic.log 2>&1
           status=$?
           cat pr51-diagnostic.log
           exit $status
