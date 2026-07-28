@@ -33,7 +33,9 @@ done
 
 assert_file_exists "$ROOT/API_VERSION"
 assert_file_exists "$ROOT/api/schemas/v1.0/system-info.schema.json"
+assert_file_exists "$ROOT/api/schemas/v1.0/operations/client-create.schema.json"
 assert_file_exists "$ROOT/api/examples/v1.0/success/system-info.json"
+assert_file_exists "$ROOT/api/examples/v1.0/success/client-create.json"
 assert_file_exists "$ROOT/CHANGELOG.md"
 assert_file_exists "$ROOT/docs/RELEASE_NOTES_V1.1.md"
 assert_file_exists "$ROOT/docs/RELEASE_NOTES_V1.2.md"
