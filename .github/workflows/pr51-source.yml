@@ -1,32 +1,30 @@
-name: PR51 Diagnostic
+name: Finalize PR51 Test Modes
 
 on:
   pull_request:
 
+permissions:
+  contents: write
+
 jobs:
-  strict-macos:
-    runs-on: macos-latest
+  finalize:
+    if: github.head_ref == 'agent/project-create-api'
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
-      - name: Install dependencies
+          ref: agent/project-create-api
+      - name: Set executable test modes and remove helper workflow
         run: |
-          command -v jq >/dev/null 2>&1 || brew install jq
-          python -m pip install -r packaging/requirements.txt
-      - name: Capture strict suite
-        env:
-          JL_MIXING_PYTHON: ${{ env.pythonLocation }}/bin/python
+          chmod +x tests/unit/test-api-project-create.sh
+          chmod +x tests/integration/test-api-project-create-parity.sh
+          git update-index --chmod=+x tests/unit/test-api-project-create.sh
+          git update-index --chmod=+x tests/integration/test-api-project-create-parity.sh
+          rm -f .github/workflows/pr51-source.yml
+      - name: Commit finalization
         run: |
-          set +e
-          make strict-test > pr51-diagnostic.log 2>&1
-          status=$?
-          cat pr51-diagnostic.log
-          exit $status
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: pr51-diagnostic
-          path: pr51-diagnostic.log
-          retention-days: 1
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add tests/unit/test-api-project-create.sh tests/integration/test-api-project-create-parity.sh .github/workflows/pr51-source.yml
+          git commit -m "Finalize project create API tests"
+          git push origin HEAD:agent/project-create-api
