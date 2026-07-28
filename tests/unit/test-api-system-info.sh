@@ -43,10 +43,14 @@ assert document["schemas"]["public_base_url"] == (
 PY_ASSERT
 pass "system-info reports independent API, application, and metadata versions"
 
-assert_success "system-info JSON matches its published schema" \
-    python3 "$ROOT/tools/validate-json.py" --strict \
-        --schema "$ROOT/api/schemas/v1.0/system-info.schema.json" \
-        --document "$stdout_file"
+if python3 -c 'import jsonschema' >/dev/null 2>&1; then
+    assert_success "system-info JSON matches its published schema" \
+        python3 "$ROOT/tools/validate-json.py" --strict \
+            --schema "$ROOT/api/schemas/v1.0/system-info.schema.json" \
+            --document "$stdout_file"
+else
+    echo "[SKIP] system-info schema validation requires jsonschema."
+fi
 
 assert_failure "system-info requires JSON mode" \
     "$ROOT/bin/jl-mixing" system-info
