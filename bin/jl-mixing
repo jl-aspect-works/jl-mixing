@@ -15,6 +15,15 @@ if [ "${1:-}" = "project" ]; then
     }
     shift
     jl_project_create_response "$@"
+elif [ "${1:-}" = "system-info" ] && [ "$#" -eq 2 ] && [ "$2" = "--json" ]; then
+    # Extend discovery only after the complete project.create contract ships.
+    python="${JL_MIXING_PYTHON:-$(command -v python3 || true)}"
+    [ -n "$python" ] && [ -x "$python" ] || {
+        echo "Error: Python 3 is required to produce Automation API JSON." >&2
+        exit 3
+    }
+    base_json="$(. "$APP_ROOT/lib/api-dispatcher-command.sh")"
+    printf '%s\n' "$base_json" | "$python" -c 'import json,sys; d=json.load(sys.stdin); d["capabilities"]=sorted(set(d.get("capabilities",[])+["project.create"])); print(json.dumps(d,separators=(",",":"),sort_keys=True))'
 else
     # Preserve the existing system-info and client.create dispatcher behavior
     # byte-for-byte while project.create is added as a separate adapter.
