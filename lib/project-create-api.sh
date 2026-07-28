@@ -53,7 +53,7 @@ PY_ERROR
 
 jl_project_create_response() {
     local api_version python json_seen dry_run project_name arg output_file error_file status
-    local project_path project_id initial_revision client_path client_id workspace_path
+    local project_path project_id artist initial_revision client_path client_id workspace_path
     local error_code response_status message previous
     api_version="$(jl_project_api_read_version)" || return $?
     python="$(jl_project_api_python)" || return $?
@@ -114,6 +114,7 @@ jl_project_create_response() {
 
     project_path="$(sed -n 's/^Project folder:[[:space:]]*//p' "$output_file" | head -1)"
     project_id="$(sed -n 's/^Project ID:[[:space:]]*//p' "$output_file" | head -1)"
+    artist="$(sed -n 's/^Artist:[[:space:]]*//p' "$output_file" | head -1)"
     initial_revision="$(sed -n 's/^Initial revision:[[:space:]]*//p' "$output_file" | head -1)"
     client_id="$(sed -n 's/^Client:.*(\([^()]\{1,\}\))[[:space:]]*$/\1/p' "$output_file" | head -1)"
     client_path=""
@@ -125,13 +126,13 @@ jl_project_create_response() {
 
     if [ "$status" -eq 0 ]; then
         if [ "$dry_run" -eq 1 ]; then response_status=planned; else response_status=success; fi
-        "$python" - "$api_version" "$response_status" "$project_name" "$project_id" \
+        "$python" - "$api_version" "$response_status" "$project_name" "$project_id" "$artist" \
             "$project_path" "$initial_revision" "$client_id" "$client_path" "$workspace_path" "$dry_run" <<'PY_SUCCESS'
 import json, sys
-(api_version, status, project_name, project_id, project_path, initial_revision,
+(api_version, status, project_name, project_id, artist, project_path, initial_revision,
  client_id, client_path, workspace_path, dry_run) = sys.argv[1:]
 data = {
-    "project": {"id": project_id, "name": project_name, "path": project_path},
+    "project": {"id": project_id, "name": project_name, "artist": artist, "path": project_path},
     "manifest_path": f"{project_path}/00_Admin/project-manifest.json",
     "client_snapshot_path": f"{project_path}/00_Admin/client-profile-snapshot.json",
     "initial_revision_path": initial_revision,
