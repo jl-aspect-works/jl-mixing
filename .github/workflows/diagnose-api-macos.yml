@@ -1,0 +1,35 @@
+name: Diagnose API macOS Tests
+
+on:
+  pull_request:
+
+jobs:
+  diagnose:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install jq when needed
+        run: command -v jq >/dev/null 2>&1 || brew install jq
+      - name: Install validation dependency
+        run: python -m pip install -r packaging/requirements.txt
+      - name: Capture strict-test tail
+        env:
+          JL_MIXING_PYTHON: ${{ env.pythonLocation }}/bin/python
+        shell: bash
+        run: |
+          set +e
+          make strict-test > strict-test.log 2>&1
+          status=$?
+          tail -n 220 strict-test.log > strict-test-tail.log
+          cat strict-test-tail.log
+          exit "$status"
+      - name: Upload strict-test tail
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-macos-strict-test-tail
+          path: strict-test-tail.log
+          retention-days: 1
