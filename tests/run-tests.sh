@@ -33,6 +33,13 @@ docs/RELEASE_NOTES_V1.2.md
 docs/RELEASE_NOTES_V1.3.md
 CHANGELOG.md
 api/schemas/v1.0/system-info.schema.json
+api/schemas/v1.0/response-envelope.schema.json
+api/schemas/v1.0/error.schema.json
+api/schemas/v1.0/warning.schema.json
+api/schemas/v1.0/operations/client-create.schema.json
+api/examples/v1.0/success/client-create.json
+api/examples/v1.0/planned/client-create.json
+api/examples/v1.0/error/client-create.json
 api/examples/v1.0/success/system-info.json
 schemas/studio.schema.json
 schemas/client.schema.json
