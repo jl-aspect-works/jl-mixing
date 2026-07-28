@@ -1,9 +1,7 @@
 name: Branch Source Artifact
 
 on:
-  push:
-    branches:
-      - agent/automation-api-contract
+  pull_request:
 
 jobs:
   package-source:
