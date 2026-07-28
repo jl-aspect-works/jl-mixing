@@ -37,6 +37,6 @@ python3 - "$info" <<'PY'
 import json, sys
 from pathlib import Path
 d = json.loads(Path(sys.argv[1]).read_text())
-assert "project.create.effective_artist" in d["capabilities"]
+assert "project.create.artist" in d["capabilities"]
 PY
-pass "system-info advertises effective artist capability"
+pass "system-info advertises project artist capability"
