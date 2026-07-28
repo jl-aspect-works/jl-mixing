@@ -1,6 +1,6 @@
 # JL Mixing Automation API
 
-**Status:** Approved design; not yet implemented  
+**Status:** API 1.0 discovery implemented; workflow operations pending
 **Initial target:** API 1.0
 
 ## Purpose

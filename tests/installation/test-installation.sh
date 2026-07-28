@@ -28,8 +28,10 @@ printf 'export USER_INSTALL_SETTING=1
 HOME="$fake_home" SHELL=/bin/bash JL_MIXING_TEST_SYSTEM_SITE_PACKAGES=1 \
     "$ROOT/install.sh" --prefix "$prefix" >/dev/null
 assert_file_exists "$prefix/share/jl-mixing/VERSION"
+assert_file_exists "$prefix/share/jl-mixing/API_VERSION"
 assert_file_exists "$prefix/share/jl-mixing/CHANGELOG.md"
 assert_file_exists "$prefix/share/jl-mixing/.venv/bin/python"
+assert_file_exists "$prefix/bin/jl-mixing"
 assert_file_exists "$prefix/bin/new-studio"
 assert_file_exists "$prefix/bin/new-client"
 assert_file_exists "$prefix/bin/jl-mixing-shell-integration"
@@ -43,10 +45,21 @@ assert_file_exists "$prefix/share/jl-mixing/tools/import-project-source.py"
 assert_file_exists "$prefix/share/jl-mixing/tools/import-revision-source.py"
 assert_file_exists "$prefix/share/jl-mixing/tools/build-delivery.py"
 assert_file_exists "$prefix/share/jl-mixing/tools/manage-shell-config.py"
+assert_file_exists "$prefix/share/jl-mixing/api/schemas/v1.0/system-info.schema.json"
+assert_file_exists "$prefix/share/jl-mixing/api/examples/v1.0/success/system-info.json"
 assert_file_exists "$prefix/share/jl-mixing/schemas/client-profile-snapshot.schema.json"
 assert_file_exists "$prefix/share/jl-mixing/templates/Intake_Report.md"
 assert_file_exists "$prefix/share/jl-mixing/templates/Revision_Notes.md"
 assert_success "installed help works" "$prefix/bin/new-studio" --help
+api_info="$temp_root/system-info.json"
+"$prefix/bin/jl-mixing" system-info --json > "$api_info"
+assert_json_eq "1.0" "$api_info" ".api_version" "installed dispatcher reports API version"
+assert_json_eq "$(cat "$ROOT/VERSION")" "$api_info" ".application.version" \
+    "installed dispatcher reports application version"
+assert_json_eq "system.info" "$api_info" ".capabilities[0]" \
+    "installed dispatcher advertises discovery capability"
+assert_json_eq "$prefix/share/jl-mixing/api/schemas/v1.0" "$api_info" \
+    ".schemas.installed_path" "installed dispatcher reports bundled schemas"
 
 PATH="$prefix/bin:$PATH" new-studio --root "$workspace" >/dev/null
 assert_file_exists "$workspace/Studio/studio.json"
@@ -117,6 +130,7 @@ assert_eq "1" "$(grep -c '^# >>> JL Mixing managed configuration >>>$' "$fake_ho
 
 HOME="$fake_home" SHELL=/bin/bash "$prefix/bin/jl-mixing-uninstall" >/dev/null
 assert_path_not_exists "$prefix/share/jl-mixing"
+assert_path_not_exists "$prefix/bin/jl-mixing"
 assert_path_not_exists "$prefix/bin/new-studio"
 assert_path_not_exists "$prefix/bin/jl-mixing-shell-integration"
 assert_file_exists "$workspace/Studio/studio.json"

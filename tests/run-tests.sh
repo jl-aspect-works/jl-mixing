@@ -13,6 +13,7 @@ echo "Verifying v$(cat VERSION) repository artifacts..."
 
 required='README.md
 VERSION
+API_VERSION
 Makefile
 install.sh
 uninstall.sh
@@ -20,6 +21,8 @@ docs/DESIGN_SPECIFICATION_V1.md
 docs/USER_GUIDE.md
 docs/SCRIPT_REFERENCE.md
 docs/INSTALLATION_GUIDE.md
+docs/AUTOMATION_API.md
+docs/AUTOMATION_API_IMPLEMENTATION.md
 docs/DEVELOPER_GUIDE.md
 docs/ARCHITECTURE_DECISIONS.md
 docs/SCOPE_FREEZE_V1.md
@@ -29,6 +32,8 @@ docs/RELEASE_NOTES_V1.1.md
 docs/RELEASE_NOTES_V1.2.md
 docs/RELEASE_NOTES_V1.3.md
 CHANGELOG.md
+api/schemas/v1.0/system-info.schema.json
+api/examples/v1.0/success/system-info.json
 schemas/studio.schema.json
 schemas/client.schema.json
 schemas/client-profile-snapshot.schema.json
@@ -58,6 +63,7 @@ lib/validation.sh
 lib/revision.sh
 lib/transaction.sh
 lib/project-state.sh
+bin/jl-mixing
 bin/new-studio
 bin/new-client
 bin/new-mix
@@ -84,7 +90,7 @@ echo "[OK] Required artifacts"
 python3 - <<'PY'
 import json
 from pathlib import Path
-for directory in ('schemas', 'examples', 'tests/fixtures'):
+for directory in ('api/schemas', 'api/examples', 'schemas', 'examples', 'tests/fixtures'):
     for path in Path(directory).rglob('*.json'):
         json.loads(path.read_text())
 print('[OK] JSON syntax')

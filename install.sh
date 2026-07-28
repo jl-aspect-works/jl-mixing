@@ -94,11 +94,13 @@ share_dir="$prefix/share"
 state_file="$app_dir/install-state.json"
 
 required_paths='VERSION
+API_VERSION
 LICENSE
 README.md
 CHANGELOG.md
 bin
 lib
+api
 schemas
 templates
 docs
@@ -212,7 +214,8 @@ fi
 
 mkdir -p "$prefix" "$share_dir" "$bin_dir"
 
-public_commands='new-studio
+public_commands='jl-mixing
+new-studio
 new-client
 new-mix
 validate-intake
@@ -307,14 +310,15 @@ trap rollback_install EXIT HUP INT TERM
 
 stage_app="$stage_root/share/jl-mixing"
 stage_bin="$stage_root/bin"
-mkdir -p "$stage_app/bin" "$stage_app/lib" "$stage_app/schemas" \
+mkdir -p "$stage_app/bin" "$stage_app/lib" "$stage_app/api" "$stage_app/schemas" \
     "$stage_app/templates" "$stage_app/docs" "$stage_app/tools" \
     "$stage_app/packaging" "$stage_bin"
 
-cp "$SOURCE_ROOT/VERSION" "$SOURCE_ROOT/LICENSE" "$SOURCE_ROOT/README.md" \
-    "$SOURCE_ROOT/CHANGELOG.md" "$stage_app/"
+cp "$SOURCE_ROOT/VERSION" "$SOURCE_ROOT/API_VERSION" "$SOURCE_ROOT/LICENSE" \
+    "$SOURCE_ROOT/README.md" "$SOURCE_ROOT/CHANGELOG.md" "$stage_app/"
 cp -R "$SOURCE_ROOT/bin/." "$stage_app/bin/"
 cp -R "$SOURCE_ROOT/lib/." "$stage_app/lib/"
+cp -R "$SOURCE_ROOT/api/." "$stage_app/api/"
 cp -R "$SOURCE_ROOT/schemas/." "$stage_app/schemas/"
 cp -R "$SOURCE_ROOT/templates/." "$stage_app/templates/"
 cp -R "$SOURCE_ROOT/docs/." "$stage_app/docs/"

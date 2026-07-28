@@ -23,6 +23,14 @@ archive="$(find "$temp_root/dist" -name '*.tar.gz' -type f | head -n 1)"
 pass "release archive created"
 assert_file_exists "$archive.sha256"
 assert_file_exists "$archive.inventory.txt"
+assert_contains "$(cat "$archive.inventory.txt")" 'API_VERSION' \
+    "Automation API version included in release archive"
+assert_contains "$(cat "$archive.inventory.txt")" 'bin/jl-mixing' \
+    "Automation API dispatcher included in release archive"
+assert_contains "$(cat "$archive.inventory.txt")" 'api/schemas/v1.0/system-info.schema.json' \
+    "Automation API schema included in release archive"
+assert_contains "$(cat "$archive.inventory.txt")" 'api/examples/v1.0/success/system-info.json' \
+    "Automation API example included in release archive"
 assert_contains "$(cat "$archive.inventory.txt")" 'tools/project-state.py' \
     "project-state tool included in release archive"
 assert_contains "$(cat "$archive.inventory.txt")" 'schemas/client-profile-snapshot.schema.json' \

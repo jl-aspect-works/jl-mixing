@@ -63,6 +63,18 @@ copy-and-paste `cd` command.
 The environment variable `JL_MIXING_INSTALL_PREFIX` is also supported, but an
 explicit `--prefix` takes precedence.
 
+## Verify the installed Automation API
+
+After installation, machine-readable discovery is available through:
+
+```bash
+jl-mixing system-info --json
+```
+
+The installed application includes `API_VERSION` and the matching schemas and
+examples under `~/.local/share/jl-mixing/api/` (or the selected prefix). The
+reported `schemas.installed_path` identifies the exact offline schema directory.
+
 ## Upgrade
 
 Extract the newer release and run its installer with the same prefix. Reinstall
