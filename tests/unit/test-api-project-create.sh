@@ -160,4 +160,71 @@ if python3 -c 'import jsonschema' >/dev/null 2>&1; then
     done
 fi
 
-echo "[OK] Automation API project/revision/intake workflows ($TEST_COUNT assertions)"
+# revision.approve must preserve manifest-only mutation and structured outcomes.
+(cd "$studio" && "$ROOT/bin/new-mix" "Approval API Project" --client api-client --artist "API Artist" --no-cd >/dev/null)
+approval_project="$studio/Clients/API Client/Projects/Approval API Project"
+approval_manifest="$approval_project/00_Admin/project-manifest.json"
+approval_before="$(cksum "$approval_manifest")"
+approval_planned="$tmp/approval-planned.json"
+"$ROOT/bin/jl-mixing" revision approve --json --project "$approval_project" --approved-by Client --date 2030-01-01T12:00:00Z --dry-run >"$approval_planned"
+assert_eq "$approval_before" "$(cksum "$approval_manifest")" "revision.approve dry-run does not update manifest"
+python3 - "$approval_planned" "$approval_project" "$approval_manifest" <<'PY'
+import json, sys
+from pathlib import Path
+d=json.loads(Path(sys.argv[1]).read_text())
+assert d["operation"] == "revision.approve"
+assert d["status"] == "planned"
+assert d["data"]["project"]["path"] == sys.argv[2]
+assert d["data"]["revision"]["number"] == 1
+assert d["data"]["approved_by"] == "Client"
+assert d["data"]["would_update"] == [sys.argv[3]]
+PY
+pass "revision.approve dry-run is structured and non-mutating"
+
+approval_success="$tmp/approval-success.json"
+"$ROOT/bin/jl-mixing" revision approve --json --project "$approval_project" --approved-by Client --date 2030-01-01T12:00:00Z >"$approval_success"
+assert_json_eq "1" "$approval_manifest" '.state.approved_revision' "revision.approve updates approved revision"
+assert_json_eq "Client" "$approval_manifest" '.revisions[] | select(.number == 1) | .approval.approved_by' "revision.approve records approver"
+assert_json_eq "2030-01-01T12:00:00Z" "$approval_manifest" '.revisions[] | select(.number == 1) | .approval.approved_at' "revision.approve records approval date"
+python3 - "$approval_success" <<'PY'
+import json, sys
+from pathlib import Path
+d=json.loads(Path(sys.argv[1]).read_text())
+assert d["status"] == "success"
+assert d["errors"] == []
+assert d["data"]["revision"]["number"] == 1
+assert d["data"]["approved_by"] == "Client"
+assert d["data"]["approved_at"] == "2030-01-01T12:00:00Z"
+PY
+pass "revision.approve commits structured approval state"
+
+set +e
+"$ROOT/bin/jl-mixing" revision approve --json --project "$approval_project" --revision 1 >"$tmp/approval-blocked.json" 2>"$tmp/approval-blocked.err"
+approval_status=$?
+set -e
+assert_eq "5" "$approval_status" "already-approved revision preserves validation exit code"
+assert_eq "" "$(cat "$tmp/approval-blocked.err")" "blocked approval keeps stderr empty"
+python3 - "$tmp/approval-blocked.json" <<'PY'
+import json, sys
+from pathlib import Path
+d=json.loads(Path(sys.argv[1]).read_text())
+assert d["status"] == "blocked"
+assert d["errors"][0]["code"] == "REVISION_ALREADY_APPROVED"
+PY
+pass "revision.approve exposes already-approved state"
+
+set +e
+"$ROOT/bin/jl-mixing" revision approve --project "$approval_project" >"$tmp/approval-invalid.json" 2>"$tmp/approval-invalid.err"
+approval_invalid_status=$?
+set -e
+assert_eq "2" "$approval_invalid_status" "revision.approve requires JSON mode"
+assert_eq "" "$(cat "$tmp/approval-invalid.err")" "approval preflight keeps stderr empty"
+
+if python3 -c 'import jsonschema' >/dev/null 2>&1; then
+    for document in "$approval_planned" "$approval_success" "$tmp/approval-blocked.json" "$tmp/approval-invalid.json"; do
+        assert_success "revision.approve response matches schema" python3 "$ROOT/tools/validate-json.py" --strict \
+            --schema "$ROOT/api/schemas/v1.0/operations/revision-approve.schema.json" --document "$document"
+    done
+fi
+
+echo "[OK] Automation API project/revision/intake/approval workflows ($TEST_COUNT assertions)"
