@@ -54,7 +54,7 @@ PY_ERROR
 jl_project_create_response() {
     local api_version python json_seen dry_run project_name arg output_file error_file status
     local project_path project_id initial_revision client_path client_id workspace_path
-    local error_code response_status message
+    local error_code response_status message previous
     api_version="$(jl_project_api_read_version)" || return $?
     python="$(jl_project_api_python)" || return $?
     json_seen=0
@@ -101,9 +101,11 @@ jl_project_create_response() {
     for arg in "$@"; do
         [ "$arg" = "--json" ] || filtered_args+=("$arg")
     done
-    # Disable automatic directory changing for machine-facing calls without
-    # exposing a human-facing --no-cd flag in the public JSON contract.
-    filtered_args+=(--no-cd)
+    # Disable automatic directory changing for real machine-facing creates.
+    # new-mix intentionally forbids --no-cd together with --dry-run.
+    if [ "$dry_run" -eq 0 ]; then
+        filtered_args+=(--no-cd)
+    fi
 
     set +e
     (jl_project_create_command "${filtered_args[@]}") >"$output_file" 2>"$error_file"
