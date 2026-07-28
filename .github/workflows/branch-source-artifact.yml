@@ -1,0 +1,20 @@
+name: Branch Source Artifact
+
+on:
+  push:
+    branches:
+      - agent/automation-api-contract
+
+jobs:
+  package-source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: automation-api-branch-source
+          path: |
+            .
+            !.git
+          include-hidden-files: true
+          retention-days: 1
