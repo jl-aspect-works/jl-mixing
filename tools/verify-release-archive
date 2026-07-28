@@ -73,7 +73,8 @@ PATH="$prefix/bin:$PATH" jl-mixing system-info --json > "$api_info"
     echo "Installed dispatcher omitted system.info capability." >&2
     exit 5
 }
-[ "$(jq -r '.schemas.installed_path' "$api_info")" = "$prefix/share/jl-mixing/api/schemas/v1.0" ] || {
+installed_schema_path="$(cd "$prefix/share/jl-mixing/api/schemas/v1.0" && pwd -P)"
+[ "$(jq -r '.schemas.installed_path' "$api_info")" = "$installed_schema_path" ] || {
     echo "Installed dispatcher reported the wrong schema path." >&2
     exit 5
 }
