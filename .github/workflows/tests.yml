@@ -32,5 +32,15 @@ jobs:
           JL_MIXING_PYTHON: ${{ env.pythonLocation }}/bin/python
         shell: bash
         run: |
-          set -o pipefail
-          make strict-test 2>&1 | tail -n 120
+          set +e
+          make strict-test > strict-test.log 2>&1
+          status=$?
+          tail -n 160 strict-test.log > strict-test-tail.log
+          cat strict-test-tail.log
+          exit "$status"
+      - name: Upload failing test tail
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: strict-test-tail-${{ matrix.os }}
+          path: strict-test-tail.log
