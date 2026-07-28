@@ -50,7 +50,7 @@ PY_ERROR
 jl_intake_validate_response() {
     local api_version python json_seen dry_run project_ref project_seen arg previous
     local output_file error_file status project_path manifest_path report_path workspace_path project_id
-    local files_discovered blocking_errors warning_count source_path ffprobe_available
+    local files_discovered blocking_errors warning_count source_path ffprobe_available report_content_path
     local error_code response_status message completed_scan
     api_version="$(jl_intake_api_read_version)" || return $?
     python="$(jl_intake_api_python)" || return $?
@@ -151,19 +151,27 @@ PY_PROJECT
         else
             response_status=error
         fi
+        if [ "$dry_run" -eq 1 ]; then
+            report_content_path="$output_file"
+        else
+            report_content_path="$report_path"
+        fi
         "$python" - "$api_version" "$response_status" "$project_id" "$project_path" "$manifest_path" \
             "$report_path" "$workspace_path" "$source_path" "$files_discovered" "$blocking_errors" \
-            "$warning_count" "$ffprobe_available" "$dry_run" "$status" <<'PY_RESULT'
+            "$warning_count" "$ffprobe_available" "$dry_run" "$status" "$report_content_path" <<'PY_RESULT'
 import json, sys
+from pathlib import Path
 (api_version, status, project_id, project_path, manifest_path, report_path,
  workspace_path, source_path, files_discovered, blocking_errors, warnings,
- ffprobe_available, dry_run, exit_code) = sys.argv[1:]
+ ffprobe_available, dry_run, exit_code, report_content_path) = sys.argv[1:]
+report_markdown = Path(report_content_path).read_text(encoding="utf-8")
 data = {
     "project": {"id": project_id, "path": project_path},
     "manifest_path": manifest_path,
     "intake_report_path": report_path,
     "workspace_path": workspace_path,
     "source_path": source_path,
+    "report_markdown": report_markdown,
     "summary": {
         "files_discovered": int(files_discovered),
         "blocking_errors": int(blocking_errors),
