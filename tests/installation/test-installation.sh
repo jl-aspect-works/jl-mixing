@@ -56,8 +56,10 @@ api_info="$temp_root/system-info.json"
 assert_json_eq "1.0" "$api_info" ".api_version" "installed dispatcher reports API version"
 assert_json_eq "$(cat "$ROOT/VERSION")" "$api_info" ".application.version" \
     "installed dispatcher reports application version"
-assert_json_eq "system.info" "$api_info" ".capabilities[0]" \
+assert_json_eq "true" "$api_info" '[.capabilities[] | select(. == "system.info")] | length == 1' \
     "installed dispatcher advertises discovery capability"
+assert_json_eq "true" "$api_info" '[.capabilities[] | select(. == "client.create")] | length == 1' \
+    "installed dispatcher advertises client.create capability"
 assert_json_eq "$prefix/share/jl-mixing/api/schemas/v1.0" "$api_info" \
     ".schemas.installed_path" "installed dispatcher reports bundled schemas"
 
