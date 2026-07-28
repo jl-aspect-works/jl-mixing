@@ -96,4 +96,38 @@ if python3 -c 'import jsonschema' >/dev/null 2>&1; then
         --schema "$ROOT/api/schemas/v1.0/operations/revision-create.schema.json" --document "$revision_response"
 fi
 
-echo "[OK] Automation API project/revision create parity ($TEST_COUNT assertions)"
+# Intake validation through the API must produce the same authoritative managed
+# report content as the human command for equivalent source trees.
+printf 'same notes\n' > "$human_project/01_Client_Files/Original_Delivery/Notes.txt"
+printf 'same notes\n' > "$api_project/01_Client_Files/Original_Delivery/Notes.txt"
+"$ROOT/bin/validate-intake" --project "$human_project" >/dev/null
+intake_response="$tmp/intake-validate-success.json"
+"$ROOT/bin/jl-mixing" intake validate --json --project "$api_project" >"$intake_response"
+python3 - "$human_project/00_Admin/Intake_Report.md" "$api_project/00_Admin/Intake_Report.md" "$human_project" "$api_project" <<'PY'
+from pathlib import Path
+import sys
+left=Path(sys.argv[1]).read_text(); right=Path(sys.argv[2]).read_text()
+left=left.replace(sys.argv[3], "<PROJECT>")
+right=right.replace(sys.argv[4], "<PROJECT>")
+assert left == right, (left, right)
+PY
+pass "API and human intake validation produce equivalent reports"
+
+python3 - "$intake_response" <<'PY'
+import json, sys
+from pathlib import Path
+d=json.loads(Path(sys.argv[1]).read_text())
+assert d["status"] == "success"
+assert d["operation"] == "intake.validate"
+assert d["errors"] == []
+assert d["data"]["summary"]["files_discovered"] == 1
+assert Path(d["data"]["intake_report_path"]).is_file()
+PY
+pass "intake.validate success response points to authoritative report"
+
+if python3 -c 'import jsonschema' >/dev/null 2>&1; then
+    assert_success "intake.validate success matches schema" python3 "$ROOT/tools/validate-json.py" --strict \
+        --schema "$ROOT/api/schemas/v1.0/operations/intake-validate.schema.json" --document "$intake_response"
+fi
+
+echo "[OK] Automation API project/revision/intake parity ($TEST_COUNT assertions)"
