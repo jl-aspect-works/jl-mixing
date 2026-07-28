@@ -97,7 +97,7 @@ PY_SYSTEM_INFO
 
 client_create_response() {
     local api_version python json_seen dry_run client_id arg output_file error_file status
-    local exit_code client_path workspace_path error_code response_status
+    local client_path workspace_path error_code response_status
     api_version="$(read_api_version)" || return $?
     python="$(require_python)" || return $?
     json_seen=0
