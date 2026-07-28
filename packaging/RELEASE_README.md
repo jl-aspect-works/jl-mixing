@@ -62,6 +62,19 @@ local timestamp.
 `create-delivery --clean` deletes and replaces all contents inside the selected
 project's `05_Final_Delivery/` directory.
 
+## Automation API discovery
+
+Supported machine clients use:
+
+```bash
+jl-mixing system-info --json
+```
+
+The JSON response reports the independent Automation API version, application
+release, metadata schema compatibility, implemented capabilities, and bundled
+schema path. API compatibility must be determined from `api_version` and
+`capabilities`, not from the application release number.
+
 ## Upgrade and uninstall
 
 Run the new release's `install.sh` to upgrade transactionally. Workspaces are

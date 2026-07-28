@@ -132,7 +132,8 @@ if [ "$state_valid" -eq 0 ]; then
     fi
 fi
 
-public_commands='new-studio
+public_commands='jl-mixing
+new-studio
 new-client
 new-mix
 validate-intake
@@ -281,7 +282,7 @@ if [ -e "$bin_dir/jl-mixing-uninstall" ] && is_managed_launcher "$bin_dir/jl-mix
 fi
 
 [ ! -e "$app_dir" ] || exit 5
-for removed in new-studio new-client new-mix validate-intake new-revision approve-mix create-delivery \
+for removed in jl-mixing new-studio new-client new-mix validate-intake new-revision approve-mix create-delivery \
         jl-mixing-shell-integration jl-mixing-uninstall; do
     if [ -e "$bin_dir/$removed" ]; then
         case "$removed" in

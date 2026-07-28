@@ -3,6 +3,24 @@
 Every command supports `-h` and `--help`. Mutating commands validate governing
 JSON and filesystem boundaries before committing changes.
 
+## `jl-mixing`
+
+```text
+jl-mixing system-info --json
+jl-mixing --help
+```
+
+`jl-mixing` is the canonical machine-facing Automation API dispatcher.
+`system-info --json` writes exactly one JSON discovery object to standard output
+and reports the Automation API version, application release, metadata schema
+compatibility, implemented capabilities, and installed API schema location.
+
+API clients must use the reported `api_version` and `capabilities`. They must not
+infer compatibility from the Automation application release. The initial API
+1.0 capability set contains only `system.info`; existing human-facing commands
+remain outside the machine API until their structured operation contracts are
+implemented.
+
 ## `new-studio`
 
 ```text

@@ -31,6 +31,9 @@ for file in "$ROOT/README.md" "$ROOT/packaging/RELEASE_README.md" \
         grep -q 'Music/JL Mixing' "$file"
 done
 
+assert_file_exists "$ROOT/API_VERSION"
+assert_file_exists "$ROOT/api/schemas/v1.0/system-info.schema.json"
+assert_file_exists "$ROOT/api/examples/v1.0/success/system-info.json"
 assert_file_exists "$ROOT/CHANGELOG.md"
 assert_file_exists "$ROOT/docs/RELEASE_NOTES_V1.1.md"
 assert_file_exists "$ROOT/docs/RELEASE_NOTES_V1.2.md"
@@ -38,6 +41,8 @@ assert_file_exists "$ROOT/docs/RELEASE_NOTES_V1.3.md"
 assert_file_exists "$ROOT/docs/SCOPE_FREEZE_V1.2.md"
 assert_eq "1.3.1" "$(sed -n '1p' "$ROOT/VERSION")" \
     "v1.3 application release version"
+assert_eq "1.0" "$(sed -n '1p' "$ROOT/API_VERSION")" \
+    "Automation API version is independent"
 assert_contains "$(cat "$ROOT/.github/workflows/release.yml")" \
     'docs/RELEASE_NOTES_V1.3.md' "release workflow publishes v1.3 notes"
 assert_contains "$(cat "$ROOT/docs/USER_GUIDE.md")" \

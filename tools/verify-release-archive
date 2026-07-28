@@ -26,8 +26,9 @@ for forbidden in .git .github tests examples .venv; do
     fi
 done
 
-for required in install.sh uninstall.sh VERSION LICENSE README.md CHANGELOG.md RELEASE_MANIFEST.txt \
-    bin lib schemas templates docs tools/validate-json.py tools/build-intake-report.py tools/project-state.py \
+for required in install.sh uninstall.sh VERSION API_VERSION LICENSE README.md CHANGELOG.md RELEASE_MANIFEST.txt \
+    bin/jl-mixing api/schemas/v1.0/system-info.schema.json \
+    api/examples/v1.0/success/system-info.json lib schemas templates docs tools/validate-json.py tools/build-intake-report.py tools/project-state.py \
     tools/import-project-source.py tools/import-revision-source.py tools/build-delivery.py \
     tools/manage-shell-config.py packaging/requirements.txt; do
     [ -e "$package_root/$required" ] || {
@@ -44,6 +45,7 @@ expected_created_with="jl-mixing $package_version"
 [ ! -e "$package_root/templates/project" ] || { echo "Obsolete project templates were packaged." >&2; exit 5; }
 
 [ -x "$package_root/install.sh" ] || { echo "install.sh is not executable." >&2; exit 5; }
+[ -x "$package_root/bin/jl-mixing" ] || { echo "API dispatcher is not executable." >&2; exit 5; }
 [ -x "$package_root/bin/new-studio" ] || { echo "commands are not executable." >&2; exit 5; }
 
 # Use system packages only inside verification. Production installs remain
@@ -56,6 +58,25 @@ HOME="$fake_home" SHELL=/bin/bash JL_MIXING_TEST_SYSTEM_SITE_PACKAGES=1 \
     "$package_root/install.sh" --prefix "$prefix" >/dev/null
 [ -f "$fake_home/.bashrc" ] || { echo "Installer did not configure .bashrc." >&2; exit 5; }
 [ -f "$prefix/bin/jl-mixing-shell-integration" ] || { echo "Shell integration was not installed." >&2; exit 5; }
+[ -x "$prefix/bin/jl-mixing" ] || { echo "Automation API dispatcher was not installed." >&2; exit 5; }
+api_info="$work_dir/system-info.json"
+PATH="$prefix/bin:$PATH" jl-mixing system-info --json > "$api_info"
+[ "$(jq -r '.api_version // empty' "$api_info" | tr -d ' ')" = "$(cat "$package_root/API_VERSION")" ] || {
+    echo "Installed dispatcher reported the wrong API version." >&2
+    exit 5
+}
+[ "$(jq -r '.application.version' "$api_info")" = "$package_version" ] || {
+    echo "Installed dispatcher reported the wrong application version." >&2
+    exit 5
+}
+[ "$(jq -r '.capabilities | index("system.info") != null' "$api_info")" = "true" ] || {
+    echo "Installed dispatcher omitted system.info capability." >&2
+    exit 5
+}
+[ "$(jq -r '.schemas.installed_path' "$api_info")" = "$prefix/share/jl-mixing/api/schemas/v1.0" ] || {
+    echo "Installed dispatcher reported the wrong schema path." >&2
+    exit 5
+}
 PATH="$prefix/bin:$PATH" new-studio --root "$workspace" >/dev/null
 [ -f "$workspace/Studio/studio.json" ] || {
     echo "Installed command failed to create studio.json." >&2

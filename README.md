@@ -90,6 +90,25 @@ modify v1.0 workspaces. Copy only user-owned material, such as original client
 deliveries or notes, into newly created v1.1/v1.2 projects. Do not copy v1.0
 JSON manifests or complete v1.0 project directories.
 
+## Automation API discovery
+
+JL Mixing Studio and other supported machine clients discover the installed
+provider contract through:
+
+```bash
+jl-mixing system-info --json
+```
+
+The response reports the Automation API version, application release, workspace
+metadata schema compatibility, implemented capabilities, and installed API
+schema location as separate fields. Clients must use `api_version` and
+`capabilities`; they must not infer API compatibility from the application
+release number.
+
+The initial API 1.0 implementation advertises only `system.info`. Existing
+human-facing workflow commands remain supported but are not machine API
+operations until their structured contracts and parity tests are implemented.
+
 ## Delivery behavior
 
 `create-delivery` always packages the approved revision. Every selected regular

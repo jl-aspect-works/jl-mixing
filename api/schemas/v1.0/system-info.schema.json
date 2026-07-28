@@ -3,7 +3,7 @@
   "$id": "https://jlaudio.github.io/jl-mixing/api/v1.0/schemas/system-info.schema.json",
   "title": "JL Mixing Automation API 1.0 System Information",
   "type": "object",
-  "additionalProperties": false,
+  "additionalProperties": true,
   "required": [
     "api_version",
     "application",
@@ -17,8 +17,11 @@
     },
     "application": {
       "type": "object",
-      "additionalProperties": false,
-      "required": ["name", "version"],
+      "additionalProperties": true,
+      "required": [
+        "name",
+        "version"
+      ],
       "properties": {
         "name": {
           "const": "jl-mixing"
@@ -31,8 +34,11 @@
     },
     "metadata": {
       "type": "object",
-      "additionalProperties": false,
-      "required": ["readable_schema_versions", "writable_schema_version"],
+      "additionalProperties": true,
+      "required": [
+        "readable_schema_versions",
+        "writable_schema_version"
+      ],
       "properties": {
         "readable_schema_versions": {
           "type": "array",
@@ -60,8 +66,11 @@
     },
     "schemas": {
       "type": "object",
-      "additionalProperties": false,
-      "required": ["installed_path", "public_base_url"],
+      "additionalProperties": true,
+      "required": [
+        "installed_path",
+        "public_base_url"
+      ],
       "properties": {
         "installed_path": {
           "type": "string",

@@ -48,6 +48,25 @@ if python3 -c 'import jsonschema' >/dev/null 2>&1; then
         python3 "$ROOT/tools/validate-json.py" --strict \
             --schema "$ROOT/api/schemas/v1.0/system-info.schema.json" \
             --document "$stdout_file"
+
+    compatible_file="$tmp/system-info-compatible.json"
+    python3 - "$stdout_file" "$compatible_file" <<'PY_COMPATIBLE'
+import json
+from pathlib import Path
+import sys
+
+source, destination = map(Path, sys.argv[1:])
+document = json.loads(source.read_text(encoding="utf-8"))
+document["future_optional_field"] = {"enabled": True}
+document["application"]["future_build_metadata"] = "example"
+document["metadata"]["future_optional_schema_policy"] = "additive"
+document["schemas"]["future_optional_format"] = "json-schema"
+destination.write_text(json.dumps(document) + "\n", encoding="utf-8")
+PY_COMPATIBLE
+    assert_success "API 1.0 schema accepts additive optional fields" \
+        python3 "$ROOT/tools/validate-json.py" --strict \
+            --schema "$ROOT/api/schemas/v1.0/system-info.schema.json" \
+            --document "$compatible_file"
 else
     echo "[SKIP] system-info schema validation requires jsonschema."
 fi
