@@ -93,4 +93,71 @@ if python3 -c 'import jsonschema' >/dev/null 2>&1; then
     done
 fi
 
-echo "[OK] Automation API project/revision create ($TEST_COUNT assertions)"
+# intake.validate must preserve report-only behavior while returning structured results.
+(cd "$studio" && "$ROOT/bin/new-mix" "Intake API Project" --client api-client --artist "API Artist" --no-cd >/dev/null)
+intake_project="$studio/Clients/API Client/Projects/Intake API Project"
+printf 'session notes\n' > "$intake_project/01_Client_Files/Original_Delivery/Notes.txt"
+intake_report="$intake_project/00_Admin/Intake_Report.md"
+intake_before="$(cksum "$intake_report")"
+intake_planned="$tmp/intake-planned.json"
+"$ROOT/bin/jl-mixing" intake validate --json --project "$intake_project" --dry-run >"$intake_planned"
+assert_eq "$intake_before" "$(cksum "$intake_report")" "intake.validate dry-run does not update report"
+python3 - "$intake_planned" "$intake_project" <<'PY'
+import json, sys
+from pathlib import Path
+d=json.loads(Path(sys.argv[1]).read_text())
+assert d["operation"] == "intake.validate"
+assert d["status"] == "planned"
+assert d["data"]["project"]["path"] == sys.argv[2]
+assert d["data"]["summary"]["files_discovered"] == 1
+assert d["data"]["summary"]["blocking_errors"] == 0
+PY
+pass "intake.validate dry-run is structured and non-mutating"
+
+intake_success="$tmp/intake-success.json"
+"$ROOT/bin/jl-mixing" intake validate --json --project "$intake_project" >"$intake_success"
+assert_contains "$(cat "$intake_report")" "Notes.txt" "intake.validate updates managed report"
+python3 - "$intake_success" <<'PY'
+import json, sys
+from pathlib import Path
+d=json.loads(Path(sys.argv[1]).read_text())
+assert d["status"] == "success"
+assert d["errors"] == []
+assert d["data"]["summary"]["files_discovered"] == 1
+assert d["data"]["summary"]["blocking_errors"] == 0
+PY
+pass "intake.validate returns structured success"
+
+(cd "$studio" && "$ROOT/bin/new-mix" "Blocked Intake Project" --client api-client --artist "API Artist" --no-cd >/dev/null)
+blocked_project="$studio/Clients/API Client/Projects/Blocked Intake Project"
+set +e
+"$ROOT/bin/jl-mixing" intake validate --json --project "$blocked_project" >"$tmp/intake-blocked.json" 2>"$tmp/intake-blocked.err"
+intake_status=$?
+set -e
+assert_eq "5" "$intake_status" "blocking intake findings preserve validation exit code"
+assert_eq "" "$(cat "$tmp/intake-blocked.err")" "completed blocked intake keeps stderr empty"
+python3 - "$tmp/intake-blocked.json" <<'PY'
+import json, sys
+from pathlib import Path
+d=json.loads(Path(sys.argv[1]).read_text())
+assert d["status"] == "blocked"
+assert d["data"]["summary"]["blocking_errors"] == 1
+assert d["errors"][0]["code"] == "INTAKE_BLOCKING_FINDINGS"
+PY
+pass "intake.validate exposes blocking findings"
+
+set +e
+"$ROOT/bin/jl-mixing" intake validate --json --project "$intake_project" --progress=json >"$tmp/intake-progress.json" 2>"$tmp/intake-progress.err"
+intake_progress_status=$?
+set -e
+assert_eq "2" "$intake_progress_status" "unsupported intake progress is an argument error"
+assert_eq "" "$(cat "$tmp/intake-progress.err")" "intake progress preflight keeps stderr empty"
+
+if python3 -c 'import jsonschema' >/dev/null 2>&1; then
+    for document in "$intake_planned" "$intake_success" "$tmp/intake-blocked.json" "$tmp/intake-progress.json"; do
+        assert_success "intake.validate response matches schema" python3 "$ROOT/tools/validate-json.py" --strict \
+            --schema "$ROOT/api/schemas/v1.0/operations/intake-validate.schema.json" --document "$document"
+    done
+fi
+
+echo "[OK] Automation API project/revision/intake workflows ($TEST_COUNT assertions)"
