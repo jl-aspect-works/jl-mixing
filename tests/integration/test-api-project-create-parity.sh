@@ -24,9 +24,6 @@ for left,right in pairs:
         metadata.pop("document_id", None)
         metadata.pop("created_at", None)
         metadata.pop("last_modified_at", None)
-        # The two fixtures intentionally create independent client documents.
-        # Normalize only their generated cross-document identities; stable
-        # client_id and all user/project content must remain identical.
         d.get("client", {}).pop("client_document_id", None)
         d.get("source_client", {}).pop("client_document_id", None)
         for rev in d.get("revisions", []):
@@ -54,4 +51,49 @@ if python3 -c 'import jsonschema' >/dev/null 2>&1; then
         --schema "$ROOT/api/schemas/v1.0/operations/project-create.schema.json" --document "$api_response"
 fi
 
-echo "[OK] Automation API project.create parity ($TEST_COUNT assertions)"
+human_project="$human/Clients/Parity Client/Projects/Parity Project"
+api_project="$api/Clients/Parity Client/Projects/Parity Project"
+"$ROOT/bin/new-revision" --project "$human_project" --description "Parity revision" --no-cd >/dev/null
+revision_response="$tmp/revision-create-success.json"
+"$ROOT/bin/jl-mixing" revision create --json --project "$api_project" --description "Parity revision" >"$revision_response"
+
+python3 - "$human_project/00_Admin/project-manifest.json" "$api_project/00_Admin/project-manifest.json" <<'PY'
+import json, sys
+from pathlib import Path
+a=json.loads(Path(sys.argv[1]).read_text()); b=json.loads(Path(sys.argv[2]).read_text())
+for d in (a,b):
+    metadata=d.get("metadata", {})
+    metadata.pop("document_id", None)
+    metadata.pop("created_at", None)
+    metadata.pop("last_modified_at", None)
+    d.get("client", {}).pop("client_document_id", None)
+    for rev in d.get("revisions", []):
+        rev.pop("revision_id", None)
+        rev.pop("created_at", None)
+assert a == b, (a,b)
+PY
+assert_eq "$(cat "$human_project/04_Revisions/Revision_02/Revision_Notes.md")" \
+    "$(cat "$api_project/04_Revisions/Revision_02/Revision_Notes.md")" \
+    "revision notes are equivalent"
+pass "API and human commands create equivalent revision state"
+
+python3 - "$revision_response" <<'PY'
+import json, sys
+from pathlib import Path
+d=json.loads(Path(sys.argv[1]).read_text())
+assert d["status"] == "success"
+assert d["operation"] == "revision.create"
+assert d["errors"] == []
+assert d["data"]["revision"]["number"] == 2
+assert Path(d["data"]["manifest_path"]).is_file()
+assert Path(d["data"]["revision"]["path"]).is_dir()
+assert Path(d["data"]["revision_notes_path"]).is_file()
+PY
+pass "revision.create success response points to committed state"
+
+if python3 -c 'import jsonschema' >/dev/null 2>&1; then
+    assert_success "revision.create success matches schema" python3 "$ROOT/tools/validate-json.py" --strict \
+        --schema "$ROOT/api/schemas/v1.0/operations/revision-create.schema.json" --document "$revision_response"
+fi
+
+echo "[OK] Automation API project/revision create parity ($TEST_COUNT assertions)"
