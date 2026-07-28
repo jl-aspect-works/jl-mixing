@@ -1,9 +1,7 @@
 name: Client API Source
 
 on:
-  push:
-    branches:
-      - agent/client-create-api
+  pull_request:
 
 jobs:
   package-source:
