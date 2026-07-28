@@ -64,7 +64,7 @@ elif [ "${1:-}" = "system-info" ] && [ "$#" -eq 2 ] && [ "$2" = "--json" ]; then
         exit 3
     }
     base_json="$(. "$APP_ROOT/lib/api-dispatcher-command.sh")"
-    printf '%s\n' "$base_json" | "$python" -c 'import json,sys; d=json.load(sys.stdin); d["capabilities"]=sorted(set(d.get("capabilities",[])+["delivery.create","intake.validate","project.create","revision.approve","revision.create"])); print(json.dumps(d,separators=(",",":"),sort_keys=True))'
+    printf '%s\n' "$base_json" | "$python" -c 'import json,sys; d=json.load(sys.stdin); d["capabilities"]=sorted(set(d.get("capabilities",[])+["delivery.create","intake.validate","project.create","project.create.artist","revision.approve","revision.create"])); print(json.dumps(d,separators=(",",":"),sort_keys=True))'
 else
     # Preserve the existing system-info and client.create dispatcher behavior
     # byte-for-byte while newer workflow adapters are layered separately.
