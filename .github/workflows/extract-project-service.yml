@@ -1,14 +1,15 @@
 name: Extract Project Service
 
 on:
-  pull_request:
+  push:
+    branches:
+      - agent/project-create-service
 
 permissions:
   contents: write
 
 jobs:
   extract:
-    if: github.head_ref == 'agent/project-create-service'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
