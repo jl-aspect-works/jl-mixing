@@ -53,7 +53,7 @@ PY_ERROR
 
 jl_revision_create_response() {
     local api_version python json_seen dry_run arg output_file error_file status
-    local revision_path revision_number project_path manifest_path workspace_path project_id
+    local revision_path revision_number revision_description project_path manifest_path workspace_path project_id
     local error_code response_status message
     api_version="$(jl_revision_api_read_version)" || return $?
     python="$(jl_revision_api_python)" || return $?
@@ -99,6 +99,7 @@ jl_revision_create_response() {
 
     revision_path="$(sed -n 's/^Revision folder:[[:space:]]*//p' "$output_file" | head -1)"
     revision_number="$(sed -n -e 's/^Revision:[[:space:]]*//p' -e 's/^New revision:[[:space:]]*//p' "$output_file" | head -1)"
+    revision_description="$(sed -n 's/^Description:[[:space:]]*//p' "$output_file" | head -1)"
     project_path=""
     manifest_path=""
     workspace_path=""
@@ -120,14 +121,14 @@ PY_PROJECT_ID
     if [ "$status" -eq 0 ]; then
         if [ "$dry_run" -eq 1 ]; then response_status=planned; else response_status=success; fi
         "$python" - "$api_version" "$response_status" "$project_id" "$project_path" "$manifest_path" \
-            "$revision_number" "$revision_path" "$workspace_path" "$dry_run" <<'PY_SUCCESS'
+            "$revision_number" "$revision_path" "$revision_description" "$workspace_path" "$dry_run" <<'PY_SUCCESS'
 import json, sys
 (api_version, status, project_id, project_path, manifest_path,
- revision_number, revision_path, workspace_path, dry_run) = sys.argv[1:]
+ revision_number, revision_path, revision_description, workspace_path, dry_run) = sys.argv[1:]
 data = {
     "project": {"id": project_id, "path": project_path},
     "manifest_path": manifest_path,
-    "revision": {"number": int(revision_number), "path": revision_path},
+    "revision": {"number": int(revision_number), "path": revision_path, "description": revision_description},
     "revision_notes_path": f"{revision_path}/Revision_Notes.md",
     "workspace_path": workspace_path,
 }
