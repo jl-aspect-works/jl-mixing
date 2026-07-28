@@ -15,6 +15,7 @@ assert_path_not_exists "$ROOT/templates/revision"
 commands="$(find "$ROOT/bin" -maxdepth 1 -type f -perm -111 -exec basename {} \; | LC_ALL=C sort)"
 expected='approve-mix
 create-delivery
+jl-mixing
 jl-mixing-shell-integration
 new-client
 new-mix
