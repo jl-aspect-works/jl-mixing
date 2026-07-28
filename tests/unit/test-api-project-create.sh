@@ -6,14 +6,17 @@ require_test_command python3
 
 tmp="$(new_test_dir)"
 trap 'rm -rf "$tmp"' EXIT HUP INT TERM
-studio="$tmp/Studio Root"
-"$ROOT/bin/new-studio" --root "$studio" --name "API Test Studio" --engineer "Jake" --no-default-cd >/dev/null
-(cd "$studio" && "$ROOT/bin/new-client" api-client --name "API Client" --artist "API Artist" --no-cd >/dev/null)
+
+# Exercise planning in an isolated workspace so its intentionally expensive
+# validation path cannot affect the subsequent committed-create fixture.
+planned_studio="$tmp/Planned Studio Root"
+"$ROOT/bin/new-studio" --root "$planned_studio" --name "API Planned Studio" --engineer "Jake" --no-default-cd >/dev/null
+(cd "$planned_studio" && "$ROOT/bin/new-client" api-client --name "API Client" --artist "API Artist" --no-cd >/dev/null)
 
 planned="$tmp/planned.json"
-(cd "$studio" && "$ROOT/bin/jl-mixing" project create "API Project" --json --client api-client --dry-run >"$planned")
-assert_path_not_exists "$studio/Clients/API Client/Projects/API Project"
-python3 - "$planned" "$studio" <<'PY'
+(cd "$planned_studio" && "$ROOT/bin/jl-mixing" project create "API Project" --json --client api-client --dry-run >"$planned")
+assert_path_not_exists "$planned_studio/Clients/API Client/Projects/API Project"
+python3 - "$planned" "$planned_studio" <<'PY'
 import json, sys
 from pathlib import Path
 d=json.loads(Path(sys.argv[1]).read_text())
@@ -26,6 +29,10 @@ assert Path(d["data"]["workspace_path"]) == Path(sys.argv[2])
 assert d["data"]["initial_revision_path"].endswith("Revision_01")
 PY
 pass "project.create dry-run is structured and non-mutating"
+
+studio="$tmp/Studio Root"
+"$ROOT/bin/new-studio" --root "$studio" --name "API Test Studio" --engineer "Jake" --no-default-cd >/dev/null
+(cd "$studio" && "$ROOT/bin/new-client" api-client --name "API Client" --artist "API Artist" --no-cd >/dev/null)
 
 success="$tmp/success.json"
 (cd "$studio" && "$ROOT/bin/jl-mixing" project create "API Project" --json --client api-client --artist "Project Artist" >"$success")
