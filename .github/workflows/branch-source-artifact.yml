@@ -1,15 +1,14 @@
 name: Apply API Packaging Patch
 
 on:
-  push:
-    branches:
-      - agent/automation-api-contract
+  pull_request:
 
 permissions:
   contents: write
 
 jobs:
   apply-patch:
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
