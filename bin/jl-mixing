@@ -25,6 +25,16 @@ elif [ "${1:-}" = "revision" ]; then
     }
     shift
     jl_revision_create_response "$@"
+elif [ "${1:-}" = "intake" ]; then
+    # shellcheck source=lib/intake-validate-api.sh
+    . "$APP_ROOT/lib/intake-validate-api.sh"
+    shift
+    [ "$#" -gt 0 ] && [ "$1" = validate ] || {
+        jl_error "Unknown intake operation."
+        exit "$JL_EXIT_ARGUMENTS"
+    }
+    shift
+    jl_intake_validate_response "$@"
 elif [ "${1:-}" = "system-info" ] && [ "$#" -eq 2 ] && [ "$2" = "--json" ]; then
     # Extend discovery only after complete workflow contracts ship.
     python="${JL_MIXING_PYTHON:-$(command -v python3 || true)}"
@@ -33,7 +43,7 @@ elif [ "${1:-}" = "system-info" ] && [ "$#" -eq 2 ] && [ "$2" = "--json" ]; then
         exit 3
     }
     base_json="$(. "$APP_ROOT/lib/api-dispatcher-command.sh")"
-    printf '%s\n' "$base_json" | "$python" -c 'import json,sys; d=json.load(sys.stdin); d["capabilities"]=sorted(set(d.get("capabilities",[])+["project.create","revision.create"])); print(json.dumps(d,separators=(",",":"),sort_keys=True))'
+    printf '%s\n' "$base_json" | "$python" -c 'import json,sys; d=json.load(sys.stdin); d["capabilities"]=sorted(set(d.get("capabilities",[])+["intake.validate","project.create","revision.create"])); print(json.dumps(d,separators=(",",":"),sort_keys=True))'
 else
     # Preserve the existing system-info and client.create dispatcher behavior
     # byte-for-byte while newer workflow adapters are layered separately.
