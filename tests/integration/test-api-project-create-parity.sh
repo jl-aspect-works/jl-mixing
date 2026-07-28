@@ -21,9 +21,17 @@ for left,right in pairs:
     a=json.loads(Path(left).read_text()); b=json.loads(Path(right).read_text())
     for d in (a,b):
         metadata=d.get("metadata", {})
-        metadata.pop("document_id", None); metadata.pop("created_at", None); metadata.pop("last_modified_at", None)
+        metadata.pop("document_id", None)
+        metadata.pop("created_at", None)
+        metadata.pop("last_modified_at", None)
+        # The two fixtures intentionally create independent client documents.
+        # Normalize only their generated cross-document identities; stable
+        # client_id and all user/project content must remain identical.
+        d.get("client", {}).pop("client_document_id", None)
+        d.get("source_client", {}).pop("client_document_id", None)
         for rev in d.get("revisions", []):
-            rev.pop("revision_id", None); rev.pop("created_at", None)
+            rev.pop("revision_id", None)
+            rev.pop("created_at", None)
     assert a == b, (a,b)
 PY
 pass "API and human commands create equivalent project state"
