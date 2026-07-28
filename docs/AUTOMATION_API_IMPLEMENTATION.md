@@ -20,6 +20,18 @@ The discovery response is governed by
 `api/schemas/v1.0/system-info.schema.json` and has a reviewed golden example at
 `api/examples/v1.0/success/system-info.json`.
 
+## Distribution contract
+
+The installer and release archive ship the dispatcher, `API_VERSION`, API
+schemas, and golden examples as one versioned application unit. Installation,
+upgrade, archive-verification, and uninstall tests verify that:
+
+- the public `jl-mixing` launcher is installed and executable;
+- `system-info --json` resolves the installed schema directory;
+- the reported API, application, and metadata-schema versions remain distinct;
+- packaged discovery output validates against the installed schema; and
+- uninstall removes the managed dispatcher without modifying studio workspaces.
+
 ## Capability admission rule
 
 `system-info` advertises only capabilities implemented and covered by contract
