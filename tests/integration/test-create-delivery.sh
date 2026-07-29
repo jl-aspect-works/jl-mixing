@@ -76,12 +76,29 @@ from pathlib import Path
 d=json.loads(Path(sys.argv[1]).read_text())
 assert d['operation']=='delivery.create'
 assert d['status']=='planned'
-assert d['data']['project']['path']==sys.argv[2]
-assert d['data']['revision']['number']==1
-assert d['data']['replacement_mode']=='default'
-assert d['data']['zip_requested'] is False
+data=d['data']
+assert data['project']['path']==sys.argv[2]
+assert data['project']['name']=='Blue Sky'
+assert data['revision']['number']==1
+assert data['current_revision']==1
+assert data['approved_revision']==1
+assert data['delivered_revision'] is None
+assert data['delivery_method']=='Download'
+assert data['replacement_mode']=='default'
+assert data['zip_requested'] is False
+assert data['zip_name'] is None
+assert data['files_delivered']==0
+assert [item['source_name'] for item in data['selected']]==[
+    'Blue Sky Main Mix.wav','Blue Sky Stem Drums.wav','BlueSky_NoVox.wav'
+]
+assert [item['path'] for item in data['selected']]==[
+    'Blue Sky Main Mix.wav','Stems/Blue Sky Stem Drums.wav','BlueSky_NoVox.wav'
+]
+assert any(item['name']=='Revision_Notes.md' for item in data['excluded'])
+assert any(item['name']=='WORK Blue Sky test.wav' for item in data['excluded'])
+assert data['deletions']==[]
 PY
-pass 'delivery.create dry-run is structured and non-mutating'
+pass 'delivery.create dry-run exposes authoritative structured plan'
 
 api_response="$tmp/delivery-success.json"
 "$ROOT/bin/jl-mixing" delivery create --json --project "$api_project" >"$api_response"
@@ -93,9 +110,15 @@ from pathlib import Path
 d=json.loads(Path(sys.argv[1]).read_text())
 assert d['status']=='success'
 assert d['errors']==[]
-assert d['data']['revision']['number']==1
-assert Path(d['data']['delivery_manifest_path'])==Path(sys.argv[2])
-assert d['data']['files_delivered']==3
+data=d['data']
+assert data['revision']['number']==1
+assert data['current_revision']==1
+assert data['approved_revision']==1
+assert data['delivered_revision']==1
+assert Path(data['delivery_manifest_path'])==Path(sys.argv[2])
+assert data['files_delivered']==3
+assert len(data['selected'])==3
+assert data['deletions']==[]
 PY
 pass 'delivery.create returns structured committed state'
 
@@ -116,11 +139,34 @@ assert_eq "$(cat "$delivery/BlueSky_NoVox.wav")" "$(cat "$api_delivery/BlueSky_N
 assert_eq "$(cat "$delivery/Stems/Blue Sky Stem Drums.wav")" "$(cat "$api_delivery/Stems/Blue Sky Stem Drums.wav")" 'stem content parity'
 pass 'API and human delivery creation produce equivalent authoritative state'
 
+# Clean-mode preview must expose the exact destructive inventory so consumers
+# can require confirmation without reconstructing or scraping human output.
+clean_studio="$tmp/clean-studio"
+clean_project="$(fixture_v11_approved_project "$clean_studio")"
+clean_revision="$clean_project/04_Revisions/Revision_01"
+printf 'main-data\n' > "$clean_revision/Blue Sky Main Mix.wav"
+printf 'stale\n' > "$clean_project/05_Final_Delivery/stale-file.txt"
+clean_plan="$tmp/delivery-clean-planned.json"
+"$ROOT/bin/jl-mixing" delivery create --json --project "$clean_project" --clean --dry-run >"$clean_plan"
+python3 - "$clean_plan" <<'PY'
+import json, sys
+from pathlib import Path
+d=json.loads(Path(sys.argv[1]).read_text())
+data=d['data']
+assert d['status']=='planned'
+assert data['replacement_mode']=='clean'
+assert 'stale-file.txt' in data['deletions']
+assert 'Delivery_Notes.md' in data['deletions']
+PY
+pass 'delivery.create clean preview exposes exact deletion inventory'
+
 if python3 -c 'import jsonschema' >/dev/null 2>&1; then
     assert_success 'delivery.create planned response matches schema' python3 "$ROOT/tools/validate-json.py" --strict \
         --schema "$ROOT/api/schemas/v1.0/operations/delivery-create.schema.json" --document "$api_plan"
     assert_success 'delivery.create success response matches schema' python3 "$ROOT/tools/validate-json.py" --strict \
         --schema "$ROOT/api/schemas/v1.0/operations/delivery-create.schema.json" --document "$api_response"
+    assert_success 'delivery.create clean planned response matches schema' python3 "$ROOT/tools/validate-json.py" --strict \
+        --schema "$ROOT/api/schemas/v1.0/operations/delivery-create.schema.json" --document "$clean_plan"
 fi
 
 set +e
