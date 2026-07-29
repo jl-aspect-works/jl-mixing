@@ -48,8 +48,8 @@ PY
 
 jl_delivery_create_response() {
     local api_version python json_seen project_seen project_ref dry_run zip_requested mode
-    local output_file error_file status project_root manifest delivery_root revision_root approved_revision
-    local project_id workspace_path zip_name files_delivered response_status error_code message
+    local output_file error_file result_file status project_root manifest delivery_root workspace_path
+    local response_status error_code message
     api_version="$(jl_delivery_api_version)" || return "$JL_EXIT_CONFIG"
     python="$(jl_delivery_api_python)" || return "$JL_EXIT_CONFIG"
     json_seen=0; project_seen=0; project_ref=""; dry_run=0; zip_requested=0; mode=default
@@ -86,22 +86,15 @@ jl_delivery_create_response() {
     project_root="$(jl_context_resolve_project_v11 "$project_ref" "$PWD" 2>/dev/null || true)"
     manifest="${project_root:+$project_root/00_Admin/project-manifest.json}"
     delivery_root="${project_root:+$project_root/05_Final_Delivery}"
-    approved_revision=""
-    project_id=""
     workspace_path=""
-    revision_root=""
     if [ -n "$project_root" ] && [ -f "$manifest" ]; then
-        approved_revision="$(jl_json_get_optional "$manifest" '.state.approved_revision' '')"
-        project_id="$(jl_json_get_optional "$manifest" '.project_id' '')"
         workspace_path="$(dirname "$(dirname "$(dirname "$(dirname "$project_root")")")")"
-        if [ -n "$approved_revision" ]; then
-            revision_root="$project_root/04_Revisions/$(printf 'Revision_%02d' "$approved_revision")"
-        fi
     fi
 
     output_file="$(mktemp "${TMPDIR:-/tmp}/jl-mixing-delivery-out.XXXXXX")"
     error_file="$(mktemp "${TMPDIR:-/tmp}/jl-mixing-delivery-err.XXXXXX")"
-    cleanup_delivery_api() { rm -f -- "$output_file" "$error_file"; }
+    result_file="$(mktemp "${TMPDIR:-/tmp}/jl-mixing-delivery-result.XXXXXX")"
+    cleanup_delivery_api() { rm -f -- "$output_file" "$error_file" "$result_file"; }
     trap cleanup_delivery_api EXIT HUP INT TERM
 
     filtered=()
@@ -110,44 +103,53 @@ jl_delivery_create_response() {
     done
 
     set +e
-    (jl_delivery_create_command "${filtered[@]}") >"$output_file" 2>"$error_file"
+    (JL_MIXING_DELIVERY_RESULT_FILE="$result_file" jl_delivery_create_command "${filtered[@]}") >"$output_file" 2>"$error_file"
     status=$?
     set -e
 
     if [ "$status" -eq 0 ]; then
         [ "$dry_run" -eq 1 ] && response_status=planned || response_status=success
-        zip_name="$(sed -n 's/^ZIP:[[:space:]]*//p' "$output_file" | head -1)"
-        files_delivered="$(sed -n 's/^Files delivered:[[:space:]]*//p' "$output_file" | head -1)"
-        [ -n "$files_delivered" ] || files_delivered=0
-        "$python" - "$api_version" "$response_status" "$project_id" "$project_root" "$manifest" "$delivery_root" \
-            "$revision_root" "${approved_revision:-0}" "$workspace_path" "$mode" "$zip_requested" "$zip_name" "$files_delivered" <<'PY'
+        [ -s "$result_file" ] || {
+            jl_delivery_api_emit_error "$python" "$api_version" error INTERNAL_ERROR "$JL_EXIT_GENERAL" \
+                "Delivery creation completed without a structured result."
+            trap - EXIT HUP INT TERM
+            cleanup_delivery_api
+            return "$JL_EXIT_GENERAL"
+        }
+        "$python" - "$api_version" "$response_status" "$manifest" "$delivery_root" "$workspace_path" "$result_file" <<'PY'
 import json, sys
-(api_version,status,project_id,project_path,manifest_path,delivery_path,revision_path,
- revision,workspace_path,mode,zip_requested,zip_name,files_delivered)=sys.argv[1:]
-revision_no=int(revision)
-data={
- "project":{"id":project_id,"path":project_path},
- "manifest_path":manifest_path,
- "delivery_path":delivery_path,
- "delivery_notes_path":delivery_path+"/Delivery_Notes.md",
- "delivery_manifest_path":delivery_path+"/delivery-manifest.json",
- "revision":{"number":revision_no,"path":revision_path},
- "workspace_path":workspace_path,
- "replacement_mode":mode,
- "zip_requested":zip_requested=="1",
-}
-if files_delivered.isdigit() and int(files_delivered) > 0:
- data["files_delivered"]=int(files_delivered)
+api_version, status, manifest_path, delivery_path, workspace_path, result_path = sys.argv[1:]
+with open(result_path, encoding="utf-8") as handle:
+    data = json.load(handle)
+if data.get("status") != status:
+    raise SystemExit("delivery result status mismatch")
+data.pop("status", None)
+data.update({
+    "manifest_path": manifest_path,
+    "delivery_path": delivery_path,
+    "delivery_notes_path": delivery_path + "/Delivery_Notes.md",
+    "delivery_manifest_path": delivery_path + "/delivery-manifest.json",
+    "workspace_path": workspace_path,
+    "files_delivered": len(data.get("selected", [])) if status == "success" else 0,
+})
+zip_name = data.get("zip_name")
 if zip_name:
- data["zip_path"]=delivery_path+"/"+zip_name
-if status=="planned":
- data["would_update"]=[manifest_path,delivery_path]
-print(json.dumps({"api_version":api_version,"operation":"delivery.create","status":status,
- "data":data,"warnings":[],"errors":[]},separators=(",",":"),sort_keys=True))
+    data["zip_path"] = delivery_path + "/" + zip_name
+if status == "planned":
+    data["would_update"] = [manifest_path, delivery_path]
+print(json.dumps({
+    "api_version": api_version,
+    "operation": "delivery.create",
+    "status": status,
+    "data": data,
+    "warnings": [],
+    "errors": [],
+}, separators=(",", ":"), sort_keys=True))
 PY
+        adapter_status=$?
         trap - EXIT HUP INT TERM
         cleanup_delivery_api
-        return 0
+        return "$adapter_status"
     fi
 
     message="$(cat "$error_file")"
