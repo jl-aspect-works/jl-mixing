@@ -83,7 +83,7 @@ assert data['revision']['number']==1
 assert data['current_revision']==1
 assert data['approved_revision']==1
 assert data['delivered_revision'] is None
-assert data['delivery_method']=='Download'
+assert data['delivery_method']=='Cloud transfer'
 assert data['replacement_mode']=='default'
 assert data['zip_requested'] is False
 assert data['zip_name'] is None
