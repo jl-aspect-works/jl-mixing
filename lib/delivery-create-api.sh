@@ -47,12 +47,12 @@ PY
 }
 
 jl_delivery_create_response() {
-    local api_version python json_seen project_seen project_ref dry_run zip_requested mode
+    local api_version python json_seen project_seen project_ref dry_run
     local output_file error_file result_file status project_root manifest delivery_root workspace_path
     local response_status error_code message
     api_version="$(jl_delivery_api_version)" || return "$JL_EXIT_CONFIG"
     python="$(jl_delivery_api_python)" || return "$JL_EXIT_CONFIG"
-    json_seen=0; project_seen=0; project_ref=""; dry_run=0; zip_requested=0; mode=default
+    json_seen=0; project_seen=0; project_ref=""; dry_run=0
 
     args=("$@")
     i=0
@@ -70,9 +70,6 @@ jl_delivery_create_response() {
                 project_ref="${args[$i]}"
                 ;;
             --dry-run) dry_run=1 ;;
-            --zip) zip_requested=1 ;;
-            --overwrite) mode=overwrite ;;
-            --clean) mode=clean ;;
         esac
         i=$((i + 1))
     done
