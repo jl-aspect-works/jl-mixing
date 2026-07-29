@@ -136,7 +136,48 @@ print_plan() {
     fi
 }
 
+write_delivery_result() {
+    result_status="$1"
+    result_delivered_revision="$2"
+    result_file="${JL_MIXING_DELIVERY_RESULT_FILE:-}"
+    [ -n "$result_file" ] || return 0
+
+    project_name="$(jl_json_get "$manifest" '.project_name')"
+    current_revision="$(jl_json_get_json "$manifest" '.state.current_revision')"
+    delivery_method="$(jl_json_get "$manifest" '.delivery.method')"
+    jq -n \
+        --arg status "$result_status" \
+        --arg project_id "$project_id" \
+        --arg project_name "$project_name" \
+        --arg project_path "$project_root" \
+        --arg revision_path "$revision_root" \
+        --arg delivery_method "$delivery_method" \
+        --arg replacement_mode "$mode" \
+        --arg zip_name "$zip_name" \
+        --argjson current_revision "$current_revision" \
+        --argjson approved_revision "$approved_revision" \
+        --argjson delivered_revision "$result_delivered_revision" \
+        --argjson zip_requested "$make_zip" \
+        --slurpfile plan "$plan_file" \
+        '{
+            status: $status,
+            project: {id: $project_id, name: $project_name, path: $project_path},
+            revision: {number: $approved_revision, path: $revision_path},
+            current_revision: $current_revision,
+            approved_revision: $approved_revision,
+            delivered_revision: $delivered_revision,
+            delivery_method: $delivery_method,
+            replacement_mode: $replacement_mode,
+            zip_requested: ($zip_requested == 1),
+            zip_name: (if $zip_requested == 1 then $zip_name else null end),
+            selected: ($plan[0].selected | map({source_name: .name, deliverable_type: .deliverable_type, path: .path})),
+            excluded: $plan[0].excluded,
+            deletions: $plan[0].deletions
+        }' > "$result_file" || return "$JL_EXIT_GENERAL"
+}
+
 if [ "$dry_run" -eq 1 ]; then
+    write_delivery_result planned null || exit $?
     printf 'Dry run — no changes made.\n\n'
     print_plan
     if [ "$clean" -eq 1 ]; then
@@ -190,6 +231,7 @@ jl_txn_commit_directory_and_file "$stage_root" "$delivery_root" "$staged_manifes
     jl_context_validate_project_v11 "$project_root" || exit $?
 stage_root=""; staged_manifest=""
 
+write_delivery_result success "$approved_revision" || exit $?
 printf 'Final delivery created successfully.\n\n'
 print_plan
 printf 'Files delivered:     %s\n' "$(jq -r '.selected | length' "$plan_file")"
