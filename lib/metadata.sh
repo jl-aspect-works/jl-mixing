@@ -31,6 +31,30 @@ jl_software_version() {
     printf '%s\n' "$first_line"
 }
 
+# Metadata provenance uses the same release-version grammar as VERSION. This
+# deliberately permits release-candidate/build suffixes without coupling
+# application provenance to metadata.schema_version.
+jl_json_require_created_with_semver() {
+    local file created_with actual_version
+    file="$1"
+
+    created_with="$(jl_json_get "$file" '.metadata.created_with')" || {
+        jl_error "Missing or invalid metadata.created_with in: $file"
+        return "$JL_EXIT_VALIDATION"
+    }
+    case "$created_with" in
+        'jl-mixing '*) actual_version="${created_with#jl-mixing }" ;;
+        *)
+            jl_error "Invalid created_with value '$created_with' in: $file"
+            return "$JL_EXIT_VALIDATION"
+            ;;
+    esac
+    if ! printf '%s\n' "$actual_version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'; then
+        jl_error "Invalid jl-mixing semantic version '$actual_version' in: $file"
+        return "$JL_EXIT_VALIDATION"
+    fi
+}
+
 # Build release-provenance metadata independently of schema_version.
 jl_created_with() {
     local software_version
