@@ -222,9 +222,9 @@ jl_json_require_created_with_semver() {
             ;;
     esac
 
-    # Reject suffixes and malformed semantic versions instead of accepting the
-    # loose shell pattern above as sufficient validation.
-    if ! printf '%s\n' "$actual_version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+    # Require semantic version core components while allowing standard
+    # prerelease and build metadata suffixes used by release candidates.
+    if ! printf '%s\n' "$actual_version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'; then
         jl_error "Invalid jl-mixing semantic version '$actual_version' in: $file"
         return "$JL_EXIT_VALIDATION"
     fi
