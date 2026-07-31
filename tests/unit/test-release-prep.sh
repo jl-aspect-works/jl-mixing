@@ -65,13 +65,14 @@ assert_file_exists "$ROOT/CHANGELOG.md"
 assert_file_exists "$ROOT/docs/RELEASE_NOTES_V1.1.md"
 assert_file_exists "$ROOT/docs/RELEASE_NOTES_V1.2.md"
 assert_file_exists "$ROOT/docs/RELEASE_NOTES_V1.3.md"
+assert_file_exists "$ROOT/docs/RELEASE_NOTES_V1.4.md"
 assert_file_exists "$ROOT/docs/SCOPE_FREEZE_V1.2.md"
-assert_eq "1.3.1" "$(sed -n '1p' "$ROOT/VERSION")" \
-    "v1.3 application release version"
+assert_eq "1.4.0-rc.1" "$(sed -n '1p' "$ROOT/VERSION")" \
+    "v1.4 RC application release version"
 assert_eq "1.0" "$(sed -n '1p' "$ROOT/API_VERSION")" \
     "Automation API version is independent"
 assert_contains "$(cat "$ROOT/.github/workflows/release.yml")" \
-    'docs/RELEASE_NOTES_V1.3.md' "release workflow publishes v1.3 notes"
+    'docs/RELEASE_NOTES_V1.4.md' "release workflow publishes v1.4 notes"
 assert_contains "$(cat "$ROOT/docs/USER_GUIDE.md")" \
     'create-delivery --clean' "user guide documents destructive clean"
 assert_contains "$(cat "$ROOT/docs/USER_GUIDE.md")" \
