@@ -33,6 +33,9 @@ expected_identities = {
     "project-manifest.json": "mixing-project",
     "delivery-manifest.json": "mixing-delivery",
 }
+created_with_pattern = (
+    r"^jl-mixing [0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$"
+)
 
 
 def visit_objects(node, location="<root>"):
@@ -53,9 +56,7 @@ for name in schema_names:
     assert schema["additionalProperties"] is False
     metadata = schema["properties"]["metadata"]
     assert metadata["properties"]["schema_version"]["const"] == "1.1.0"
-    assert metadata["properties"]["created_with"]["pattern"] == (
-        r"^jl-mixing [0-9]+\.[0-9]+\.[0-9]+$"
-    )
+    assert metadata["properties"]["created_with"]["pattern"] == created_with_pattern
     assert "created_by" not in metadata["properties"]
     visit_objects(schema, name)
 
@@ -65,7 +66,10 @@ for name in example_names:
     metadata = document["metadata"]
     assert metadata["schema"] == expected_identities[name]
     assert metadata["schema_version"] == "1.1.0"
-    assert re.fullmatch(r"jl-mixing [0-9]+\.[0-9]+\.[0-9]+", metadata["created_with"])
+    assert re.fullmatch(
+        r"jl-mixing [0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?",
+        metadata["created_with"],
+    )
     assert "created_by" not in metadata
 
 expected_templates = {

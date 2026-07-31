@@ -53,7 +53,8 @@ def validate_created_with(metadata: dict[str, Any], label: str) -> None:
     """Validate creator provenance without coupling it to schema_version."""
     value = metadata.get("created_with")
     if not isinstance(value, str) or not re.fullmatch(
-        r"jl-mixing [0-9]+\.[0-9]+\.[0-9]+", value
+        r"jl-mixing [0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?",
+        value,
     ):
         raise StateValidationError(
             f"{label} created_with must identify a semantic jl-mixing release"

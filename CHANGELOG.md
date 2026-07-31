@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.4.0
+
+- Added the structured Automation API 1.0 workflow operations used by JL Mixing
+  Studio v1.1: client/project creation, intake validation, revision creation and
+  approval, and delivery creation.
+- Added additive capability discovery for the completed workflow API surface.
+- Added provider-authored effective project artist and revision description
+  results plus authoritative intake report content for Studio reconciliation.
+- Expanded `delivery.create` results with selected/excluded files and clean-mode
+  deletion inventory required for safe Studio preview/confirm/commit handling.
+- Added SemVer prerelease/build-version support for application release identity,
+  API discovery, and persisted `created_with` provenance so release candidates
+  can be tested against real workspaces without changing metadata schema 1.1.0.
+- Preserved the existing human-facing CLI workflows and v1.1 workspace schemas.
+
 ## 1.3.0
 
 - Name delivery ZIPs with the project ID, zero-padded delivered revision, and
