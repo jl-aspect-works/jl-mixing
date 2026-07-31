@@ -1,10 +1,10 @@
 # Build and publish JL Mixing Automation release packages.
 #
 # Normal use:
-#   Push an annotated tag such as v1.3.0.
+#   Push an annotated tag such as v1.4.0-rc.1.
 #
 # Recovery use:
-#   Run this workflow manually and enter an existing tag, such as v1.3.0.
+#   Run this workflow manually and enter an existing tag, such as v1.4.0-rc.1.
 #   This is useful when package builds succeeded but the publish job failed.
 
 name: Release
@@ -17,7 +17,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Existing release tag to build and publish, such as v1.3.0"
+        description: "Existing release tag to build and publish, such as v1.4.0-rc.1"
         required: true
         type: string
 
@@ -173,7 +173,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ env.RELEASE_TAG }}
-          sparse-checkout: docs/RELEASE_NOTES_V1.3.md
+          sparse-checkout: docs/RELEASE_NOTES_V1.4.md
           sparse-checkout-cone-mode: false
 
       # Download and merge the macOS and Linux workflow artifacts into one
@@ -204,7 +204,7 @@ jobs:
           fi
 
       # Supplying --repo tells the GitHub CLI exactly which repository owns the
-      # release. A new release uses the reviewed v1.3 notes checked out above.
+      # release. A new release uses the reviewed v1.4 notes checked out above.
       # If a prior attempt already created the release, upload replaces assets.
       - name: Create or update GitHub release
         shell: bash
@@ -242,5 +242,5 @@ jobs:
                   --repo "$GITHUB_REPOSITORY" \
                   --verify-tag \
                   --title "JL Mixing Automation ${tag#v}" \
-                  --notes-file docs/RELEASE_NOTES_V1.3.md
+                  --notes-file docs/RELEASE_NOTES_V1.4.md
           fi
