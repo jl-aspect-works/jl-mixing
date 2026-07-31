@@ -24,7 +24,7 @@ jl_software_version() {
     fi
     first_line="$(sed -n '1p' "$version_file")"
     jl_assert_nonempty "$first_line" "software version" || return $?
-    if ! printf '%s\n' "$first_line" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+    if ! printf '%s\n' "$first_line" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'; then
         jl_error "Invalid application version '$first_line' in: $version_file"
         return "$JL_EXIT_CONFIG"
     fi
