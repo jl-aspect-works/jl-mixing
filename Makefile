@@ -28,7 +28,7 @@ test:
 # Require all runtime/development dependencies and execute the complete suite.
 strict-test:
 	@PYTHON="$${JL_MIXING_PYTHON:-}"; \
-	if [ -z "$$PYTHON" ] && [ -x .venv/bin/python ]; then PYTHON=.venv/bin/python; fi; \
+	if [ -z "$$PYTHON" ] && [ -x .venv/bin/python ]; then PYTHON="$$(cd .venv/bin && pwd -P)/python"; fi; \
 	if [ -z "$$PYTHON" ]; then PYTHON="$$(command -v python3 || true)"; fi; \
 	[ -n "$$PYTHON" ] || { echo "Missing Python 3" >&2; exit 1; }; \
 	command -v jq >/dev/null 2>&1 || { echo "Missing required command: jq" >&2; exit 1; }; \
@@ -38,7 +38,7 @@ strict-test:
 # Run semantic Draft 2020-12 validation only.
 schema-test:
 	@PYTHON="$${JL_MIXING_PYTHON:-}"; \
-	if [ -z "$$PYTHON" ] && [ -x .venv/bin/python ]; then PYTHON=.venv/bin/python; fi; \
+	if [ -z "$$PYTHON" ] && [ -x .venv/bin/python ]; then PYTHON="$$(cd .venv/bin && pwd -P)/python"; fi; \
 	if [ -z "$$PYTHON" ]; then PYTHON="$$(command -v python3 || true)"; fi; \
 	[ -n "$$PYTHON" ] || { echo "Missing Python 3" >&2; exit 1; }; \
 	"$$PYTHON" -c 'import jsonschema' 2>/dev/null || { echo "Missing jsonschema. Run: python3 -m venv .venv && .venv/bin/pip install -r packaging/requirements.txt" >&2; exit 1; }; \
