@@ -1,10 +1,5 @@
 #!/usr/bin/env bash
-# Create a JL Mixing Automation client profile.
+# JL Mixing Automation new-client launcher.
 set -eu
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-APP_ROOT="${JL_MIXING_HOME:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-# shellcheck source=lib/client-create.sh
-. "$APP_ROOT/lib/client-create.sh"
-
-jl_client_create_command "$@"
+exec "$SCRIPT_DIR/jl-mixing-python-command" jl_mixing.new_client_cli "$@"
