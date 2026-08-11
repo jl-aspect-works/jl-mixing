@@ -16,6 +16,7 @@ from .errors import ContextError, UnsafeOperationError, ValidationError
 from .metadata import create_v11, validate_v11
 from .naming import slugify
 from .paths import assert_no_symlink_components
+from .transactions import commit_new_directory
 from .validation import require_bit_depth, require_file_format, require_sample_rate, require_slug
 from .versions import application_root
 
@@ -118,7 +119,7 @@ def create_studio(request: StudioCreateRequest) -> StudioCreateResult:
         )
         if root.exists() or root.is_symlink():
             raise UnsafeOperationError(f"Studio root already exists: {root}")
-        os.replace(stage, root)
+        commit_new_directory(stage, root)
     except Exception:
         if stage.exists():
             shutil.rmtree(stage, ignore_errors=True)
