@@ -1,7 +1,7 @@
-# JL Mixing Automation v1.3 Command Reference
+# JL Mixing Automation v1.5 Command Reference
 
-Every command supports `-h` and `--help`. Mutating commands validate governing
-JSON and filesystem boundaries before committing changes.
+Every human-facing command supports `-h` and `--help`. Mutating commands validate
+workspace metadata and filesystem boundaries before committing changes.
 
 ## `jl-mixing`
 
@@ -11,15 +11,11 @@ jl-mixing --help
 ```
 
 `jl-mixing` is the canonical machine-facing Automation API dispatcher.
-`system-info --json` writes exactly one JSON discovery object to standard output
-and reports the Automation API version, application release, metadata schema
-compatibility, implemented capabilities, and installed API schema location.
+`system-info --json` reports the Automation API version, application release,
+metadata schema compatibility, capabilities, and installed API schema location.
 
-API clients must use the reported `api_version` and `capabilities`. They must not
-infer compatibility from the Automation application release. The initial API
-1.0 capability set contains only `system.info`; existing human-facing commands
-remain outside the machine API until their structured operation contracts are
-implemented.
+API clients must use `api_version` and `capabilities`, not the application
+release number, to determine compatibility.
 
 ## `new-studio`
 
@@ -30,8 +26,7 @@ new-studio [--root PATH] [--name NAME] [--engineer NAME]
            [--default-cd|--no-default-cd] [--dry-run]
 ```
 
-Creates a new, previously nonexistent workspace. No DAW directories or DAW
-metadata are created.
+Creates a new workspace. The default root is `~/Music/Mixes/`.
 
 ## `new-client`
 
@@ -39,10 +34,20 @@ metadata are created.
 new-client CLIENT_ID [--name NAME] [--artist NAME]
            [--sample-rate HZ] [--bit-depth BITS]
            [--file-format WAV|AIFF] [--delivery-method TEXT]
-           [--deliverables LIST] [--cd|--no-cd] [--dry-run]
+           [--deliverables LIST] [--root PATH]
+           [--cd|--no-cd] [--dry-run]
 ```
 
 Creates `Clients/<Readable Name>/client.json` and `Projects/`.
+
+Studio-root resolution order is:
+
+1. explicit `--root PATH`
+2. `JL_MIXING_ROOT`
+3. current-directory studio context
+4. default `~/Music/Mixes` workspace
+
+This allows studio-level client creation from an unrelated working directory.
 
 ## `new-mix`
 
@@ -59,14 +64,9 @@ Options include:
   --description TEXT   --source PATH    --cd|--no-cd  --dry-run
 ```
 
-Exactly one project name is required. The positional form may appear before or
-after other valid options. Supplying both forms or additional positional
-arguments is rejected before filesystem mutation.
-
-Creates the complete flattened project tree, strict project manifest, immutable
-client-profile snapshot, and unapproved `Revision_01/Revision_Notes.md` in one
-atomic transaction. When `--artist` is omitted, artist precedence is client
-artist default, then client display name.
+Creates the complete project tree, project manifest, client-profile snapshot,
+and unapproved Revision 1 transactionally. Artist precedence is explicit
+`--artist`, client artist default, then client display name.
 
 ## `validate-intake`
 
@@ -77,8 +77,13 @@ validate-intake [--project PATH] [--source PATH]
                 [--no-duplicate-check] [--dry-run]
 ```
 
-Preserves v1.0.4 intake behavior while writing the clearer v1.1-schema managed
-report. `--no-duplicate-check` skips duplicate-basename detection only.
+Validation is read-only with respect to original client files. The managed report
+can include metadata, decode-integrity results, exact SHA-256 duplicates,
+project-format mismatches, channel counts, exact dual-mono warnings, unsupported
+or unreadable files, skipped checks, and preparation recommendations.
+
+`ffprobe` and `ffmpeg` are used when available for enhanced checks. Missing
+external inspection tools produce explicit skipped-check reporting.
 
 ## `new-revision`
 
@@ -88,8 +93,7 @@ new-revision [--project PATH] [--description TEXT]
 ```
 
 Creates the next contiguous `Revision_NN/` directory and advances
-`state.current_revision` transactionally. For v1.2-created projects, the first
-call creates Revision 2. Existing valid zero-revision projects remain supported.
+`state.current_revision` transactionally.
 
 ## `approve-mix`
 
@@ -98,8 +102,8 @@ approve-mix [--project PATH] [--revision NUMBER]
             [--approved-by NAME] [--date TIMESTAMP] [--dry-run]
 ```
 
-Approves the current revision by default. Approval may move to any existing
-revision. Approval does not modify revision files or final-delivery content.
+Approves the current revision by default. Approval may move to another existing
+revision and does not modify revision files or final-delivery content.
 
 ## `create-delivery`
 
@@ -110,20 +114,47 @@ create-delivery [--project PATH] [--include PATTERN]
 ```
 
 Packages the approved revision, verifies copied bytes with SHA-256, writes the
-strict delivery manifest, and updates `state.delivered_revision` as one
-rollback-capable transaction.
+delivery manifest, and updates `state.delivered_revision` transactionally.
 
-To create a ZIP with completed notes, run `create-delivery`, edit
-`05_Final_Delivery/Delivery_Notes.md`, then run
-`create-delivery --zip --overwrite`. `--overwrite` requires an unchanged
-delivered path set. `--clean` replaces all contents of `05_Final_Delivery/`, not
-only files listed by a prior manifest.
+For a ZIP containing edited delivery notes:
 
-`--zip` creates
-`<project-id>-rev-<NN>-<YYYYMMDDHHMMSS>.zip`, using the delivered revision and
-a local creation timestamp.
+```text
+create-delivery
+edit 05_Final_Delivery/Delivery_Notes.md
+create-delivery --zip --overwrite
+```
 
-## Removed v1.0 interface
+`--overwrite` requires an unchanged delivered path set. `--clean` replaces all
+contents inside `05_Final_Delivery/`; review `--dry-run --clean` before using it.
 
-v1.3 retains the v1.1 removal of the project-completion command. Known v1.0
-flags are rejected with specific diagnostics rather than silently ignored.
+Generated ZIPs use:
+
+```text
+<project-id>-rev-<NN>-<YYYYMMDDHHMMSS>.zip
+```
+
+## Automation API 1.0 capabilities
+
+v1.5 advertises these capability names through `system-info`:
+
+```text
+client.create
+delivery.create
+intake.validate
+intake.validate.report
+project.create
+project.create.artist
+revision.approve
+revision.create
+revision.create.description
+system.info
+```
+
+The API schemas under `api/schemas/v1.0/` govern machine request/response
+contracts. Human CLI output is not a machine API contract.
+
+## Removed legacy interface
+
+v1.5 retains the v1.1 removal of the project-completion command and other retired
+v1.0 options. Known removed flags are rejected with explicit diagnostics rather
+than silently ignored.
