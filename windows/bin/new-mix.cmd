@@ -1,3 +1,5 @@
 @echo off
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0jl-mixing-python-command.ps1" "jl_mixing.new_mix_cli" %*
+setlocal
+set "_JL_MIXING_MODULE=jl_mixing.new_mix_cli"
+call "%~dp0jl-mixing-python-command.cmd" %*
 exit /b %ERRORLEVEL%
