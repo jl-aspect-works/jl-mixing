@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 import shutil
 import tempfile
 from dataclasses import dataclass
@@ -14,6 +13,7 @@ from .errors import ContextError, UnsafeOperationError, ValidationError
 from .metadata import create_v11
 from .naming import sanitize_folder_name, title_from_slug
 from .paths import assert_no_case_insensitive_child_collision, assert_no_symlink_components
+from .transactions import commit_new_directory
 from .validation import (
     require_bit_depth,
     require_deliverables,
@@ -151,7 +151,7 @@ def create_client(request: ClientCreateRequest) -> ClientCreateResult:
         )
         if destination.exists() or destination.is_symlink():
             raise UnsafeOperationError(f"Client destination already exists: {destination}")
-        os.replace(stage, destination)
+        commit_new_directory(stage, destination)
     except Exception:
         if stage.exists():
             shutil.rmtree(stage, ignore_errors=True)
