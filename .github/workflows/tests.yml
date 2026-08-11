@@ -34,7 +34,7 @@ jobs:
 
   windows-python:
     # Exercise the v1.5 authoritative Python runtime, native command glue,
-    # self-contained runtime bundle, and installer on Windows.
+    # self-contained runtime bundle, installer, and release ZIP on Windows.
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -61,3 +61,6 @@ jobs:
       - name: Run Windows installation lifecycle tests
         shell: pwsh
         run: ./tests/windows/test-installation.ps1
+      - name: Run Windows release package lifecycle tests
+        shell: pwsh
+        run: ./tests/windows/test-release-package.ps1
