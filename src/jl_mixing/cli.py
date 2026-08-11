@@ -12,6 +12,9 @@ from .api.client_create import parse_args as parse_client_args
 from .api.intake_validate import _error_envelope as intake_error_envelope
 from .api.intake_validate import execute as intake_execute
 from .api.intake_validate import parse_args as parse_intake_args
+from .api.project_create import _error_envelope as project_error_envelope
+from .api.project_create import execute as project_execute
+from .api.project_create import parse_args as parse_project_args
 from .errors import ArgumentError, ValidationError
 from .system_info import document as system_info_document
 
@@ -45,6 +48,19 @@ def main(argv: Sequence[str] | None = None) -> int:
             _emit_json(client_error_envelope("VALIDATION_FAILED", str(exc), exc.exit_code, status="blocked"))
             return exc.exit_code
         payload, status = client_execute(request)
+        _emit_json(payload)
+        return status
+
+    if len(args) >= 2 and args[0:2] == ["project", "create"]:
+        try:
+            request = parse_project_args(args[2:])
+        except ArgumentError as exc:
+            _emit_json(project_error_envelope("INVALID_REQUEST", str(exc), exc.exit_code))
+            return exc.exit_code
+        except ValidationError as exc:
+            _emit_json(project_error_envelope("VALIDATION_FAILED", str(exc), exc.exit_code, status="blocked"))
+            return exc.exit_code
+        payload, status = project_execute(request)
         _emit_json(payload)
         return status
 
