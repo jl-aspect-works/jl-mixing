@@ -2,4 +2,4 @@
 # JL Mixing Automation new-revision launcher.
 set -eu
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-exec "$SCRIPT_DIR/jl-mixing-python-command" jl_mixing.new_revision_cli "$@"
+exec bash "$SCRIPT_DIR/jl-mixing-python-command" jl_mixing.new_revision_cli "$@"
