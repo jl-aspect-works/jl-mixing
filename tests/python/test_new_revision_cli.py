@@ -88,7 +88,7 @@ class NewRevisionCliTests(unittest.TestCase):
             self.assertIn("New revision:               2", proc.stdout)
             self.assertIn("Description:                Client notes", proc.stdout)
             self.assertIn("Revision_02/Mix.wav", proc.stdout)
-            self.assertIn("state.current_revision: 1 → 2", proc.stdout)
+            self.assertIn("state.current_revision: 1 -> 2", proc.stdout)
             self.assertIn("state.approved_revision: null", proc.stdout)
             self.assertIn("approve-mix", proc.stdout)
             self.assertFalse((project / "04_Revisions" / "Revision_02").exists())
