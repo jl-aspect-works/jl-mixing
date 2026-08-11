@@ -57,7 +57,9 @@ jobs:
         with:
           python-version: "3.12"
           cache: "pip"
-          cache-dependency-path: packaging/requirements.txt
+          cache-dependency-path: |
+            packaging/requirements.txt
+            packaging/macos-build-requirements.txt
 
       - name: Install operating-system dependencies
         shell: bash
@@ -80,6 +82,9 @@ jobs:
           set -euo pipefail
           python -m pip install --upgrade pip
           python -m pip install -r packaging/requirements.txt
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+              python -m pip install -r packaging/macos-build-requirements.txt
+          fi
 
       - name: Verify tag and application version
         shell: bash
@@ -95,6 +100,16 @@ jobs:
               echo "Actual tag:   $RELEASE_TAG" >&2
               exit 1
           fi
+
+      - name: Build self-contained macOS runtime
+        if: runner.os == 'macOS'
+        shell: bash
+        run: bash ./macos/build-runtime.sh
+
+      - name: Run bundled macOS runtime smoke tests
+        if: runner.os == 'macOS'
+        shell: bash
+        run: bash ./tests/macos/test-runtime-bundle.sh
 
       - name: Run release verification
         shell: bash
@@ -124,6 +139,12 @@ jobs:
               fi
               echo "Created: $file"
           done
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+              tar -tzf "$archive" | grep -q "jl-mixing-${version}/runtime/python$" || {
+                  echo "macOS release archive is missing runtime/python." >&2
+                  exit 1
+              }
+          fi
           echo
           ls -lh dist
 
