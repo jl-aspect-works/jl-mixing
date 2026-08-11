@@ -19,6 +19,7 @@ from .errors import ContextError, UnsafeOperationError, ValidationError
 from .metadata import now_iso8601, validate_v11
 from .paths import assert_no_case_insensitive_child_collision, assert_no_symlink_components
 from .revision_source import RevisionSourcePlan, build_plan, copy_from_plan
+from .transactions import _fail_requested, _injected_failure
 from .versions import application_root
 
 
@@ -124,6 +125,21 @@ def _render_notes(number: int, description: str) -> str:
     return text.replace("{{REVISION_NUMBER}}", str(number)).replace("{{REVISION_DESCRIPTION}}", description)
 
 
+def _restore_manifest(path: Path, data: bytes, mode: int) -> None:
+    fd, temp_name = tempfile.mkstemp(prefix=f".{path.name}.jl-restore-", dir=path.parent)
+    restore = Path(temp_name)
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(data)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.chmod(restore, mode)
+        os.replace(restore, path)
+    finally:
+        if restore.exists():
+            restore.unlink()
+
+
 def create_revision(request: RevisionCreateRequest) -> RevisionCreateResult:
     project_root = resolve_project(request.project_root, Path.cwd())
     studio_root = resolve_studio_root(project_root)
@@ -179,10 +195,13 @@ def create_revision(request: RevisionCreateRequest) -> RevisionCreateResult:
             updated, effective_cd, source_plan, False,
         )
 
+    prior_manifest = manifest_path.read_bytes()
+    prior_manifest_mode = manifest_path.stat().st_mode & 0o777
     stage = Path(tempfile.mkdtemp(prefix=f".{revision_name}.jl-stage-", dir=revisions_root))
     manifest_fd, manifest_temp_name = tempfile.mkstemp(prefix=f".{manifest_path.name}.", dir=manifest_path.parent)
     manifest_temp = Path(manifest_temp_name)
     committed_directory = False
+    manifest_replaced = False
     try:
         os.close(manifest_fd)
         if source_plan is not None:
@@ -196,21 +215,30 @@ def create_revision(request: RevisionCreateRequest) -> RevisionCreateResult:
         )
         if revision_root.exists() or revision_root.is_symlink():
             raise UnsafeOperationError(f"Revision destination already exists: {revision_root}")
+
+        if _fail_requested("after-coordinated-backup"):
+            raise _injected_failure("after-coordinated-backup")
+
         os.replace(stage, revision_root)
         committed_directory = True
-        try:
-            os.replace(manifest_temp, manifest_path)
-        except Exception:
-            shutil.rmtree(revision_root, ignore_errors=True)
-            committed_directory = False
-            raise
+        if _fail_requested("after-coordinated-directory"):
+            raise _injected_failure("after-coordinated-directory")
+
+        os.replace(manifest_temp, manifest_path)
+        manifest_replaced = True
+        if _fail_requested("after-coordinated-file"):
+            raise _injected_failure("after-coordinated-file")
     except Exception:
-        if stage.exists():
-            shutil.rmtree(stage, ignore_errors=True)
+        if manifest_replaced:
+            _restore_manifest(manifest_path, prior_manifest, prior_manifest_mode)
+            manifest_replaced = False
         if committed_directory and revision_root.exists():
             shutil.rmtree(revision_root, ignore_errors=True)
+            committed_directory = False
         raise
     finally:
+        if stage.exists():
+            shutil.rmtree(stage, ignore_errors=True)
         if manifest_temp.exists():
             manifest_temp.unlink()
 
