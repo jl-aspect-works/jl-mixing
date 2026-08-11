@@ -109,7 +109,8 @@ def _parse(args: list[str]) -> tuple[ClientCreateRequest | None, bool]:
     if dry_run and (cd_seen or no_cd_seen):
         raise ArgumentError("--cd and --no-cd cannot be used with --dry-run.")
 
-    root = studio_root(Path.cwd())
+    configured_root = os.environ.get("JL_MIXING_ROOT")
+    root = studio_root(Path(configured_root) if configured_root else Path.cwd())
     return (
         ClientCreateRequest(
             studio_root=root,
