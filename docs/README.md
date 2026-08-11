@@ -24,6 +24,7 @@
 - [v1.1 Release Notes](RELEASE_NOTES_V1.1.md)
 - [v1.2 Release Notes](RELEASE_NOTES_V1.2.md)
 - [v1.3 Release Notes](RELEASE_NOTES_V1.3.md)
+- [v1.4 Release Notes](RELEASE_NOTES_V1.4.md)
 
 For current behavior, prefer the v1.5 User Guide, Command Reference,
 Installation Guide, API implementation-status document, and v1.5 release notes.
