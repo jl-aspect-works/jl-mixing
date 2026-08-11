@@ -9,6 +9,7 @@ function Assert-True {
 $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 $python = (Get-Command python.exe -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
 $pwsh = (Get-Command pwsh.exe -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
+$bundledRuntime = Join-Path $root 'runtime\python.exe'
 $tempRoot = Join-Path ([IO.Path]::GetTempPath()) ("jl-mixing-windows-install-{0}" -f [Guid]::NewGuid().ToString('N'))
 $prefix = Join-Path $tempRoot 'prefix'
 $profile = Join-Path $tempRoot 'profile\Microsoft.PowerShell_profile.ps1'
@@ -22,11 +23,17 @@ $originalFailure = $env:JL_MIXING_TEST_FAIL_INSTALL_AT
 try {
     New-Item -ItemType Directory -Force -Path (Split-Path -Parent $profile) | Out-Null
     Set-Content -LiteralPath $profile -Value "# user profile content`r`n" -NoNewline -Encoding utf8
-    $env:JL_MIXING_TEST_PYTHON = $python
     $env:JL_MIXING_TEST_PROFILE = $profile
 
+    $expectedTestRuntime = -not (Test-Path -LiteralPath $bundledRuntime -PathType Leaf)
+    if ($expectedTestRuntime) {
+        $env:JL_MIXING_TEST_PYTHON = $python
+    } else {
+        Remove-Item Env:JL_MIXING_TEST_PYTHON -ErrorAction SilentlyContinue
+    }
+
     & $pwsh -NoProfile -File (Join-Path $root 'windows\install.ps1') -Prefix $prefix | Out-Null
-    Assert-True ($LASTEXITCODE -eq 0) 'Windows installer succeeds with CI test runtime'
+    Assert-True ($LASTEXITCODE -eq 0) 'Windows installer succeeds'
 
     $app = Join-Path $prefix 'share\jl-mixing'
     $bin = Join-Path $prefix 'bin'
@@ -34,11 +41,14 @@ try {
     Assert-True (Test-Path -LiteralPath (Join-Path $app 'src\jl_mixing\__init__.py') -PathType Leaf) 'installed application contains Python package'
     Assert-True (Test-Path -LiteralPath (Join-Path $bin 'jl-mixing.cmd') -PathType Leaf) 'installed jl-mixing launcher exists'
     Assert-True (Test-Path -LiteralPath (Join-Path $bin 'jl-mixing-shell-integration.ps1') -PathType Leaf) 'installed PowerShell integration exists'
+    if (-not $expectedTestRuntime) {
+        Assert-True (Test-Path -LiteralPath (Join-Path $app 'runtime\python.exe') -PathType Leaf) 'installer copies bundled Windows runtime'
+    }
 
     $state = Get-Content -LiteralPath (Join-Path $app 'install-state.json') -Raw | ConvertFrom-Json
     Assert-True ($state.installation_prefix -eq [IO.Path]::GetFullPath($prefix)) 'install state records prefix'
     Assert-True ($state.shell_integration.enabled -eq $true) 'install state records shell integration'
-    Assert-True ($state.test_runtime -eq $true) 'CI install state records test runtime mode'
+    Assert-True ($state.test_runtime -eq $expectedTestRuntime) 'install state records runtime mode'
 
     $profileText = Get-Content -LiteralPath $profile -Raw
     Assert-True ($profileText -match '# user profile content') 'installer preserves user PowerShell profile content'
