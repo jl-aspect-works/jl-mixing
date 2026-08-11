@@ -119,7 +119,7 @@ echo "[OK] Shell syntax"
 for test_file in tests/unit/test-*.sh; do
     echo
     echo "Running $test_file"
-    "$test_file"
+    bash "$test_file"
 done
 
 validator_python="${JL_MIXING_PYTHON:-}"
@@ -144,7 +144,7 @@ if [ "$runtime_available" -eq 1 ]; then
     for test_file in tests/integration/test-*.sh; do
         echo
         echo "Running $test_file"
-        "$test_file"
+        bash "$test_file"
     done
     echo
     "$validator_python" tools/validate-json.py --strict
@@ -157,7 +157,7 @@ if [ "$runtime_available" -eq 1 ]; then
         for test_file in tests/installation/test-*.sh; do
             echo
             echo "Running $test_file"
-            "$test_file"
+            bash "$test_file"
         done
     fi
 else
