@@ -129,7 +129,7 @@ def main(argv: list[str] | None = None) -> int:
                     for name in result.source_plan.files:
                         print(f"  {revision_name}/{name}")
             print("\nWould update:")
-            print(f"  state.current_revision: {result.previous_revision} → {result.number}")
+            print(f"  state.current_revision: {result.previous_revision} -> {result.number}")
             print(f"  revisions: append Revision {result.number}")
             print("  metadata.last_modified_at")
             print("\nWould preserve:")
