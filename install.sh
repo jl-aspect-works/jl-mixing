@@ -100,6 +100,7 @@ README.md
 CHANGELOG.md
 bin
 lib
+src
 api
 schemas
 templates
@@ -310,7 +311,7 @@ trap rollback_install EXIT HUP INT TERM
 
 stage_app="$stage_root/share/jl-mixing"
 stage_bin="$stage_root/bin"
-mkdir -p "$stage_app/bin" "$stage_app/lib" "$stage_app/api" "$stage_app/schemas" \
+mkdir -p "$stage_app/bin" "$stage_app/lib" "$stage_app/src" "$stage_app/api" "$stage_app/schemas" \
     "$stage_app/templates" "$stage_app/docs" "$stage_app/tools" \
     "$stage_app/packaging" "$stage_bin"
 
@@ -318,6 +319,7 @@ cp "$SOURCE_ROOT/VERSION" "$SOURCE_ROOT/API_VERSION" "$SOURCE_ROOT/LICENSE" \
     "$SOURCE_ROOT/README.md" "$SOURCE_ROOT/CHANGELOG.md" "$stage_app/"
 cp -R "$SOURCE_ROOT/bin/." "$stage_app/bin/"
 cp -R "$SOURCE_ROOT/lib/." "$stage_app/lib/"
+cp -R "$SOURCE_ROOT/src/." "$stage_app/src/"
 cp -R "$SOURCE_ROOT/api/." "$stage_app/api/"
 cp -R "$SOURCE_ROOT/schemas/." "$stage_app/schemas/"
 cp -R "$SOURCE_ROOT/templates/." "$stage_app/templates/"
@@ -459,6 +461,7 @@ fi
 
 # Verify the complete staged installation before touching the active version.
 [ -x "$stage_app/.venv/bin/python" ]
+[ -f "$stage_app/src/jl_mixing/__init__.py" ]
 [ -f "$stage_app/install-state.json" ]
 jq -e '.installation_prefix and (.shell_integration.enabled | type == "boolean")' \
     "$stage_app/install-state.json" >/dev/null
@@ -530,6 +533,7 @@ install_maybe_fail after-shell
 # Final verification happens against stable paths. Any failure triggers rollback.
 [ -f "$app_dir/VERSION" ]
 [ -x "$app_dir/.venv/bin/python" ]
+[ -f "$app_dir/src/jl_mixing/__init__.py" ]
 while IFS= read -r public_name; do
     [ -x "$bin_dir/$public_name" ] || exit 5
 done <<EOF_FINAL_PUBLIC
