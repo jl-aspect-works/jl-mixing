@@ -9,6 +9,9 @@ from collections.abc import Sequence
 from .api.client_create import _error_envelope as client_error_envelope
 from .api.client_create import execute as client_execute
 from .api.client_create import parse_args as parse_client_args
+from .api.delivery_create import _error_envelope as delivery_error_envelope
+from .api.delivery_create import execute as delivery_execute
+from .api.delivery_create import parse_args as parse_delivery_args
 from .api.intake_validate import _error_envelope as intake_error_envelope
 from .api.intake_validate import execute as intake_execute
 from .api.intake_validate import parse_args as parse_intake_args
@@ -93,6 +96,19 @@ def main(argv: Sequence[str] | None = None) -> int:
             _emit_json(approval_error_envelope("VALIDATION_FAILED", str(exc), exc.exit_code, status="blocked"))
             return exc.exit_code
         payload, status = approval_execute(request)
+        _emit_json(payload)
+        return status
+
+    if len(args) >= 2 and args[0:2] == ["delivery", "create"]:
+        try:
+            request = parse_delivery_args(args[2:])
+        except ArgumentError as exc:
+            _emit_json(delivery_error_envelope("INVALID_REQUEST", str(exc), exc.exit_code))
+            return exc.exit_code
+        except ValidationError as exc:
+            _emit_json(delivery_error_envelope("DELIVERY_VALIDATION_FAILED", str(exc), exc.exit_code, status="blocked"))
+            return exc.exit_code
+        payload, status = delivery_execute(request)
         _emit_json(payload)
         return status
 
