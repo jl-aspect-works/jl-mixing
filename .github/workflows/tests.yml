@@ -14,7 +14,6 @@ jobs:
         os: [macos-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      # Fetch the exact commit under review.
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
@@ -31,6 +30,30 @@ jobs:
         env:
           JL_MIXING_PYTHON: ${{ env.pythonLocation }}/bin/python
         run: make strict-test
+
+  macos-runtime:
+    # Build and exercise the self-contained macOS application runtime.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install runtime dependencies
+        run: |
+          python -m pip install -r packaging/requirements.txt
+          python -m pip install -r packaging/macos-build-requirements.txt
+      - name: Build self-contained macOS runtime
+        run: bash ./macos/build-runtime.sh
+      - name: Run bundled macOS runtime smoke tests
+        run: bash ./tests/macos/test-runtime-bundle.sh
+      - name: Verify macOS release tarball includes runtime
+        run: |
+          rm -rf dist
+          ./tools/build-release --platform macos --output-dir dist
+          version="$(tr -d '[:space:]' < VERSION)"
+          archive="dist/jl-mixing-${version}-macos.tar.gz"
+          tar -tzf "$archive" | grep -q "jl-mixing-${version}/runtime/python$"
 
   windows-python:
     # Exercise the v1.5 authoritative Python runtime, native command glue,
