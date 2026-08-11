@@ -1,168 +1,135 @@
 # JL Mixing Automation
 
-JL Mixing Automation v1.3 creates and manages a consistent filesystem workflow
-for professional mixing projects. It preserves original client files, tracks
-revision approvals, and builds verified final-delivery packages without taking
-ownership of the DAW session itself.
+JL Mixing Automation v1.5 is a cross-platform workflow engine for professional
+mixing projects. It creates consistent workspaces, preserves original client
+files, manages revisions and approval, validates intake, and builds verified
+final-delivery packages.
 
-## v1.3 workflow
+The authoritative v1.5 runtime is Python and is shared across Windows and macOS.
+The Automation API remains version `1.0`, while workspace metadata schemas remain
+version `1.1.0`.
+
+## Workflow
 
 ```text
 new-studio
-  → new-client
-  → new-mix (creates Revision_01)
-  → validate-intake
-  → work in and send the current revision manually
-  → new-revision when another revision is needed
-  → approve-mix
-  → create-delivery
+  -> new-client
+  -> new-mix (creates Revision_01)
+  -> validate-intake
+  -> work in and send the current revision
+  -> new-revision when needed
+  -> approve-mix
+  -> create-delivery
 ```
 
-The default workspace is `~/Music/Mixes/`. Projects have stable paths beneath
+The default workspace is `~/Music/Mixes/`. Projects live directly beneath
 `Clients/<Client>/Projects/<Project>/`; there are no `Active/` or `Completed/`
-directories and no project-completion command.
+directories.
 
-## Requirements
+## Installation
 
-- macOS or Linux
-- Bash 3.2 or newer
-- Python 3.10 or newer
-- `jq`
-- `ffprobe` is optional and preserves the opportunistic intake inspection
-  available in v1.0.4
+### Windows
 
-## Install a release archive
+Download and extract the Windows ZIP, then run the included PowerShell installer:
+
+```powershell
+.\windows\install.ps1
+```
+
+The Windows package includes its private Python runtime. End users do not need to
+install Python, Bash, or jq separately. The default installation is beneath:
+
+```text
+%LOCALAPPDATA%\Programs\JL Mixing\
+```
+
+Open a new PowerShell session after installation so the managed PATH and shell
+integration are active.
+
+### macOS
+
+Download and extract the macOS archive, then run:
 
 ```bash
-cd ~/Downloads
-tar -xzf jl-mixing-1.3.0-macos.tar.gz
-cd jl-mixing-1.3.0
+./macos/install.sh
+```
+
+The macOS package includes its private Python runtime. End users do not need a
+separate Python or jq installation. The default prefix is `~/.local`.
+
+### Linux and source/developer installs
+
+The Linux/source installer remains the compatibility path:
+
+```bash
 ./install.sh
 ```
 
-Use the `linux` archive name on Linux. The default installation is:
+It requires Bash, Python 3.10+ with `venv`, and jq. See
+[`docs/INSTALLATION_GUIDE.md`](docs/INSTALLATION_GUIDE.md) for platform-specific
+details and custom-prefix options.
 
-```text
-Application: ~/.local/share/jl-mixing/
-Commands:    ~/.local/bin/
-```
-
-The installer adds one reversible managed block to `.zshrc` or `.bashrc`. That
-single block adds the command directory to `PATH` and loads the optional shell
-wrappers used by `--cd`. Open a new Terminal tab after installation, or source
-the startup file shown by the installer.
-
-To install without editing shell configuration:
-
-```bash
-./install.sh --no-shell-integration
-```
-
-To install under another prefix:
-
-```bash
-./install.sh --prefix "$HOME/Applications/jl-local"
-```
+`ffprobe`/`ffmpeg` are optional external tools used for enhanced audio intake QC.
+When unavailable, affected checks are reported as skipped rather than silently
+assumed to have passed.
 
 ## Start
 
 ```bash
 new-studio
 new-client acme --name "Acme Records"
-cd "$HOME/Music/Mixes/Clients/Acme Records"
-new-mix "Blue Sky"
+new-mix "Blue Sky" --client acme
 ```
 
-`new-mix --project "Blue Sky"` remains fully supported. When `--artist` is
-omitted, `new-mix` uses the client's artist default and then the client display
-name. Creation commands print a copy-and-paste `Next:` command. When shell
-integration is active, `new-client`, `new-mix`, and `new-revision` can change the
-current Terminal directory with `--cd`; the studio-wide default is configured
-by `new-studio --default-cd`.
+`new-client` can be run from anywhere. Studio-root resolution uses this order:
 
-## Compatibility rule
+1. explicit `--root PATH`
+2. `JL_MIXING_ROOT`
+3. current-directory studio context
+4. the default `~/Music/Mixes` workspace
 
-JL Mixing Automation v1.3 continues using the v1.1 workspace schemas and is
-compatible with valid v1.1 workspaces. Application provenance is independent:
-new records use `created_with: jl-mixing 1.3.0` while the unchanged document
-contract remains `schema_version: 1.1.0`. It does not migrate, restructure, or
-modify v1.0 workspaces. Copy only user-owned material, such as original client
-deliveries or notes, into newly created v1.1/v1.2 projects. Do not copy v1.0
-JSON manifests or complete v1.0 project directories.
+## Automation API
 
-## Automation API discovery
+Machine clients discover the installed provider with:
 
-JL Mixing Studio and other supported machine clients discover the installed
-provider contract through:
-
-```bash
+```text
 jl-mixing system-info --json
 ```
 
-The response reports the Automation API version, application release, workspace
-metadata schema compatibility, implemented capabilities, and installed API
-schema location as separate fields. Clients must use `api_version` and
-`capabilities`; they must not infer API compatibility from the application
-release number.
+API 1.0 advertises capability-backed operations including:
 
-The initial API 1.0 implementation advertises only `system.info`. Existing
-human-facing workflow commands remain supported but are not machine API
-operations until their structured contracts and parity tests are implemented.
-
-## Delivery behavior
-
-`create-delivery` always packages the approved revision. Every selected regular
-file is eligible regardless of extension. Familiar filename phrases are
-classified on a best-effort basis; unmatched files are recorded as
-`unclassified` and are still delivered.
-
-To create a ZIP containing completed delivery notes:
-
-```bash
-create-delivery
-# Edit 05_Final_Delivery/Delivery_Notes.md
-create-delivery --zip --overwrite
+```text
+client.create
+project.create
+project.create.artist
+intake.validate
+intake.validate.report
+revision.create
+revision.create.description
+revision.approve
+delivery.create
+system.info
 ```
 
-`--overwrite` preserves the edited notes when the delivered path set is
-unchanged. A one-step `create-delivery --zip` packages the clean notes template
-because it creates and zips the delivery before the user can edit the file.
+Clients must use the reported `api_version` and `capabilities`; they must not
+infer API compatibility from the Automation product release number.
 
-Generated ZIPs use
-`<project-id>-rev-<NN>-<YYYYMMDDHHMMSS>.zip`, with a zero-padded revision and
-local timestamp.
+## Compatibility
 
-`create-delivery --clean` is intentionally destructive: it replaces every item
-inside the resolved project's `05_Final_Delivery/` directory. Dry-run lists the
-planned deletions before any changes occur.
+- Automation application release: v1.5
+- Automation API: `1.0`
+- readable metadata schemas: `1.1.0`
+- writable metadata schema: `1.1.0`
+- no v1.0 workspace migration
 
-## Upgrade and uninstall
+Existing valid v1.1+ workspaces remain usable. New records identify the current
+application release in `created_with` without changing the metadata schema
+identity.
 
-Running a newer release's `install.sh` upgrades the application transactionally
-without modifying studio workspaces.
+## Documentation
 
-```bash
-jl-mixing-uninstall
-```
+Start with [`docs/README.md`](docs/README.md), the
+[`User Guide`](docs/USER_GUIDE.md), and the
+[`Installation Guide`](docs/INSTALLATION_GUIDE.md).
 
-Uninstall removes the application, managed launchers, and the exact managed
-shell block. It never removes studio workspaces.
-
-## Developer setup and quality gates
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -r packaging/requirements.txt
-
-make test
-make strict-test
-tools/shellcheck-all
-make release-check
-```
-
-Release archives, checksums, and inventories are written to `dist/` by
-`make release`.
-
-See [docs/README.md](docs/README.md) for the full documentation index and
-[docs/RELEASE_NOTES_V1.3.md](docs/RELEASE_NOTES_V1.3.md) for release highlights.
+JL Mixing Automation is licensed under Apache-2.0. See [LICENSE](LICENSE).
