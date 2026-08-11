@@ -22,6 +22,7 @@ from .context import resolve_project, revision_root_for_number, studio_root as r
 from .errors import ContextError, UnsafeOperationError, ValidationError
 from .metadata import create_v11, now_iso8601
 from .revision import _load_manifest, _validate_project_state, _validate_schema
+from .transactions import _fail_requested, _injected_failure
 from .versions import application_root
 
 DeliveryMode = Literal["default", "overwrite", "clean"]
@@ -445,42 +446,70 @@ def _stage_delivery(
     return delivery_manifest
 
 
+def _restore_file_bytes(path: Path, data: bytes, mode: int) -> None:
+    fd, temp_name = tempfile.mkstemp(prefix=f".{path.name}.jl-restore-", dir=path.parent)
+    temp = Path(temp_name)
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(data)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.chmod(temp, mode)
+        os.replace(temp, path)
+    finally:
+        if temp.exists():
+            temp.unlink()
+
+
 def _commit_delivery_and_manifest(stage: Path, delivery_root: Path, manifest_temp: Path, manifest_path: Path) -> None:
+    if manifest_path.is_symlink() or not manifest_path.is_file():
+        raise UnsafeOperationError(f"Project manifest is missing or unsafe: {manifest_path}")
+    prior_manifest = manifest_path.read_bytes()
+    prior_manifest_mode = manifest_path.stat().st_mode & 0o777
+
     parent = delivery_root.parent
     backup = Path(tempfile.mkdtemp(prefix=f".{delivery_root.name}.jl-backup-", dir=parent))
     backup.rmdir()
     moved_old = False
     installed_new = False
+    manifest_replaced = False
     try:
         if delivery_root.exists() or delivery_root.is_symlink():
             if delivery_root.is_symlink() or not delivery_root.is_dir():
                 raise UnsafeOperationError(f"Delivery root is missing or unsafe: {delivery_root}")
             os.replace(delivery_root, backup)
             moved_old = True
+
+        if _fail_requested("after-coordinated-backup"):
+            raise _injected_failure("after-coordinated-backup")
+
         os.replace(stage, delivery_root)
         installed_new = True
-        try:
-            os.replace(manifest_temp, manifest_path)
-        except Exception:
-            if installed_new and delivery_root.exists():
-                shutil.rmtree(delivery_root, ignore_errors=True)
-            installed_new = False
-            if moved_old:
-                os.replace(backup, delivery_root)
-                moved_old = False
-            raise
+        if _fail_requested("after-coordinated-directory"):
+            raise _injected_failure("after-coordinated-directory")
+
+        os.replace(manifest_temp, manifest_path)
+        manifest_replaced = True
+        if _fail_requested("after-coordinated-file"):
+            raise _injected_failure("after-coordinated-file")
+
         if moved_old and backup.exists():
             shutil.rmtree(backup)
             moved_old = False
     except Exception:
-        if stage.exists():
-            shutil.rmtree(stage, ignore_errors=True)
+        if manifest_replaced:
+            _restore_file_bytes(manifest_path, prior_manifest, prior_manifest_mode)
+            manifest_replaced = False
         if installed_new and delivery_root.exists():
             shutil.rmtree(delivery_root, ignore_errors=True)
+            installed_new = False
         if moved_old and backup.exists() and not delivery_root.exists():
             os.replace(backup, delivery_root)
+            moved_old = False
         raise
     finally:
+        if stage.exists():
+            shutil.rmtree(stage, ignore_errors=True)
         if backup.exists():
             shutil.rmtree(backup, ignore_errors=True)
 
