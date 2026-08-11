@@ -1,8 +1,9 @@
-"""Cross-platform staged file transaction primitives."""
+"""Cross-platform staged transaction primitives."""
 
 from __future__ import annotations
 
 import os
+import shutil
 import tempfile
 from pathlib import Path
 
@@ -17,6 +18,36 @@ def _fail_requested(point: str) -> bool:
 
 def _injected_failure(point: str) -> JLMixingError:
     return JLMixingError(f"Injected transaction failure at: {point}")
+
+
+def commit_new_directory(staged_directory: Path, destination: Path) -> None:
+    """Commit a staged directory that must not already exist.
+
+    Preserves the v1.4 ``before-directory-commit`` and
+    ``after-directory-commit`` failure-injection contract. A failure after the
+    rename removes only the directory created by this transaction.
+    """
+
+    if staged_directory.is_symlink() or not staged_directory.is_dir():
+        raise JLMixingError(f"Staged directory is missing or unsafe: {staged_directory}")
+    if destination.exists() or destination.is_symlink():
+        raise JLMixingError(f"Transaction destination already exists: {destination}")
+    if _fail_requested("before-directory-commit"):
+        raise _injected_failure("before-directory-commit")
+
+    committed = False
+    try:
+        os.replace(staged_directory, destination)
+        committed = True
+        if _fail_requested("after-directory-commit"):
+            raise _injected_failure("after-directory-commit")
+    except Exception:
+        if committed and (destination.exists() or destination.is_symlink()):
+            if destination.is_symlink() or destination.is_file():
+                destination.unlink()
+            elif destination.is_dir():
+                shutil.rmtree(destination, ignore_errors=True)
+        raise
 
 
 def _write_sibling(path: Path, data: bytes, mode: int | None) -> Path:
