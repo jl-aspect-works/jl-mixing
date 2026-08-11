@@ -34,18 +34,23 @@ def _read_first_line(path: Path, label: str) -> str:
 
 
 def application_version() -> str:
-    value = _read_first_line(application_root() / "VERSION", "application version")
+    version_file = Path(os.environ.get("JL_MIXING_VERSION_FILE", application_root() / "VERSION"))
+    value = _read_first_line(version_file, "application version")
     if not _SEMVER.fullmatch(value):
         raise RuntimeError(f"Invalid application version: {value}")
     return value
 
 
 def api_version() -> str:
-    value = _read_first_line(application_root() / "API_VERSION", "Automation API version")
+    version_file = Path(os.environ.get("JL_MIXING_API_VERSION_FILE", application_root() / "API_VERSION"))
+    value = _read_first_line(version_file, "Automation API version")
     if not _API_VERSION.fullmatch(value):
         raise RuntimeError(f"Invalid Automation API version: {value}")
     return value
 
 
 def schema_root() -> Path:
-    return application_root() / "api" / "schemas" / f"v{api_version()}"
+    path = application_root() / "api" / "schemas" / f"v{api_version()}"
+    if not path.is_dir():
+        raise RuntimeError(f"Automation API schemas are not installed: {path}")
+    return path

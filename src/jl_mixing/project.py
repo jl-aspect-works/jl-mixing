@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 import shutil
 import tempfile
 import uuid
@@ -21,6 +20,7 @@ from .metadata import create_v11, now_iso8601, validate_v11
 from .naming import sanitize_folder_name, slugify
 from .paths import assert_no_case_insensitive_child_collision, assert_no_symlink_components
 from .source_import import SourcePlan, build_plan, copy_from_plan
+from .transactions import commit_new_directory
 from .validation import require_bit_depth, require_deliverables, require_file_format, require_sample_rate, require_slug
 from .versions import application_root
 
@@ -309,7 +309,7 @@ def create_project(request: ProjectCreateRequest) -> ProjectCreateResult:
             copy_from_plan(values["source_plan"], stage / "01_Client_Files" / "Original_Delivery")
         if project_root.exists() or project_root.is_symlink():
             raise UnsafeOperationError(f"Project destination already exists: {project_root}")
-        os.replace(stage, project_root)
+        commit_new_directory(stage, project_root)
     except Exception:
         if stage.exists():
             shutil.rmtree(stage, ignore_errors=True)

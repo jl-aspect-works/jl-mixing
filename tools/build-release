@@ -76,7 +76,7 @@ mkdir -p "$package_root"
 cp "$ROOT/VERSION" "$ROOT/API_VERSION" "$ROOT/LICENSE" "$ROOT/CHANGELOG.md" \
     "$ROOT/install.sh" "$ROOT/uninstall.sh" "$package_root/"
 cp "$ROOT/packaging/RELEASE_README.md" "$package_root/README.md"
-cp -R "$ROOT/bin" "$ROOT/lib" "$ROOT/api" "$ROOT/schemas" "$ROOT/templates" "$ROOT/docs" "$package_root/"
+cp -R "$ROOT/bin" "$ROOT/lib" "$ROOT/src" "$ROOT/api" "$ROOT/schemas" "$ROOT/templates" "$ROOT/docs" "$package_root/"
 mkdir -p "$package_root/tools" "$package_root/packaging"
 cp "$ROOT/tools/validate-json.py" "$ROOT/tools/build-intake-report.py" \
     "$ROOT/tools/project-state.py" "$ROOT/tools/import-project-source.py" \

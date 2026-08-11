@@ -1,10 +1,5 @@
 #!/usr/bin/env bash
-# Human-facing project creation launcher backed by the shared project-create service.
+# JL Mixing Automation new-mix launcher.
 set -eu
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-APP_ROOT="${JL_MIXING_HOME:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-# shellcheck source=lib/project-create.sh
-. "$APP_ROOT/lib/project-create.sh"
-
-jl_project_create_command "$@"
+exec bash "$SCRIPT_DIR/jl-mixing-python-command" jl_mixing.new_mix_cli "$@"

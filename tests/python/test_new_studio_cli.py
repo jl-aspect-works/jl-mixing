@@ -47,7 +47,8 @@ class NewStudioCliTests(unittest.TestCase):
                 "--dry-run",
             )
             self.assertEqual(proc.returncode, 0, proc.stderr)
-            self.assertIn("Dry run - no changes made.", proc.stdout)
+            expected_heading = "Dry run - no changes made." if os.name == "nt" else "Dry run — no changes made."
+            self.assertIn(expected_heading, proc.stdout)
             self.assertIn("Studio:                     My Studio", proc.stdout)
             self.assertIn("Audio format:               96000 Hz / 32-bit / AIFF", proc.stdout)
             self.assertIn("Automatic directory change: enabled", proc.stdout)

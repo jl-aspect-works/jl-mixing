@@ -91,6 +91,10 @@ def _pointer(value: object) -> str:
     return "null" if value is None else str(value)
 
 
+def _transition() -> str:
+    return "->" if os.name == "nt" else "→"
+
+
 def _print_summary(result: RevisionCreateResult, heading: str, *, planned: bool) -> None:
     print(heading)
     print()
@@ -129,7 +133,7 @@ def main(argv: list[str] | None = None) -> int:
                     for name in result.source_plan.files:
                         print(f"  {revision_name}/{name}")
             print("\nWould update:")
-            print(f"  state.current_revision: {result.previous_revision} -> {result.number}")
+            print(f"  state.current_revision: {result.previous_revision} {_transition()} {result.number}")
             print(f"  revisions: append Revision {result.number}")
             print("  metadata.last_modified_at")
             print("\nWould preserve:")

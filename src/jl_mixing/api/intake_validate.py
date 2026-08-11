@@ -80,8 +80,14 @@ def execute(request: IntakeRequest) -> tuple[dict[str, Any], int]:
             duplicate_check=request.duplicate_check,
         )
         report_path = project / "00_Admin" / "Intake_Report.md"
-        if not request.dry_run:
+        if request.dry_run:
+            report_markdown = result.report_markdown
+        else:
             replace_managed_section(report_path, _BEGIN, _END, result.report_markdown)
+            try:
+                report_markdown = report_path.read_text(encoding="utf-8")
+            except OSError as exc:
+                raise ValidationError(f"Intake report is unreadable after update: {report_path}") from exc
 
         status = "planned" if request.dry_run and not result.blocked else "blocked" if result.blocked else "success"
         exit_code = 5 if result.blocked else 0
@@ -91,7 +97,7 @@ def execute(request: IntakeRequest) -> tuple[dict[str, Any], int]:
             "intake_report_path": str(report_path),
             "workspace_path": str(_workspace_path(project)),
             "source_path": str(source),
-            "report_markdown": result.report_markdown,
+            "report_markdown": report_markdown,
             "summary": {
                 "files_discovered": result.files_discovered,
                 "blocking_errors": result.blocking_errors,
