@@ -2,60 +2,87 @@
 
 ## Current implementation
 
-Automation API `1.0` discovery is implemented through:
+JL Mixing Automation v1.5 implements Automation API `1.0` on the same Python
+services used by the human CLI. Discovery is available through:
 
-```bash
+```text
 jl-mixing system-info --json
 ```
 
-The discovery response reports these independently versioned contracts:
+The discovery response reports independently versioned contracts:
 
-- Automation API version from `API_VERSION`;
-- Automation application release from `VERSION`;
-- readable and writable workspace metadata schema versions;
-- implemented machine-facing capabilities; and
-- installed and public API-schema locations.
+- Automation API version from `API_VERSION`
+- Automation application release from `VERSION`
+- readable and writable workspace metadata schema versions
+- implemented machine-facing capabilities
+- installed/public API schema locations
 
-The discovery response is governed by
-`api/schemas/v1.0/system-info.schema.json` and has a reviewed golden example at
-`api/examples/v1.0/success/system-info.json`.
+Workspace metadata remains schema `1.1.0`; application release changes do not
+implicitly change API or metadata-schema versions.
 
-## Distribution contract
+## Advertised capability set
 
-The installer and release archive ship the dispatcher, `API_VERSION`, API
-schemas, and golden examples as one versioned application unit. Installation,
-upgrade, archive-verification, and uninstall tests verify that:
-
-- the public `jl-mixing` launcher is installed and executable;
-- `system-info --json` resolves the installed schema directory;
-- the reported API, application, and metadata-schema versions remain distinct;
-- packaged discovery output validates against the installed schema; and
-- uninstall removes the managed dispatcher without modifying studio workspaces.
-
-## Capability admission rule
-
-`system-info` advertises only capabilities implemented and covered by contract
-tests. The initial capability set is:
+v1.5 advertises:
 
 ```text
+client.create
+delivery.create
+intake.validate
+intake.validate.report
+project.create
+project.create.artist
+revision.approve
+revision.create
+revision.create.description
 system.info
 ```
 
-Existing human-facing commands are not automatically Automation API operations.
-They remain supported, but Studio and other API clients must not treat their
-human-readable output as API `1.0` JSON.
+Each advertised workflow capability is backed by the shared Python service layer
+and structured API adapter rather than by parsing human-readable CLI output.
 
-Workflow capabilities such as `client.create`, `project.create`,
-`intake.validate`, `revision.create`, `revision.approve`, and `delivery.create`
-will be advertised only after their dispatcher routes, response envelopes,
-schemas, golden examples, parity tests, and packaging checks are implemented.
+## Contract artifacts
 
-## Compatibility
+API 1.0 schemas are shipped beneath:
 
-The Automation application version may change without changing `API_VERSION`
-when the published API contract remains backward compatible. Workspace metadata
-schema versions remain independent from both product and API versions.
+```text
+api/schemas/v1.0/
+```
 
-Within API major version 1, clients must ignore unknown optional fields and use
-capability discovery instead of inferring support from the Automation product
-release number.
+Reviewed success/error examples are shipped beneath:
+
+```text
+api/examples/v1.0/
+```
+
+`system-info` reports the installed schema location so offline clients can
+validate provider responses against the exact installed contract.
+
+## Distribution contract
+
+Windows and macOS release packages include the dispatcher, `API_VERSION`, API
+schemas/examples, shared Python services, and private runtime as one application
+unit. Linux/source installation uses the compatibility installer but exposes the
+same API contract.
+
+Release and lifecycle tests verify provider discovery, installed schemas,
+application/API/schema version separation, and workspace preservation during
+install/uninstall operations.
+
+## Compatibility rule
+
+Clients must admit providers based on:
+
+1. compatible `api_version`
+2. required capability names
+3. supported readable/writable metadata schema versions as appropriate
+
+Clients must not require the Automation product release number to match their
+own release number. Within API major version 1, clients should tolerate unknown
+optional response fields and rely on capability discovery for feature admission.
+
+## Human CLI relationship
+
+Human commands and machine operations share authoritative workflow services, but
+their presentation contracts are separate. Human-formatted stdout/stderr must
+not be treated as Automation API JSON unless a documented machine operation
+explicitly defines that output.
