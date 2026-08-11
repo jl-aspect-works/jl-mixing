@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=70"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jl-mixing"
+dynamic = ["version"]
+description = "Cross-platform JL Mixing Automation runtime"
+requires-python = ">=3.10"
+license = {text = "Apache-2.0"}
+
+[project.scripts]
+jl-mixing-python = "jl_mixing.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.dynamic]
+version = {file = ["VERSION"]}
