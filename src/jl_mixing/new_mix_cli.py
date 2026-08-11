@@ -199,7 +199,9 @@ def _parse(args: list[str]) -> tuple[ProjectCreateRequest | None, bool]:
     if project_name is None:
         raise ArgumentError("A project name is required. Supply it positionally or with --project.")
 
-    client_root = resolve_client_reference(client_reference, Path.cwd())
+    configured_root = os.environ.get("JL_MIXING_ROOT")
+    context = Path(configured_root) if configured_root else Path.cwd()
+    client_root = resolve_client_reference(client_reference, context)
     return ProjectCreateRequest(
         client_root=client_root,
         project_name=project_name,
