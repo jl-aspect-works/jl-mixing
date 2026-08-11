@@ -16,6 +16,17 @@ def title_from_slug(slug: str) -> str:
     return " ".join(part[:1].upper() + part[1:] for part in slug.split("-"))
 
 
+def slugify(value: str) -> str:
+    """Derive the v1.4-compatible lowercase ASCII project/client slug."""
+
+    normalized = unicodedata.normalize("NFKD", value)
+    ascii_value = normalized.encode("ascii", "ignore").decode("ascii").lower()
+    slug = re.sub(r"[^a-z0-9]+", "-", ascii_value).strip("-")
+    if not slug:
+        raise ValidationError("Project name does not produce a usable project ID.")
+    return slug
+
+
 def sanitize_folder_name(value: str) -> str:
     value = unicodedata.normalize("NFC", value)
     characters: list[str] = []
