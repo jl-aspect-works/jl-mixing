@@ -60,7 +60,7 @@ class IntakeServiceTests(unittest.TestCase):
             self.assertEqual(result.report_markdown, helper_report.read_text(encoding="utf-8"))
             self.assertEqual(result.files_discovered, 3)
             self.assertEqual(result.blocking_errors, 0)
-            self.assertEqual(result.warnings, 4)  # duplicate pair + 3 unsupported files
+            self.assertEqual(result.warnings, 5)  # duplicate pair + 3 unsupported files + ffprobe unavailable
             self.assertFalse(result.ffprobe_available)
 
 
