@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -116,7 +117,8 @@ def main(argv: list[str] | None = None) -> int:
                 print("Approval timestamp:          current time at execution")
             print("\nWould update:")
             prior_pointer = "null" if result.previous_approved_revision is None else str(result.previous_approved_revision)
-            print(f"  state.approved_revision: {prior_pointer} -> {result.number}")
+            arrow = "->" if os.name == "nt" else "→"
+            print(f"  state.approved_revision: {prior_pointer} {arrow} {result.number}")
             print(f"  Revision {result.number} approval metadata")
             print("  metadata.last_modified_at")
             if prior_approved_at is not None:
