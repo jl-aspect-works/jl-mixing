@@ -122,9 +122,9 @@ infer API compatibility from the Automation product release number.
 - writable metadata schema: `1.1.0`
 - no v1.0 workspace migration
 
-Existing valid v1.1+ workspaces remain usable. New records identify the current
-application release in `created_with` without changing the metadata schema
-identity.
+v1.5 is compatible with valid v1.1 workspaces and later compatible 1.1.0-schema
+records. New records identify the current application release in `created_with`
+without changing the metadata schema identity.
 
 ## Documentation
 
