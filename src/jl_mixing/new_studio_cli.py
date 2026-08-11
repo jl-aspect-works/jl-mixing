@@ -122,7 +122,7 @@ def main(argv: list[str] | None = None) -> int:
         default_cd = result.document["cli"]["change_directory_after_create"] is True
         shell_active = _truthy(os.environ.get("JL_MIXING_SHELL_INTEGRATION"))
         if request.dry_run:
-            dry_run_heading = "Dry run -> no changes made." if os.name == "nt" else "Dry run — no changes made."
+            dry_run_heading = "Dry run - no changes made." if os.name == "nt" else "Dry run — no changes made."
             _print_summary(result, dry_run_heading)
             print("\nWould create:\n  Clients/\n  Studio/\n  Studio/studio.json")
             print("\nAfter creation:\n  new-client <client-id>")
