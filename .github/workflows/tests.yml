@@ -35,6 +35,9 @@ jobs:
       - name: Run bundled macOS runtime smoke tests
         if: runner.os == 'macOS'
         run: bash ./tests/macos/test-runtime-bundle.sh
+      - name: Run self-contained macOS installation lifecycle tests
+        if: runner.os == 'macOS'
+        run: bash ./tests/macos/test-self-contained-installation.sh
       - name: Run strict Batch 4 tests
         env:
           JL_MIXING_PYTHON: ${{ env.pythonLocation }}/bin/python
