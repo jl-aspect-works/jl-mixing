@@ -15,6 +15,7 @@ from jl_mixing import (
     approve_mix_cli,
     cli,
     create_delivery_cli,
+    macos_installer,
     new_client_cli,
     new_mix_cli,
     new_revision_cli,
@@ -33,6 +34,7 @@ ENTRY_POINTS: dict[str, EntryPoint] = {
     "jl_mixing.new_revision_cli": new_revision_cli.main,
     "jl_mixing.approve_mix_cli": approve_mix_cli.main,
     "jl_mixing.create_delivery_cli": create_delivery_cli.main,
+    "jl_mixing.macos_installer": macos_installer.main,
 }
 
 
