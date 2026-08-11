@@ -9,9 +9,9 @@ from pathlib import Path
 
 from .client import ClientCreateRequest, create_client
 from .context import studio_root
-from .errors import ArgumentError, JLMixingError, ValidationError
+from .errors import ArgumentError, ContextError, JLMixingError, ValidationError
 
-_USAGE = """Usage: new-client CLIENT_ID [options]\n\nOptions:\n  --name NAME             Display name (default: title-cased client ID)\n  --artist NAME           Default artist or program name\n  --sample-rate HZ        Default project sample rate\n  --bit-depth BITS        Default project bit depth\n  --file-format FORMAT    Default project format: WAV or AIFF\n  --delivery-method TEXT  Default delivery method\n  --deliverables LIST     Comma-separated requested deliverables\n  --cd                    Enter the new client directory after creation\n  --no-cd                 Remain in the current directory after creation\n  --dry-run               Show the planned client without creating it\n  -h, --help              Show this help\n"""
+_USAGE = """Usage: new-client CLIENT_ID [options]\n\nOptions:\n  --name NAME             Display name (default: title-cased client ID)\n  --artist NAME           Default artist or program name\n  --sample-rate HZ        Default project sample rate\n  --bit-depth BITS        Default project bit depth\n  --file-format FORMAT    Default project format: WAV or AIFF\n  --delivery-method TEXT  Default delivery method\n  --deliverables LIST     Comma-separated requested deliverables\n  --root PATH             Studio root to target explicitly\n  --cd                    Enter the new client directory after creation\n  --no-cd                 Remain in the current directory after creation\n  --dry-run               Show the planned client without creating it\n  -h, --help              Show this help\n"""
 
 
 def _removed_option(name: str) -> ArgumentError:
@@ -36,6 +36,20 @@ def _parse_deliverables(value: str) -> list[str]:
     return values
 
 
+def _resolve_studio_root(explicit_root: str | None) -> Path:
+    if explicit_root:
+        return studio_root(Path(explicit_root).expanduser())
+
+    configured_root = os.environ.get("JL_MIXING_ROOT")
+    if configured_root:
+        return studio_root(Path(configured_root).expanduser())
+
+    try:
+        return studio_root(Path.cwd())
+    except ContextError:
+        return studio_root(Path.home() / "Music" / "Mixes")
+
+
 def _parse(args: list[str]) -> tuple[ClientCreateRequest | None, bool]:
     if not args:
         raise ArgumentError("client ID must not be empty.")
@@ -53,6 +67,7 @@ def _parse(args: list[str]) -> tuple[ClientCreateRequest | None, bool]:
         "file_format": None,
         "delivery_method": None,
         "deliverables": None,
+        "root": None,
     }
     cd_value: bool | None = None
     cd_seen = False
@@ -73,7 +88,16 @@ def _parse(args: list[str]) -> tuple[ClientCreateRequest | None, bool]:
             cd_value = False
         elif arg == "--dry-run":
             dry_run = True
-        elif arg in {"--name", "--artist", "--sample-rate", "--bit-depth", "--file-format", "--delivery-method", "--deliverables"}:
+        elif arg in {
+            "--name",
+            "--artist",
+            "--sample-rate",
+            "--bit-depth",
+            "--file-format",
+            "--delivery-method",
+            "--deliverables",
+            "--root",
+        }:
             index += 1
             if index >= len(args):
                 raise ArgumentError(f"{arg} requires a value.")
@@ -96,8 +120,10 @@ def _parse(args: list[str]) -> tuple[ClientCreateRequest | None, bool]:
                 values["file_format"] = value
             elif arg == "--delivery-method":
                 values["delivery_method"] = value
-            else:
+            elif arg == "--deliverables":
                 values["deliverables"] = _parse_deliverables(value)
+            else:
+                values["root"] = value
         elif arg.startswith("-"):
             raise ArgumentError(f"Unknown option: {arg}")
         else:
@@ -109,8 +135,8 @@ def _parse(args: list[str]) -> tuple[ClientCreateRequest | None, bool]:
     if dry_run and (cd_seen or no_cd_seen):
         raise ArgumentError("--cd and --no-cd cannot be used with --dry-run.")
 
-    configured_root = os.environ.get("JL_MIXING_ROOT")
-    root = studio_root(Path(configured_root) if configured_root else Path.cwd())
+    root_value = values["root"] if isinstance(values["root"], str) else None
+    root = _resolve_studio_root(root_value)
     return (
         ClientCreateRequest(
             studio_root=root,
