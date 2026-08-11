@@ -33,7 +33,7 @@ jobs:
         run: make strict-test
 
   windows-python:
-    # Exercise the v1.5 authoritative Python runtime and native command glue on Windows.
+    # Exercise the v1.5 authoritative Python runtime, native command glue, and installer on Windows.
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -49,3 +49,6 @@ jobs:
       - name: Run native Windows command surface tests
         shell: pwsh
         run: ./tests/windows/test-command-surface.ps1
+      - name: Run Windows installation lifecycle tests
+        shell: pwsh
+        run: ./tests/windows/test-installation.ps1
