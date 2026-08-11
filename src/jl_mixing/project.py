@@ -6,25 +6,22 @@ import json
 import os
 import shutil
 import tempfile
+import uuid
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 from typing import Any
 
+import jsonschema
+
 from .context import studio_root as resolve_studio_root
 from .errors import ContextError, UnsafeOperationError, ValidationError
-from .metadata import create_v11, now_iso8601
+from .metadata import create_v11, now_iso8601, validate_v11
 from .naming import sanitize_folder_name, slugify
 from .paths import assert_no_case_insensitive_child_collision, assert_no_symlink_components
 from .source_import import SourcePlan, build_plan, copy_from_plan
-from .validation import (
-    require_bit_depth,
-    require_deliverables,
-    require_file_format,
-    require_sample_rate,
-    require_slug,
-)
+from .validation import require_bit_depth, require_deliverables, require_file_format, require_sample_rate, require_slug
 from .versions import application_root
 
 
@@ -72,8 +69,7 @@ def _load_json(path: Path, schema: str) -> dict[str, Any]:
     except (OSError, json.JSONDecodeError) as exc:
         raise ValidationError(f"Invalid JSON document: {path}") from exc
     metadata = document.get("metadata")
-    if not isinstance(metadata, dict) or metadata.get("schema") != schema or metadata.get("schema_version") != "1.1.0":
-        raise ValidationError(f"Unexpected schema identity in: {path}")
+    validate_v11(metadata, schema, mutability="mutable")
     return document
 
 
@@ -120,6 +116,17 @@ def _project_id_available(projects_root: Path, candidate: str) -> None:
             raise ValidationError(f"Project ID already exists for this client: {candidate}")
 
 
+def _validate_schema(filename: str, document: dict[str, Any]) -> None:
+    schema_path = application_root() / "schemas" / filename
+    try:
+        schema = json.loads(schema_path.read_text(encoding="utf-8"))
+        jsonschema.Draft202012Validator(schema).validate(document)
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ContextError(f"Required schema is unreadable: {schema_path}") from exc
+    except jsonschema.ValidationError as exc:
+        raise ValidationError(f"Generated document failed {filename}: {exc.message}") from exc
+
+
 def _write_template(name: str, destination: Path, replacements: dict[str, str] | None = None) -> None:
     source = application_root() / "templates" / name
     try:
@@ -131,13 +138,9 @@ def _write_template(name: str, destination: Path, replacements: dict[str, str] |
     destination.write_text(text, encoding="utf-8", newline="\n")
 
 
-def _resolve_inputs(request: ProjectCreateRequest) -> tuple[
-    Path, Path, dict[str, Any], dict[str, Any], dict[str, Any], str, str, str, str,
-    int, int, str, str, list[str], bool, SourcePlan | None
-]:
+def _resolve_inputs(request: ProjectCreateRequest) -> dict[str, Any]:
     client_root = request.client_root.expanduser().resolve(strict=False)
-    client_file = client_root / "client.json"
-    client = _load_json(client_file, "mixing-client")
+    client = _load_json(client_root / "client.json", "mixing-client")
     studio_root = resolve_studio_root(client_root)
     studio = _load_json(studio_root / "Studio" / "studio.json", "mixing-studio")
     clients_root = studio_root / "Clients"
@@ -172,15 +175,22 @@ def _resolve_inputs(request: ProjectCreateRequest) -> tuple[
     studio_audio = studio_defaults.get("audio") if isinstance(studio_defaults.get("audio"), dict) else {}
     studio_delivery = studio_defaults.get("delivery") if isinstance(studio_defaults.get("delivery"), dict) else {}
 
-    if request.artist is None:
-        artist = _optional_text(client_defaults.get("artist")) or client_name
-    else:
-        artist = _nonempty(request.artist, "Artist")
-    engineer = _optional_text(request.engineer) if request.engineer is not None else _optional_text(studio_defaults.get("mix_engineer"))
+    artist = (_optional_text(client_defaults.get("artist")) or client_name) if request.artist is None else _nonempty(request.artist, "Artist")
+    engineer = _optional_text(studio_defaults.get("mix_engineer")) if request.engineer is None else _optional_text(request.engineer)
 
-    sample_rate = require_sample_rate(request.sample_rate if request.sample_rate is not None else client_audio.get("sample_rate", studio_audio.get("sample_rate")))
-    bit_depth = require_bit_depth(request.bit_depth if request.bit_depth is not None else client_audio.get("bit_depth", studio_audio.get("bit_depth")))
-    file_format = require_file_format(request.file_format if request.file_format is not None else client_audio.get("file_format", studio_audio.get("file_format")))
+    sample_rate_source = request.sample_rate if request.sample_rate is not None else client_audio.get("sample_rate")
+    if sample_rate_source in {None, ""}:
+        sample_rate_source = studio_audio.get("sample_rate")
+    bit_depth_source = request.bit_depth if request.bit_depth is not None else client_audio.get("bit_depth")
+    if bit_depth_source in {None, ""}:
+        bit_depth_source = studio_audio.get("bit_depth")
+    format_source = request.file_format if request.file_format is not None else client_audio.get("file_format")
+    if format_source in {None, ""}:
+        format_source = studio_audio.get("file_format")
+    sample_rate = require_sample_rate(sample_rate_source)
+    bit_depth = require_bit_depth(bit_depth_source)
+    file_format = require_file_format(format_source)
+
     delivery_method = _nonempty(client_delivery.get("method") or studio_delivery.get("method"), "delivery method")
     inherited_deliverables = client_delivery.get("requested_deliverables")
     if not isinstance(inherited_deliverables, list) or not inherited_deliverables:
@@ -188,114 +198,91 @@ def _resolve_inputs(request: ProjectCreateRequest) -> tuple[
     deliverables = require_deliverables(request.deliverables if request.deliverables is not None else inherited_deliverables)
 
     cli = studio.get("cli") if isinstance(studio.get("cli"), dict) else {}
-    inherited_cd = cli.get("change_directory_after_create") is True
-    effective_cd = request.change_directory if request.change_directory is not None else inherited_cd
+    effective_cd = request.change_directory if request.change_directory is not None else cli.get("change_directory_after_create") is True
 
-    source_plan = None
-    if request.source is not None:
-        source = request.source.expanduser().resolve(strict=False)
-        if source.is_dir():
-            try:
-                projects_root.resolve(strict=False).relative_to(source)
-            except ValueError:
-                pass
-            else:
-                raise UnsafeOperationError(f"Source directory cannot contain the client Projects directory: {source}")
-        source_plan = build_plan(source)
+    source_plan = build_plan(request.source) if request.source is not None else None
+    if source_plan is not None and source_plan.source_type == "directory":
+        try:
+            projects_root.resolve(strict=False).relative_to(source_plan.source)
+        except ValueError:
+            pass
+        else:
+            raise UnsafeOperationError(f"Source directory cannot contain the client Projects directory: {source_plan.source}")
 
-    context = {
+    return {
+        "studio_root": studio_root,
+        "client_root": client_root,
+        "client": client,
+        "project_root": project_root,
         "project_name": project_name,
         "project_id": project_id,
-        "folder_name": folder_name,
         "client_name": client_name,
         "client_id": client_id,
         "client_document_id": client_document_id,
         "artist": artist,
         "engineer": engineer,
+        "sample_rate": sample_rate,
+        "bit_depth": bit_depth,
+        "file_format": file_format,
+        "delivery_method": delivery_method,
+        "deliverables": deliverables,
+        "effective_cd": effective_cd,
+        "source_plan": source_plan,
     }
-    return (
-        studio_root, client_root, studio, client, context, project_root,
-        _optional_text(request.album), _optional_text(request.producer), _optional_text(request.musical_key),
-        sample_rate, bit_depth, file_format, delivery_method, deliverables, effective_cd, source_plan,
-    )
 
 
 def create_project(request: ProjectCreateRequest) -> ProjectCreateResult:
-    (
-        studio_root, client_root, studio, client, context, project_root,
-        album, producer, musical_key, sample_rate, bit_depth, file_format,
-        delivery_method, deliverables, effective_cd, source_plan,
-    ) = _resolve_inputs(request)
-
+    values = _resolve_inputs(request)
     bpm = _validate_bpm(request.bpm)
     deadline = _validate_deadline(request.deadline)
     timestamp = now_iso8601()
-    project_metadata = create_v11("mixing-project", mutability="mutable", timestamp=timestamp)
-    snapshot_metadata = create_v11("mixing-client-profile-snapshot", mutability="immutable", timestamp=timestamp)
-    revision_metadata_id = create_v11("placeholder", mutability="immutable", timestamp=timestamp)["document_id"]
-    revision_record = {
-        "number": 1,
-        "revision_id": revision_metadata_id,
-        "created_at": timestamp,
-        "description": "Initial mix",
-        "approval": {"approved_at": None, "approved_by": None},
-    }
+
     manifest: dict[str, Any] = {
-        "metadata": project_metadata,
-        "project_id": context["project_id"],
-        "project_name": context["project_name"],
-        "client": {
-            "client_document_id": context["client_document_id"],
-            "client_id": context["client_id"],
-        },
-        "artist": context["artist"],
-        "album": album,
-        "producer": producer,
-        "mix_engineer": context["engineer"],
-        "music": {
-            "bpm": bpm,
-            "key": musical_key,
-            "time_signature": _optional_text(request.time_signature),
-        },
-        "audio": {
-            "sample_rate": sample_rate,
-            "bit_depth": bit_depth,
-            "file_format": file_format,
-        },
-        "delivery": {
-            "method": delivery_method,
-            "requested_deliverables": deliverables,
-        },
+        "metadata": create_v11("mixing-project", mutability="mutable", timestamp=timestamp),
+        "project_id": values["project_id"],
+        "project_name": values["project_name"],
+        "client": {"client_document_id": values["client_document_id"], "client_id": values["client_id"]},
+        "artist": values["artist"],
+        "album": _optional_text(request.album),
+        "producer": _optional_text(request.producer),
+        "mix_engineer": values["engineer"],
+        "music": {"bpm": bpm, "key": _optional_text(request.musical_key), "time_signature": _optional_text(request.time_signature)},
+        "audio": {"sample_rate": values["sample_rate"], "bit_depth": values["bit_depth"], "file_format": values["file_format"]},
+        "delivery": {"method": values["delivery_method"], "requested_deliverables": values["deliverables"]},
         "schedule": {"deadline": deadline},
         "creative_direction": _optional_text(request.description),
-        "state": {
-            "current_revision": 1,
-            "approved_revision": None,
-            "delivered_revision": None,
-        },
-        "revisions": [revision_record],
+        "state": {"current_revision": 1, "approved_revision": None, "delivered_revision": None},
+        "revisions": [{
+            "number": 1,
+            "revision_id": str(uuid.uuid4()),
+            "created_at": timestamp,
+            "description": "Initial mix",
+            "approval": {"approved_at": None, "approved_by": None},
+        }],
     }
     snapshot: dict[str, Any] = {
-        "metadata": snapshot_metadata,
+        "metadata": create_v11("mixing-client-profile-snapshot", mutability="immutable", timestamp=timestamp),
         "source_client": {
-            "client_document_id": context["client_document_id"],
-            "client_id": context["client_id"],
-            "client_name": context["client_name"],
+            "client_document_id": values["client_document_id"],
+            "client_id": values["client_id"],
+            "client_name": values["client_name"],
         },
-        "defaults": deepcopy(client.get("defaults") if isinstance(client.get("defaults"), dict) else {}),
+        "defaults": deepcopy(values["client"].get("defaults") if isinstance(values["client"].get("defaults"), dict) else {}),
     }
+    validate_v11(manifest["metadata"], "mixing-project", mutability="mutable")
+    validate_v11(snapshot["metadata"], "mixing-client-profile-snapshot", mutability="immutable")
+    _validate_schema("project-manifest.schema.json", manifest)
+    _validate_schema("client-profile-snapshot.schema.json", snapshot)
+
+    project_root: Path = values["project_root"]
     initial_revision_root = project_root / "04_Revisions" / "Revision_01"
-
     if request.dry_run:
-        return ProjectCreateResult(
-            project_root, manifest, snapshot, initial_revision_root,
-            client_root, studio_root, effective_cd, source_plan, False,
-        )
+        return ProjectCreateResult(project_root, manifest, snapshot, initial_revision_root, values["client_root"], values["studio_root"], values["effective_cd"], values["source_plan"], False)
 
-    projects_root = client_root / "Projects"
+    projects_root = values["client_root"] / "Projects"
     stage = Path(tempfile.mkdtemp(prefix=f".{project_root.name}.jl-stage-", dir=projects_root))
     try:
-        directories = [
+        for relative in (
             "00_Admin",
             "01_Client_Files/Original_Delivery",
             "01_Client_Files/References",
@@ -307,30 +294,19 @@ def create_project(request: ProjectCreateRequest) -> ProjectCreateResult:
             "05_Final_Delivery/Stems",
             "06_Recall/External_Files",
             "06_Recall/Screenshots",
-        ]
-        for relative in directories:
+        ):
             stage.joinpath(*relative.split("/")).mkdir(parents=True, exist_ok=True)
 
-        (stage / "00_Admin" / "project-manifest.json").write_text(
-            json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n"
-        )
-        (stage / "00_Admin" / "client-profile-snapshot.json").write_text(
-            json.dumps(snapshot, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n"
-        )
+        (stage / "00_Admin" / "project-manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
+        (stage / "00_Admin" / "client-profile-snapshot.json").write_text(json.dumps(snapshot, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
         _write_template("Intake_Report.md", stage / "00_Admin" / "Intake_Report.md")
         _write_template("Project_Notes.md", stage / "00_Admin" / "Project_Notes.md")
         _write_template("Preparation_Report.md", stage / "02_Audio_Preparation" / "Preparation_Report.md")
-        _write_template(
-            "Revision_Notes.md",
-            stage / "04_Revisions" / "Revision_01" / "Revision_Notes.md",
-            {"REVISION_NUMBER": "1", "REVISION_DESCRIPTION": "Initial mix"},
-        )
+        _write_template("Revision_Notes.md", stage / "04_Revisions" / "Revision_01" / "Revision_Notes.md", {"REVISION_NUMBER": "1", "REVISION_DESCRIPTION": "Initial mix"})
         _write_template("Delivery_Notes.md", stage / "05_Final_Delivery" / "Delivery_Notes.md")
         _write_template("Recall_Sheet.md", stage / "06_Recall" / "Recall_Sheet.md")
-
-        if source_plan is not None:
-            copy_from_plan(source_plan, stage / "01_Client_Files" / "Original_Delivery")
-
+        if values["source_plan"] is not None:
+            copy_from_plan(values["source_plan"], stage / "01_Client_Files" / "Original_Delivery")
         if project_root.exists() or project_root.is_symlink():
             raise UnsafeOperationError(f"Project destination already exists: {project_root}")
         os.replace(stage, project_root)
@@ -339,7 +315,4 @@ def create_project(request: ProjectCreateRequest) -> ProjectCreateResult:
             shutil.rmtree(stage, ignore_errors=True)
         raise
 
-    return ProjectCreateResult(
-        project_root, manifest, snapshot, initial_revision_root,
-        client_root, studio_root, effective_cd, source_plan, True,
-    )
+    return ProjectCreateResult(project_root, manifest, snapshot, initial_revision_root, values["client_root"], values["studio_root"], values["effective_cd"], values["source_plan"], True)
