@@ -62,8 +62,15 @@ def _validate_project_state(document: dict[str, Any]) -> int:
     if not isinstance(state, dict) or not isinstance(revisions, list):
         raise ValidationError("Project manifest has invalid revision state.")
     current = state.get("current_revision")
-    if not isinstance(current, int) or isinstance(current, bool) or current < 1:
-        raise ValidationError("Project state.current_revision must be a positive integer.")
+    if not isinstance(current, int) or isinstance(current, bool) or current < 0:
+        raise ValidationError("Project state.current_revision must be a non-negative integer.")
+    if current == 0:
+        if revisions:
+            raise ValidationError("Project revision records do not match state.current_revision.")
+        if state.get("approved_revision") is not None or state.get("delivered_revision") is not None:
+            raise ValidationError("Setup-state project cannot have approval or delivery pointers.")
+        return 0
+
     numbers: list[int] = []
     revision_ids: set[str] = set()
     for record in revisions:
