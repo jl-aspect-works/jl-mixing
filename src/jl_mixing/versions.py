@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import re
+import sys
 from pathlib import Path
 
 _SEMVER = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$")
@@ -14,12 +15,21 @@ def application_root() -> Path:
     """Return the installed application root.
 
     JL_MIXING_HOME remains supported for compatibility with the v1.4 launch and
-    test environment. Otherwise resolve from the source/package layout.
+    test environment. Frozen release runtimes infer the application root from
+    their executable location under ``runtime/``. Source/development execution
+    otherwise resolves from the package layout.
     """
 
     override = os.environ.get("JL_MIXING_HOME")
     if override:
         return Path(override).expanduser().resolve()
+
+    if getattr(sys, "frozen", False):
+        executable = Path(sys.executable).resolve()
+        runtime_parent = executable.parent.parent
+        if (runtime_parent / "VERSION").is_file() and (runtime_parent / "API_VERSION").is_file():
+            return runtime_parent
+
     return Path(__file__).resolve().parents[2]
 
 

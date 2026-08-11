@@ -80,7 +80,7 @@ if [ "$platform" = "macos" ]; then
         echo "Error: macOS release requires bundled runtime/python. Run macos/build-runtime.sh first." >&2
         exit 3
     }
-    cp -R "$ROOT/runtime" "$package_root/"
+    cp -R "$ROOT/runtime" "$ROOT/macos" "$package_root/"
 fi
 
 mkdir -p "$package_root/tools" "$package_root/packaging"
@@ -97,7 +97,9 @@ chmod +x "$package_root/install.sh" "$package_root/uninstall.sh" "$package_root/
     "$package_root/tools/import-revision-source.py" \
     "$package_root/tools/build-delivery.py" \
     "$package_root/tools/manage-shell-config.py"
-[ "$platform" != "macos" ] || chmod +x "$package_root/runtime/python"
+if [ "$platform" = "macos" ]; then
+    chmod +x "$package_root/runtime/python" "$package_root/macos/install.sh" "$package_root/macos/uninstall.sh"
+fi
 
 (
     cd "$package_root"
