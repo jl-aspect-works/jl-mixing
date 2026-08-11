@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .errors import ArgumentError, ContextError, ValidationError
 from .paths import native_absolute_path
+from .validation import require_slug
 
 
 def _read_json(path: Path) -> dict[str, object]:
@@ -83,6 +84,46 @@ def resolve_client(explicit: Path | str | None, start: Path | str) -> Path:
         raise ContextError(f"Client not found or unsafe at explicit path: {explicit}")
     _require_identity(marker, "mixing-client")
     return candidate
+
+
+def resolve_client_reference(reference: str | Path | None, start: Path | str) -> Path:
+    """Resolve a v1.4 new-mix client reference by context, path, or stable ID."""
+
+    if reference is None or str(reference) == "":
+        try:
+            return client_root(start)
+        except ContextError as exc:
+            raise ContextError(
+                "Run new-mix inside a client directory or supply --client CLIENT_ID_OR_PATH."
+            ) from exc
+
+    text = str(reference)
+    base = native_absolute_path(start, base=Path.cwd())
+    candidate = Path(text).expanduser()
+    if not candidate.is_absolute():
+        candidate = base / candidate
+    if candidate.exists() or candidate.is_symlink():
+        return resolve_client(candidate, start)
+
+    client_id = require_slug(text, label="Client ID")
+    try:
+        studio = studio_root(start)
+    except ContextError as exc:
+        raise ContextError(f"A studio context is required to resolve client ID '{client_id}'.") from exc
+
+    matches: list[Path] = []
+    for client_file in (studio / "Clients").glob("*/client.json"):
+        if client_file.is_symlink() or not client_file.is_file():
+            continue
+        document = _read_json(client_file)
+        if document.get("client_id") == client_id:
+            matches.append(client_file.parent)
+    if len(matches) == 1:
+        _require_identity(matches[0] / "client.json", "mixing-client")
+        return matches[0]
+    if len(matches) > 1:
+        raise ValidationError(f"Multiple clients use the ID '{client_id}'.")
+    raise ContextError(f"Client not found: {client_id}")
 
 
 def revision_root_for_number(project: Path, number: int) -> Path:
