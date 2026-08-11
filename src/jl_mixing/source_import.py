@@ -53,6 +53,9 @@ def _absolute_without_following(path: Path) -> Path:
 def build_plan(source: Path) -> SourcePlan:
     source = _absolute_without_following(source)
     source_type = _classify(source)
+    # It is safe to canonicalize only after lstat() has rejected a top-level
+    # symlink. Canonical paths keep containment comparisons stable on Windows.
+    source = source.resolve(strict=True)
     entries: list[SourceEntry] = []
     seen: dict[str, str] = {}
 
