@@ -1,8 +1,8 @@
-# JL Mixing Automation v1.3 User Guide
+# JL Mixing Automation v1.5 User Guide
 
 ## 1. Create the workspace
 
-```bash
+```text
 new-studio
 ```
 
@@ -12,9 +12,16 @@ override that preference for an individual command.
 
 ## 2. Create a client
 
-```bash
+```text
 new-client acme --name "Acme Records"
 ```
+
+`new-client` may be run from anywhere. Studio-root resolution uses:
+
+1. `--root PATH`
+2. `JL_MIXING_ROOT`
+3. current-directory studio context
+4. `~/Music/Mixes`
 
 A client contains `client.json` and a flattened `Projects/` directory. Audio and
 delivery defaults are inherited from `studio.json` unless overridden. An artist
@@ -22,144 +29,137 @@ default is optional.
 
 ## 3. Create a project and Revision 1
 
-From the client directory:
+From a client directory or with an explicit client reference:
 
-```bash
+```text
 new-mix "Blue Sky"
+new-mix "Blue Sky" --client acme
 ```
 
-The equivalent explicit form remains supported:
+The equivalent `--project "Blue Sky"` form remains supported. When `--artist`
+is omitted, the project uses the nonempty `client.defaults.artist` value and
+then the client's display name.
 
-```bash
-new-mix --project "Blue Sky"
-```
-
-When `--artist` is omitted, the project uses the nonempty
-`client.defaults.artist` value and then the client's display name. An explicit
-nonempty `--artist` overrides both; an explicit empty value is rejected.
-
-`new-mix` creates `04_Revisions/Revision_01/Revision_Notes.md` with the
-description `Initial mix`. The new project starts in the existing `In progress`
-state with Revision 1 unapproved.
-
-Use `--source PATH` to copy an initial delivery into
-`01_Client_Files/Original_Delivery/`. The source is copied, never moved or
-modified. It is not copied into Revision 1. The project is created directly
-beneath the client's `Projects/` directory and keeps the same path for its
-entire lifetime.
+`new-mix` creates `04_Revisions/Revision_01/Revision_Notes.md` with the initial
+revision description. Use `--source PATH` to copy an initial client delivery into
+`01_Client_Files/Original_Delivery/`. Source material is copied, never moved or
+modified.
 
 ## 4. Validate intake
 
-```bash
+```text
 validate-intake
 ```
 
-The command recursively inventories the original delivery, preserves v1.0.4's
-recognized-extension and duplicate-basename behavior, and uses `ffprobe`
-opportunistically when available. It updates only the managed section in
-`00_Admin/Intake_Report.md`; text outside the markers is preserved.
+Validation is non-destructive to `01_Client_Files/Original_Delivery/`. The
+managed intake report can include:
+
+- file inventory and channel counts
+- project-format mismatches
+- exact SHA-256 duplicate detection
+- corrupt/unreadable-file findings
+- `ffprobe` metadata inspection when available
+- full-file decode integrity checks through `ffmpeg` when available
+- exact dual-mono warnings for stereo files with identical channels
+- skipped checks and preparation recommendations
+
+Unavailable external inspection tools are reported as skipped. JL Mixing does
+not automatically convert, repair, rename, move, or delete original client
+files.
 
 Prepare accepted files manually in `02_Audio_Preparation/Working_Audio/` and
 record engineering decisions in `Preparation_Report.md`.
 
 ## 5. Work with revisions
 
-Place the initial mix prints directly in:
+Place initial mix prints in:
 
 ```text
 04_Revisions/Revision_01/
 ```
 
-Send those files to the client using the studio's normal review process. When a
-later revision is needed, run:
+When another revision is needed:
 
-```bash
+```text
 new-revision --description "Client notes addressed"
 ```
 
 Use `--source FILE_OR_DIRECTORY` to copy immediate mix-print files into the new
-`Revision_NN/` directory. Files can also be placed there manually after
-creation. JL Mixing does not add a separate review-packaging command.
+revision directory. JL Mixing does not add a separate review-package lifecycle.
 
 ## 6. Record approval
 
-```bash
+```text
 approve-mix
 ```
 
 The current revision is approved by default. An older existing revision can be
 selected explicitly:
 
-```bash
+```text
 approve-mix --revision 2 --approved-by "Client"
 ```
 
-Approval updates project metadata only. It does not copy files or alter the
+Approval updates project metadata only. It does not alter revision files or an
 existing final-delivery package.
 
 ## 7. Create final delivery
 
-```bash
+```text
 create-delivery
 ```
 
-The command always packages the approved revision. It considers every immediate
-regular file except `Revision_Notes.md`; there is no extension allowlist.
-`--include`, `--exclude`, and `--working-prefix` control selection.
+The command packages the approved revision, considering immediate regular files
+except `Revision_Notes.md`. `--include`, `--exclude`, and `--working-prefix`
+control selection. Copied files are SHA-256 verified and recorded in the delivery
+manifest.
 
-Recognized naming phrases are classified on a best-effort basis. Unmatched files
-use `unclassified` and remain valid deliverables. Only files recognized as stems
-are placed beneath `05_Final_Delivery/Stems/`.
+### ZIP workflow
 
-Each copied file is verified by comparing source and staged SHA-256 values. The
-final manifest records the destination-relative path, classification, size, and
-SHA-256.
+To include edited delivery notes in a ZIP:
 
-### Create a ZIP with completed delivery notes
-
-Use this two-step workflow:
-
-```bash
+```text
 create-delivery
 # Edit 05_Final_Delivery/Delivery_Notes.md
 create-delivery --zip --overwrite
 ```
 
-The first command creates an editable delivery folder. The second rebuilds the
-same delivery and creates a ZIP containing the edited `Delivery_Notes.md`.
-
-ZIP filenames identify the delivered revision and creation time:
+Generated ZIP names use:
 
 ```text
 <project-id>-rev-<NN>-<YYYYMMDDHHMMSS>.zip
 ```
 
-The revision is zero-padded and the timestamp uses the computer's local timezone. For example:
-`blue-sky-rev-01-20260724153045.zip`. Each generated archive has a unique,
-traceable name; earlier generated archives are not nested inside later ones.
-
-`--overwrite` requires the delivered path set to remain unchanged. File contents
-may change, but adding, removing, or renaming delivered paths causes overwrite
-to fail. A one-step `create-delivery --zip` contains the clean notes template
-because the ZIP is created before the user has an opportunity to edit it.
-
 ### Replacing a delivery
 
-```bash
+```text
 create-delivery --overwrite
 ```
 
-`--overwrite` is for same-shape replacement and preserves unrelated content.
-It fails if old tracked files would become stale.
+`--overwrite` is for same-shape replacement and requires the delivered path set
+to remain unchanged.
 
-```bash
+```text
 create-delivery --clean
 ```
 
-`--clean` is intentionally destructive. It replaces **every file and directory**
-inside the project's `05_Final_Delivery/`, including untracked and user-added
-content. Preserve edited notes before using it. Use `--dry-run --clean` to review
-the exact deletion plan first.
+`--clean` replaces every file and directory inside the project's
+`05_Final_Delivery/`. Review `create-delivery --dry-run --clean` before using it.
+Current v1.5 behavior may regenerate delivery-note templates during a clean
+rebuild; delivery-note preservation semantics are tracked for a future workflow
+revision.
+
+## 8. Machine/API integration
+
+JL Mixing Studio and other machine clients discover Automation with:
+
+```text
+jl-mixing system-info --json
+```
+
+Automation API `1.0` exposes capability-backed client, project, intake,
+revision/approval, delivery, and system-info operations. Machine clients should
+use API capabilities instead of parsing human CLI output.
 
 ## Directory layout
 
@@ -179,10 +179,10 @@ the exact deletion plan first.
 ```
 
 `03_DAW_Project/` is opaque user/DAW-owned content. JL Mixing creates the
-boundary but does not interpret, clean, or manage native DAW project files.
+boundary but does not interpret or manage native DAW project files.
 
-## v1.0 compatibility
+## Compatibility
 
-v1.2 continues using v1.1 workspace schemas and supports valid v1.1 workspaces.
-It does not migrate v1.0 workspaces. Commands stop before modifying a workspace
-that uses a v1.0 schema or recognizable v1.0 layout.
+v1.5 continues using metadata schema `1.1.0` and supports valid v1.1+
+workspaces. It does not migrate v1.0 workspaces. Application, Automation API,
+and metadata schema versions are independent contracts.
