@@ -9,11 +9,14 @@ shift
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_ROOT="${JL_MIXING_HOME:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 python="${JL_MIXING_PYTHON:-}"
+if [ -z "$python" ] && [ -x "$APP_ROOT/runtime/python" ]; then
+    python="$APP_ROOT/runtime/python"
+fi
 if [ -z "$python" ]; then
     python="$(command -v python3 || true)"
 fi
 if [ -z "$python" ]; then
-    echo "Error: Python 3.10 or newer is required." >&2
+    echo "Error: JL Mixing Python runtime was not found." >&2
     exit 3
 fi
 if [ "${python#*/}" != "$python" ] && [ ! -x "$python" ]; then
