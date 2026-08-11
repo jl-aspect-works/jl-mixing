@@ -51,8 +51,9 @@ echo "[PASS] installer preserves user shell content and adds managed block"
 
 "$bin/jl-mixing" system-info --json > "$tmp/system-info.json"
 "$app/runtime/python" -m jl_mixing.cli system-info --json > "$tmp/runtime-system-info.json"
-grep -q '"api_version": "1.0"' "$tmp/system-info.json"
-echo "[PASS] installed command runs through bundled runtime"
+grep -Eq '"api_version"[[:space:]]*:[[:space:]]*"1\.0"' "$tmp/system-info.json"
+grep -Eq '"api_version"[[:space:]]*:[[:space:]]*"1\.0"' "$tmp/runtime-system-info.json"
+echo "[PASS] installed command and direct runtime report API 1.0"
 
 "$bin/new-studio" --root "$workspace" --name 'Self Contained Studio' --no-default-cd >/dev/null
 [ -f "$workspace/Studio/studio.json" ] || { echo "[FAIL] installed new-studio creates workspace" >&2; exit 1; }
