@@ -69,7 +69,7 @@ class IntakeApiTests(unittest.TestCase):
             self.assertEqual(payload["data"]["project"]["id"], "intake-project")
             self.assertEqual(payload["data"]["summary"]["files_discovered"], 1)
             self.assertIn("Notes.txt", payload["data"]["report_markdown"])
-            self.assertEqual(payload["data"]["would_update"], [str(report)])
+            self.assertEqual(payload["data"]["would_update"], [str(report.resolve())])
             self.assertEqual(report.read_bytes(), before)
 
     def test_success_updates_only_managed_report_region(self) -> None:
