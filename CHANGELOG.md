@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.5.0
+
+- Replaced the authoritative Bash workflow implementation with one shared Python
+  runtime while preserving the v1.4 human CLI and Automation API 1.0 contracts.
+- Added first-class Windows support for all public commands, PowerShell parent-
+  shell directory changes, workspace/path safety, installation, rollback, and
+  release packaging.
+- Added self-contained PyInstaller runtimes for Windows and macOS so packaged
+  end-user installs do not require a separately installed Python interpreter.
+- Added a transactional Windows installer/uninstaller with managed PowerShell
+  profile integration and workspace-preserving cleanup.
+- Added a transactional self-contained macOS installer/uninstaller that does not
+  require external Python or jq and preserves existing bash/zsh integration.
+- Added native Windows CI plus macOS/Ubuntu compatibility regressions covering
+  the shared Python runtime, API adapters, human CLIs, install/rollback behavior,
+  package extraction, and release artifacts.
+- Added Windows ZIP releases with SHA-256 checksums and inventory files while
+  retaining macOS/Linux tarball release artifacts.
+- Kept Automation API version 1.0 and workspace metadata schema version 1.1.0;
+  no workspace migration or workflow redesign is introduced.
+
 ## 1.4.0
 
 - Added the structured Automation API 1.0 workflow operations used by JL Mixing
