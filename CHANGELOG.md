@@ -18,6 +18,8 @@
   package extraction, and release artifacts.
 - Added Windows ZIP releases with SHA-256 checksums and inventory files while
   retaining macOS/Linux tarball release artifacts.
+- Added `new-client --root PATH` with explicit root precedence across the flag,
+  `JL_MIXING_ROOT`, current studio context, and the default `~/Music/Mixes` root.
 - Kept Automation API version 1.0 and workspace metadata schema version 1.1.0;
   no workspace migration or workflow redesign is introduced.
 
