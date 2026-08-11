@@ -11,6 +11,7 @@ from ..context import resolve_project
 from ..errors import ArgumentError, ContextError, JLMixingError, ValidationError
 from ..intake import validate_intake
 from ..markdown import replace_managed_section
+from ..validation import require_bit_depth, require_sample_rate
 from ..versions import api_version
 
 _BEGIN = "<!-- BEGIN AUTOMATED SECTION -->"
@@ -64,12 +65,12 @@ def execute(request: IntakeRequest) -> tuple[dict[str, Any], int]:
         manifest = _manifest(project)
         project_id = manifest.get("project_id", "")
         audio = manifest.get("audio") if isinstance(manifest.get("audio"), dict) else {}
-        sample_rate = request.expected_sample_rate or audio.get("sample_rate")
-        bit_depth = request.expected_bit_depth or audio.get("bit_depth")
-        if not isinstance(sample_rate, int) or sample_rate <= 0:
-            raise ValidationError(f"Unsupported expected sample rate: {sample_rate}")
-        if not isinstance(bit_depth, int) or bit_depth <= 0:
-            raise ValidationError(f"Unsupported expected bit depth: {bit_depth}")
+        sample_rate = require_sample_rate(
+            request.expected_sample_rate if request.expected_sample_rate is not None else audio.get("sample_rate")
+        )
+        bit_depth = require_bit_depth(
+            request.expected_bit_depth if request.expected_bit_depth is not None else audio.get("bit_depth")
+        )
 
         source = (request.source or (project / "01_Client_Files" / "Original_Delivery")).resolve()
         result = validate_intake(
@@ -147,15 +148,22 @@ def parse_args(args: list[str]) -> IntakeRequest:
                 if project is not None:
                     raise ArgumentError("intake validate JSON mode requires exactly one --project PATH option.")
                 project = value
-            elif arg == "--source": source = value
+            elif arg == "--source":
+                source = value
             elif arg == "--expected-sample-rate":
-                try: sample_rate = int(value)
-                except ValueError as exc: raise ArgumentError(f"Invalid sample rate: {value}") from exc
+                try:
+                    sample_rate = int(value)
+                except ValueError as exc:
+                    raise ArgumentError(f"Invalid sample rate: {value}") from exc
             else:
-                try: bit_depth = int(value)
-                except ValueError as exc: raise ArgumentError(f"Invalid bit depth: {value}") from exc
-        elif arg == "--no-duplicate-check": duplicate_check = False
-        elif arg == "--dry-run": dry_run = True
+                try:
+                    bit_depth = int(value)
+                except ValueError as exc:
+                    raise ArgumentError(f"Invalid bit depth: {value}") from exc
+        elif arg == "--no-duplicate-check":
+            duplicate_check = False
+        elif arg == "--dry-run":
+            dry_run = True
         elif arg.startswith("--progress="):
             raise ArgumentError("intake validate does not yet support JSON progress events.")
         else:
