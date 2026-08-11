@@ -70,6 +70,10 @@ try {
     Assert-True ([string]::Equals((Get-Location).Path, $tempRoot, [StringComparison]::OrdinalIgnoreCase)) 'failed creation leaves parent location unchanged'
     Assert-True ($failureOutput -match 'Error:') 'failed creation keeps human diagnostic'
 
+    # The final product assertion intentionally observes a nonzero child exit.
+    # Reset the harness status after validating it so a fully passing script
+    # itself exits successfully under GitHub Actions.
+    $global:LASTEXITCODE = 0
     Write-Output '[OK] Windows command surface'
 } finally {
     Set-Location -LiteralPath $originalLocation
