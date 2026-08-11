@@ -43,8 +43,15 @@ def _classify(path: Path) -> str:
     raise ValidationError(f"Unsupported source filesystem object: {path}")
 
 
+def _absolute_without_following(path: Path) -> Path:
+    expanded = path.expanduser()
+    if not expanded.is_absolute():
+        expanded = Path.cwd() / expanded
+    return Path(os.path.abspath(expanded))
+
+
 def build_plan(source: Path) -> SourcePlan:
-    source = source.expanduser().resolve(strict=False)
+    source = _absolute_without_following(source)
     source_type = _classify(source)
     entries: list[SourceEntry] = []
     seen: dict[str, str] = {}
