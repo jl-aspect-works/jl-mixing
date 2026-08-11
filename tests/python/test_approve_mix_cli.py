@@ -84,7 +84,8 @@ class ApproveMixCliTests(unittest.TestCase):
             self.assertIn("Current approved revision:   <none>", proc.stdout)
             self.assertIn("Approver:                    Producer", proc.stdout)
             self.assertIn(f"Approval timestamp:          {created}", proc.stdout)
-            self.assertIn("state.approved_revision: null -> 1", proc.stdout)
+            arrow = "->" if os.name == "nt" else "→"
+            self.assertIn(f"state.approved_revision: null {arrow} 1", proc.stdout)
             self.assertIn("state.delivered_revision: null", proc.stdout)
             self.assertEqual(before, manifest_path.read_bytes())
 
