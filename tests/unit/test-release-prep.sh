@@ -69,7 +69,7 @@ assert_file_exists "$ROOT/docs/RELEASE_NOTES_V1.3.md"
 assert_file_exists "$ROOT/docs/RELEASE_NOTES_V1.4.md"
 assert_file_exists "$ROOT/docs/RELEASE_NOTES_V1.5.md"
 assert_file_exists "$ROOT/docs/SCOPE_FREEZE_V1.2.md"
-assert_eq "1.5.0-rc.1" "$(sed -n '1p' "$ROOT/VERSION")" \
+assert_eq "1.5.0-rc.2" "$(sed -n '1p' "$ROOT/VERSION")" \
     "v1.5 RC application release version"
 assert_eq "1.0" "$(sed -n '1p' "$ROOT/API_VERSION")" \
     "Automation API version is independent"
