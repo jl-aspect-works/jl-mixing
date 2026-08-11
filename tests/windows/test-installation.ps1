@@ -8,6 +8,7 @@ function Assert-True {
 
 $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 $python = (Get-Command python.exe -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
+$pwsh = (Get-Command pwsh.exe -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
 $tempRoot = Join-Path ([IO.Path]::GetTempPath()) ("jl-mixing-windows-install-{0}" -f [Guid]::NewGuid().ToString('N'))
 $prefix = Join-Path $tempRoot 'prefix'
 $profile = Join-Path $tempRoot 'profile\Microsoft.PowerShell_profile.ps1'
@@ -24,7 +25,7 @@ try {
     $env:JL_MIXING_TEST_PYTHON = $python
     $env:JL_MIXING_TEST_PROFILE = $profile
 
-    & (Join-Path $root 'windows\install.ps1') -Prefix $prefix | Out-Null
+    & $pwsh -NoProfile -File (Join-Path $root 'windows\install.ps1') -Prefix $prefix | Out-Null
     Assert-True ($LASTEXITCODE -eq 0) 'Windows installer succeeds with CI test runtime'
 
     $app = Join-Path $prefix 'share\jl-mixing'
@@ -58,21 +59,22 @@ try {
     Assert-True ($LASTEXITCODE -eq 0) 'installed new-client creates client'
     Assert-True (Test-Path -LiteralPath (Join-Path $workspace 'Clients\Installed Client\client.json') -PathType Leaf) 'installed client configuration exists'
 
-    & (Join-Path $root 'windows\install.ps1') -Prefix $prefix | Out-Null
+    & $pwsh -NoProfile -File (Join-Path $root 'windows\install.ps1') -Prefix $prefix | Out-Null
+    Assert-True ($LASTEXITCODE -eq 0) 'Windows reinstall succeeds'
     $profileText = Get-Content -LiteralPath $profile -Raw
     Assert-True (([regex]::Matches($profileText, '# >>> JL Mixing managed configuration >>>')).Count -eq 1) 'reinstall keeps one managed PowerShell block'
 
     $sentinel = Join-Path $app 'rollback-sentinel.txt'
     Set-Content -LiteralPath $sentinel -Value 'stable' -Encoding utf8
     $env:JL_MIXING_TEST_FAIL_INSTALL_AT = 'after-application'
-    & (Join-Path $root 'windows\install.ps1') -Prefix $prefix 2>$null | Out-Null
+    & $pwsh -NoProfile -File (Join-Path $root 'windows\install.ps1') -Prefix $prefix 2>$null | Out-Null
     Assert-True ($LASTEXITCODE -ne 0) 'injected Windows install failure is reported'
     Remove-Item Env:JL_MIXING_TEST_FAIL_INSTALL_AT -ErrorAction SilentlyContinue
     Assert-True (Test-Path -LiteralPath $sentinel -PathType Leaf) 'failed reinstall restores previous application'
     Assert-True ((Get-Content -LiteralPath $sentinel -Raw).Trim() -eq 'stable') 'rollback preserves previous application bytes'
     Assert-True ((Get-Content -LiteralPath $profile -Raw) -match '# user profile content') 'rollback preserves PowerShell profile content'
 
-    & (Join-Path $app 'windows\uninstall.ps1') -Prefix $prefix | Out-Null
+    & $pwsh -NoProfile -File (Join-Path $app 'windows\uninstall.ps1') -Prefix $prefix | Out-Null
     Assert-True ($LASTEXITCODE -eq 0) 'Windows uninstaller succeeds'
     Assert-True (-not (Test-Path -LiteralPath $app)) 'uninstaller removes application'
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $bin 'jl-mixing.cmd'))) 'uninstaller removes managed launcher'
