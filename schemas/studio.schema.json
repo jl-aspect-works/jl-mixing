@@ -58,7 +58,7 @@
     },
     "root_path": {
       "type": "string",
-      "pattern": "^/"
+      "pattern": "^(?:/|[A-Za-z]:[\\\\/]|\\\\\\\\[^\\\\/]+[\\\\/][^\\\\/]+)"
     },
     "defaults": {
       "type": "object",
