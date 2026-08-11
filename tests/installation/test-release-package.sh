@@ -27,6 +27,8 @@ assert_contains "$(cat "$archive.inventory.txt")" 'API_VERSION' \
     "Automation API version included in release archive"
 assert_contains "$(cat "$archive.inventory.txt")" 'bin/jl-mixing' \
     "Automation API dispatcher included in release archive"
+assert_contains "$(cat "$archive.inventory.txt")" 'src/jl_mixing/__init__.py' \
+    "Python runtime included in release archive"
 assert_contains "$(cat "$archive.inventory.txt")" 'api/schemas/v1.0/system-info.schema.json' \
     "Automation API schema included in release archive"
 assert_contains "$(cat "$archive.inventory.txt")" 'api/examples/v1.0/success/system-info.json' \
