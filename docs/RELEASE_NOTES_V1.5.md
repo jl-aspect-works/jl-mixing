@@ -20,6 +20,9 @@ shared Python codebase and adding first-class Windows support.
 - **Cross-platform CI:** native Windows tests and macOS/Linux regression suites
   cover CLI/API behavior, filesystem safety, installation, rollback, and package
   extraction/install lifecycles.
+- **Root-aware client creation:** `new-client --root PATH` now supports explicit
+  studio-root selection with platform-neutral precedence across `--root`,
+  `JL_MIXING_ROOT`, current studio context, and the default `~/Music/Mixes` root.
 
 ## Compatibility
 
@@ -32,6 +35,8 @@ redesign.
 
 ## Release candidate
 
-`1.5.0-rc.1` is intended for final cross-platform acceptance testing before the
-stable `1.5.0` release. Validate the macOS and Windows packaged installers and
-representative existing workspaces before promoting the final release.
+`1.5.0-rc.2` supersedes the earlier `1.5.0-rc.1` acceptance build and includes
+post-RC1 root-resolution fixes plus the refreshed v1.5 documentation set. Use
+RC2 for final cross-platform acceptance testing before the stable `1.5.0`
+release. Validate the macOS and Windows packaged installers and representative
+existing workspaces before promoting the final release.

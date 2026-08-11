@@ -308,9 +308,14 @@ jobs:
               gh release upload "$tag" "${assets[@]}" --repo "$GITHUB_REPOSITORY" --clobber
           else
               echo "Creating release $tag."
+              prerelease_args=()
+              if [[ "$tag" == *-* ]]; then
+                  prerelease_args+=(--prerelease)
+              fi
               gh release create "$tag" "${assets[@]}" \
                   --repo "$GITHUB_REPOSITORY" \
                   --verify-tag \
                   --title "JL Mixing Automation ${tag#v}" \
-                  --notes-file docs/RELEASE_NOTES_V1.5.md
+                  --notes-file docs/RELEASE_NOTES_V1.5.md \
+                  "${prerelease_args[@]}"
           fi
