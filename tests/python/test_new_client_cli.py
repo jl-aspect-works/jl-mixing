@@ -43,6 +43,7 @@ def make_studio(root: Path, *, auto_cd: bool = False) -> None:
 def run_cli(cwd: Path, *args: str, extra_env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
     env["PYTHONPATH"] = str(SRC)
+    env.pop("JL_MIXING_ROOT", None)
     if extra_env:
         env.update(extra_env)
     return subprocess.run(
@@ -61,6 +62,7 @@ class NewClientCliTests(unittest.TestCase):
         self.assertEqual(proc.returncode, 0, proc.stderr)
         self.assertIn("Usage: new-client CLIENT_ID [options]", proc.stdout)
         self.assertIn("--delivery-method TEXT", proc.stdout)
+        self.assertIn("--root PATH", proc.stdout)
         self.assertIn("--cd", proc.stdout)
 
     def test_dry_run_inherits_defaults_without_mutation(self) -> None:
@@ -99,6 +101,72 @@ class NewClientCliTests(unittest.TestCase):
             self.assertEqual(doc["defaults"]["delivery"]["requested_deliverables"], ["main_mix", "stems"])
             self.assertTrue((studio / "Clients" / "API Client" / "Projects").is_dir())
             self.assertIn("Client created successfully.", proc.stdout)
+
+    def test_default_workspace_is_used_outside_studio_context(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            home = base / "home"
+            default_studio = home / "Music" / "Mixes"
+            unrelated = base / "downloads"
+            unrelated.mkdir()
+            make_studio(default_studio)
+            proc = run_cli(
+                unrelated,
+                "default-client",
+                "--name", "Default Client",
+                extra_env={"HOME": str(home), "USERPROFILE": str(home)},
+            )
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            self.assertTrue((default_studio / "Clients" / "Default Client" / "client.json").is_file())
+
+    def test_explicit_root_takes_precedence_over_environment_and_context(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            explicit = base / "explicit"
+            configured = base / "configured"
+            context = base / "context"
+            make_studio(explicit)
+            make_studio(configured)
+            make_studio(context)
+            proc = run_cli(
+                context,
+                "precedence-client",
+                "--name", "Precedence Client",
+                "--root", str(explicit),
+                extra_env={"JL_MIXING_ROOT": str(configured)},
+            )
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            self.assertTrue((explicit / "Clients" / "Precedence Client" / "client.json").is_file())
+            self.assertFalse((configured / "Clients" / "Precedence Client").exists())
+            self.assertFalse((context / "Clients" / "Precedence Client").exists())
+
+    def test_environment_root_takes_precedence_over_current_context(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            configured = base / "configured"
+            context = base / "context"
+            make_studio(configured)
+            make_studio(context)
+            proc = run_cli(
+                context,
+                "environment-client",
+                "--name", "Environment Client",
+                extra_env={"JL_MIXING_ROOT": str(configured)},
+            )
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            self.assertTrue((configured / "Clients" / "Environment Client" / "client.json").is_file())
+            self.assertFalse((context / "Clients" / "Environment Client").exists())
+
+    def test_invalid_explicit_root_fails_without_mutation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            valid_studio = base / "studio"
+            invalid_root = base / "missing"
+            make_studio(valid_studio)
+            proc = run_cli(valid_studio, "blocked-client", "--root", str(invalid_root))
+            self.assertNotEqual(proc.returncode, 0)
+            self.assertIn("No context marker", proc.stderr)
+            self.assertFalse((valid_studio / "Clients" / "Blocked Client").exists())
 
     def test_cd_result_file_receives_created_directory(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
