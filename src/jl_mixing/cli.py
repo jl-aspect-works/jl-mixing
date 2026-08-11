@@ -15,6 +15,9 @@ from .api.intake_validate import parse_args as parse_intake_args
 from .api.project_create import _error_envelope as project_error_envelope
 from .api.project_create import execute as project_execute
 from .api.project_create import parse_args as parse_project_args
+from .api.revision_approve import _error_envelope as approval_error_envelope
+from .api.revision_approve import execute as approval_execute
+from .api.revision_approve import parse_args as parse_approval_args
 from .api.revision_create import _error_envelope as revision_error_envelope
 from .api.revision_create import execute as revision_execute
 from .api.revision_create import parse_args as parse_revision_args
@@ -77,6 +80,19 @@ def main(argv: Sequence[str] | None = None) -> int:
             _emit_json(revision_error_envelope("VALIDATION_FAILED", str(exc), exc.exit_code, status="blocked"))
             return exc.exit_code
         payload, status = revision_execute(request)
+        _emit_json(payload)
+        return status
+
+    if len(args) >= 2 and args[0:2] == ["revision", "approve"]:
+        try:
+            request = parse_approval_args(args[2:])
+        except ArgumentError as exc:
+            _emit_json(approval_error_envelope("INVALID_REQUEST", str(exc), exc.exit_code))
+            return exc.exit_code
+        except ValidationError as exc:
+            _emit_json(approval_error_envelope("VALIDATION_FAILED", str(exc), exc.exit_code, status="blocked"))
+            return exc.exit_code
+        payload, status = approval_execute(request)
         _emit_json(payload)
         return status
 
