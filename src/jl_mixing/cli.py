@@ -6,8 +6,13 @@ import json
 import sys
 from collections.abc import Sequence
 
-from .api.intake_validate import _error_envelope, execute as intake_execute, parse_args as parse_intake_args
-from .errors import ArgumentError
+from .api.client_create import _error_envelope as client_error_envelope
+from .api.client_create import execute as client_execute
+from .api.client_create import parse_args as parse_client_args
+from .api.intake_validate import _error_envelope as intake_error_envelope
+from .api.intake_validate import execute as intake_execute
+from .api.intake_validate import parse_args as parse_intake_args
+from .errors import ArgumentError, ValidationError
 from .system_info import document as system_info_document
 
 EXIT_ARGUMENTS = 2
@@ -30,11 +35,24 @@ def main(argv: Sequence[str] | None = None) -> int:
         _emit_json(payload)
         return 0
 
+    if len(args) >= 2 and args[0:2] == ["client", "create"]:
+        try:
+            request = parse_client_args(args[2:])
+        except ArgumentError as exc:
+            _emit_json(client_error_envelope("INVALID_REQUEST", str(exc), exc.exit_code))
+            return exc.exit_code
+        except ValidationError as exc:
+            _emit_json(client_error_envelope("VALIDATION_FAILED", str(exc), exc.exit_code, status="blocked"))
+            return exc.exit_code
+        payload, status = client_execute(request)
+        _emit_json(payload)
+        return status
+
     if len(args) >= 2 and args[0:2] == ["intake", "validate"]:
         try:
             request = parse_intake_args(args[2:])
         except ArgumentError as exc:
-            _emit_json(_error_envelope("INVALID_REQUEST", str(exc), exc.exit_code))
+            _emit_json(intake_error_envelope("INVALID_REQUEST", str(exc), exc.exit_code))
             return exc.exit_code
         payload, status = intake_execute(request)
         _emit_json(payload)
