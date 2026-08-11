@@ -13,6 +13,7 @@ license = {text = "Apache-2.0"}
 jl-mixing-python = "jl_mixing.cli:main"
 validate-intake-python = "jl_mixing.validate_intake_cli:main"
 new-client-python = "jl_mixing.new_client_cli:main"
+new-mix-python = "jl_mixing.new_mix_cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
