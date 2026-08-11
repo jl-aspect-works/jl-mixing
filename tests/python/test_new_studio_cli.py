@@ -70,7 +70,7 @@ class NewStudioCliTests(unittest.TestCase):
             self.assertEqual(document["metadata"]["schema"], "mixing-studio")
             self.assertEqual(document["metadata"]["schema_version"], "1.1.0")
             self.assertEqual(document["studio_id"], "jl-room")
-            self.assertEqual(document["root_path"], str(target.resolve()))
+            self.assertEqual(document["root_path"], os.path.abspath(os.path.expanduser(str(target))))
             self.assertEqual(document["defaults"]["mix_engineer"], "Jake")
             self.assertFalse(document["cli"]["change_directory_after_create"])
             self.assertEqual(sorted(path.name for path in target.iterdir()), ["Clients", "Studio"])
