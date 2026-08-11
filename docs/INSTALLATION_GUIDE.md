@@ -1,100 +1,174 @@
-# JL Mixing Automation v1.3 Installation Guide
+# JL Mixing Automation v1.5 Installation Guide
 
-## Requirements
+JL Mixing Automation v1.5 provides platform-specific packages. Windows and
+macOS packages include the private Python runtime used by Automation; Linux and
+source/developer installs retain the compatibility installer.
 
-- macOS or Linux
-- Bash 3.2 or newer
-- Python 3.10 or newer with `venv`
-- `jq`
-- Network access to install the pinned Python dependency unless the release
-  includes an offline wheelhouse
+## Windows
 
-`ffprobe` is optional and is checked only when `validate-intake` uses it.
+### Requirements
 
-## Standard installation
+- Windows x64
+- PowerShell
 
-Extract the release archive and run:
+No separate Python, Bash, or jq installation is required.
+
+### Install
+
+Extract `jl-mixing-<version>-windows.zip`, open PowerShell in the extracted
+folder, and run:
+
+```powershell
+.\windows\install.ps1
+```
+
+The default prefix is:
+
+```text
+%LOCALAPPDATA%\Programs\JL Mixing
+```
+
+The application is installed beneath `share\jl-mixing`, and public command
+launchers are installed beneath `bin`. The installer manages a PowerShell
+profile block that adds the command directory to PATH and loads the optional
+`--cd` shell integration. Open a new PowerShell session after installation.
+
+To skip profile changes:
+
+```powershell
+.\windows\install.ps1 -NoShellIntegration
+```
+
+To use another prefix:
+
+```powershell
+.\windows\install.ps1 -Prefix "C:\Tools\JL Mixing"
+```
+
+### Uninstall
+
+Run the matching packaged uninstaller with the same prefix when applicable:
+
+```powershell
+.\windows\uninstall.ps1
+```
+
+or:
+
+```powershell
+.\windows\uninstall.ps1 -Prefix "C:\Tools\JL Mixing"
+```
+
+The uninstaller removes only JL Mixing-managed application files, launchers, and
+PowerShell profile integration. Studio workspaces are not modified.
+
+## macOS
+
+### Requirements
+
+The release archive contains its private runtime. A separate Python or jq install
+is not required for the packaged macOS path.
+
+### Install
+
+Extract `jl-mixing-<version>-macos.tar.gz`, then run:
+
+```bash
+./macos/install.sh
+```
+
+The default prefix is `~/.local`:
+
+```text
+Application: ~/.local/share/jl-mixing/
+Commands:    ~/.local/bin/
+```
+
+The installer manages exactly one block in `.zshrc` or `.bashrc` for PATH and
+optional `--cd` integration. Existing content outside that managed block is
+preserved. Open a new Terminal tab after installation.
+
+To skip shell integration:
+
+```bash
+./macos/install.sh --no-shell-integration
+```
+
+To use another prefix:
+
+```bash
+./macos/install.sh --prefix "$HOME/Applications/jl-local"
+```
+
+### Uninstall
+
+From an extracted matching package, run:
+
+```bash
+./macos/uninstall.sh
+```
+
+Use `--prefix PATH` when the application was installed under a custom prefix.
+The uninstaller removes managed application files, launchers, and the managed
+shell block while preserving workspaces and project content.
+
+## Linux and source/developer installation
+
+The compatibility installer remains:
 
 ```bash
 ./install.sh
 ```
 
-Default locations:
+Requirements for this path are:
+
+- Bash 3.2 or newer
+- Python 3.10 or newer with `venv`
+- jq
+
+The default prefix is `~/.local`. `--prefix` and `--no-shell-integration` remain
+available. This installer may create a private virtual environment and therefore
+is distinct from the frozen runtime included in Windows/macOS release packages.
+
+## Optional intake-QC tools
+
+`ffprobe` and `ffmpeg` enable enhanced audio intake checks such as metadata
+inspection and full-file decode verification. When an external check is not
+available, `validate-intake` reports it as skipped rather than treating it as a
+pass.
+
+## Verify an installation
+
+After opening a new shell, run:
 
 ```text
-~/.local/share/jl-mixing/
-~/.local/bin/
-```
-
-The installer builds and verifies the complete application in a staging area,
-then commits the application, launchers, and shell configuration together. A
-failed install restores the previous working version.
-
-## Automatic shell configuration
-
-By default, the installer detects bash or zsh and manages exactly one block in
-`.bashrc` or `.zshrc`:
-
-```text
-# >>> JL Mixing managed configuration >>>
-...
-# <<< JL Mixing managed configuration <<<
-```
-
-The block adds the single installed `bin` directory to `PATH` and sources the
-wrapper integration used by `--cd`. Existing startup-file content outside the
-block is preserved byte-for-byte. Open a new Terminal tab after installation.
-
-To avoid startup-file modification:
-
-```bash
-./install.sh --no-shell-integration
-```
-
-The commands still work; automatic directory changes fall back to a quoted
-copy-and-paste `cd` command.
-
-## Custom prefix
-
-```bash
-./install.sh --prefix "$HOME/Applications/jl-local"
-```
-
-The environment variable `JL_MIXING_INSTALL_PREFIX` is also supported, but an
-explicit `--prefix` takes precedence.
-
-## Verify the installed Automation API
-
-After installation, machine-readable discovery is available through:
-
-```bash
 jl-mixing system-info --json
 ```
 
-The installed application includes `API_VERSION` and the matching schemas and
-examples under `~/.local/share/jl-mixing/api/` (or the selected prefix). The
-reported `schemas.installed_path` identifies the exact offline schema directory.
+The response reports:
 
-## Upgrade
+- Automation API version (`1.0`)
+- installed application version
+- readable and writable metadata schemas (`1.1.0`)
+- implemented API capabilities
+- installed API schema location
 
-Extract the newer release and run its installer with the same prefix. Reinstall
-is idempotent: the single managed shell block is replaced in place and the
-active application is not changed until the staged version passes verification.
-Studio workspaces are never modified.
+You can also verify the human command surface with:
 
-## Uninstall
-
-```bash
-jl-mixing-uninstall
+```text
+new-client --help
+new-mix --help
+validate-intake --help
 ```
 
-The uninstaller removes managed application files, launchers, and the exact
-managed shell block as one rollback-capable transaction. Studio workspaces,
-audio, and project data are never removed. Open a new Terminal tab afterward to
-clear already-loaded shell functions and PATH entries.
+## Upgrade/reinstall behavior
 
-## Fresh workspace requirement
+Reinstall using the newer package for the same platform and prefix. Installers
+stage and validate managed application state before replacing the prior install.
+User workspaces are outside the application prefix and are not migrated or
+removed during install, reinstall, or uninstall.
 
-v1.3 supports valid v1.1 workspaces. Installation or upgrade does not migrate
-v1.0 workspaces. Use a separate root when retaining a v1.0 workspace for
-reference.
+## Workspace compatibility
+
+v1.5 continues to read and write metadata schema `1.1.0`. Existing valid v1.1+
+workspaces remain usable. v1.0 workspace contents are not migrated.
