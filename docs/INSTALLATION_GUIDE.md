@@ -69,9 +69,36 @@ PowerShell profile integration. Studio workspaces are not modified.
 The release archive contains its private runtime. A separate Python or jq install
 is not required for the packaged macOS path.
 
+Download the package matching the Mac architecture:
+
+- Intel: `jl-mixing-<version>-macos-x86_64.tar.gz`
+- Apple Silicon: `jl-mixing-<version>-macos-arm64.tar.gz`
+
+Run `uname -m` when needed: `x86_64` means Intel and `arm64` means Apple Silicon.
+
+### Unsigned release note
+
+The current macOS release packages are not Developer ID signed or notarized.
+Downloaded archives can therefore carry the macOS quarantine attribute, causing
+Gatekeeper to block the bundled runtime or `Python.framework` even after the
+archive checksum and CPU architecture are correct.
+
+Before removing quarantine, verify the downloaded archive against its matching
+`.sha256` file. Then extract the archive, change into the extracted
+`jl-mixing-<version>` directory, and remove quarantine from that verified copy:
+
+```bash
+xattr -dr com.apple.quarantine .
+```
+
+Do not run the quarantine-removal command on an archive or directory whose
+origin and checksum you have not verified. Signing and notarization are tracked
+separately from the v1.5.1 architecture packaging fix.
+
 ### Install
 
-Extract `jl-mixing-<version>-macos.tar.gz`, then run:
+After choosing the matching architecture package and completing the unsigned
+release step above when required, run:
 
 ```bash
 ./macos/install.sh
@@ -129,6 +156,8 @@ Requirements for this path are:
 The default prefix is `~/.local`. `--prefix` and `--no-shell-integration` remain
 available. This installer may create a private virtual environment and therefore
 is distinct from the frozen runtime included in Windows/macOS release packages.
+The top-level `./install.sh` also remains a macOS compatibility/fallback path
+when these host dependencies are present.
 
 ## Optional intake-QC tools
 

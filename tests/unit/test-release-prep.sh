@@ -69,8 +69,8 @@ assert_file_exists "$ROOT/docs/RELEASE_NOTES_V1.3.md"
 assert_file_exists "$ROOT/docs/RELEASE_NOTES_V1.4.md"
 assert_file_exists "$ROOT/docs/RELEASE_NOTES_V1.5.md"
 assert_file_exists "$ROOT/docs/SCOPE_FREEZE_V1.2.md"
-assert_eq "1.5.1-rc.1" "$(sed -n '1p' "$ROOT/VERSION")" \
-    "v1.5.1 RC application release version"
+assert_eq "1.5.1" "$(sed -n '1p' "$ROOT/VERSION")" \
+    "v1.5.1 stable application release version"
 assert_eq "1.0" "$(sed -n '1p' "$ROOT/API_VERSION")" \
     "Automation API version is independent"
 assert_contains "$(cat "$ROOT/.github/workflows/release.yml")" \
@@ -79,6 +79,8 @@ assert_contains "$(cat "$ROOT/.github/workflows/release.yml")" \
     'macos-15-intel' "release workflow builds Intel macOS package"
 assert_contains "$(cat "$ROOT/.github/workflows/release.yml")" \
     'macos-arm64' "release workflow labels Apple Silicon package"
+assert_contains "$(cat "$ROOT/docs/INSTALLATION_GUIDE.md")" \
+    'xattr -dr com.apple.quarantine .' "installation guide documents unsigned macOS quarantine handling"
 assert_contains "$(cat "$ROOT/docs/USER_GUIDE.md")" \
     'create-delivery --clean' "user guide documents destructive clean"
 assert_contains "$(cat "$ROOT/docs/USER_GUIDE.md")" \
