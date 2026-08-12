@@ -33,10 +33,15 @@ Human CLI command names, options, output semantics, and exit-code behavior remai
 compatible with v1.4. This release is a platform/runtime port, not a workflow
 redesign.
 
-## Release candidate
+## Stable release
 
-`1.5.0-rc.2` supersedes the earlier `1.5.0-rc.1` acceptance build and includes
-post-RC1 root-resolution fixes plus the refreshed v1.5 documentation set. Use
-RC2 for final cross-platform acceptance testing before the stable `1.5.0`
-release. Validate the macOS and Windows packaged installers and representative
-existing workspaces before promoting the final release.
+`1.5.0` promotes the accepted `1.5.0-rc.2` build after coordinated packaged
+validation with JL Mixing Studio v1.1.1. RC2 included the post-RC1 root-resolution
+fixes and refreshed v1.5 documentation set; no runtime behavior changes are added
+between the accepted RC2 baseline and this stable release beyond release identity.
+
+The final validation covered packaged macOS and Windows installs, Automation API
+1.0 discovery/admission, valid v1.1 workspace compatibility, client/project/intake/
+revision/approval/delivery workflows, and the Studio cross-platform compatibility
+matrix. Linux remains supported through the release archive/source compatibility
+path and existing CI coverage.
