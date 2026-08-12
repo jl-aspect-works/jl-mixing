@@ -39,11 +39,17 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-latest
-            platform: macos
+          - os: macos-15-intel
+            platform: macos-x86_64
+            architecture: x86_64
+
+          - os: macos-15
+            platform: macos-arm64
+            architecture: arm64
 
           - os: ubuntu-latest
             platform: linux
+            architecture: none
 
     steps:
       - name: Check out release source
@@ -109,6 +115,8 @@ jobs:
       - name: Run bundled macOS runtime smoke tests
         if: runner.os == 'macOS'
         shell: bash
+        env:
+          JL_MIXING_EXPECTED_ARCH: ${{ matrix.architecture }}
         run: bash ./tests/macos/test-runtime-bundle.sh
 
       - name: Run release verification
@@ -122,7 +130,7 @@ jobs:
         run: |
           set -euo pipefail
           rm -rf dist
-          make release
+          tools/build-release --platform "${{ matrix.platform }}"
 
       - name: Verify generated assets
         shell: bash
@@ -282,9 +290,10 @@ jobs:
           echo "Assets prepared for $RELEASE_TAG:"
           find release-assets -maxdepth 1 -type f -print | sort
           asset_count="$(find release-assets -maxdepth 1 -type f | wc -l | tr -d '[:space:]')"
-          # Three platforms, with an archive, checksum, and inventory for each.
-          if [[ "$asset_count" -ne 9 ]]; then
-              echo "Expected 9 release assets; found $asset_count." >&2
+          # Intel macOS, Apple Silicon macOS, Linux, and Windows each publish
+          # an archive, checksum, and inventory.
+          if [[ "$asset_count" -ne 12 ]]; then
+              echo "Expected 12 release assets; found $asset_count." >&2
               exit 1
           fi
 
