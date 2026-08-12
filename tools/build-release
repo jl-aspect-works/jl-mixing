@@ -11,7 +11,7 @@ Usage: tools/build-release [options]
 
 Options:
   --output-dir PATH  Destination directory (default: dist)
-  --platform NAME    Package label (default: detected macos or linux)
+  --platform NAME    Package label (default: detected macos-<arch> or linux)
   -h, --help         Show this help
 USAGE
 }
@@ -47,7 +47,13 @@ done
 
 if [ -z "$platform" ]; then
     case "$(uname -s)" in
-        Darwin) platform="macos" ;;
+        Darwin)
+            case "$(uname -m)" in
+                x86_64) platform="macos-x86_64" ;;
+                arm64) platform="macos-arm64" ;;
+                *) echo "Error: unsupported macOS architecture: $(uname -m)" >&2; exit 3 ;;
+            esac
+            ;;
         Linux) platform="linux" ;;
         *) echo "Error: unsupported release platform: $(uname -s)" >&2; exit 3 ;;
     esac
@@ -75,13 +81,15 @@ cp "$ROOT/VERSION" "$ROOT/API_VERSION" "$ROOT/LICENSE" "$ROOT/CHANGELOG.md" \
 cp "$ROOT/packaging/RELEASE_README.md" "$package_root/README.md"
 cp -R "$ROOT/bin" "$ROOT/lib" "$ROOT/src" "$ROOT/api" "$ROOT/schemas" "$ROOT/templates" "$ROOT/docs" "$package_root/"
 
-if [ "$platform" = "macos" ]; then
-    [ -x "$ROOT/runtime/python" ] || {
-        echo "Error: macOS release requires bundled runtime/python. Run macos/build-runtime.sh first." >&2
-        exit 3
-    }
-    cp -R "$ROOT/runtime" "$ROOT/macos" "$package_root/"
-fi
+case "$platform" in
+    macos|macos-*)
+        [ -x "$ROOT/runtime/python" ] || {
+            echo "Error: macOS release requires bundled runtime/python. Run macos/build-runtime.sh first." >&2
+            exit 3
+        }
+        cp -R "$ROOT/runtime" "$ROOT/macos" "$package_root/"
+        ;;
+esac
 
 mkdir -p "$package_root/tools" "$package_root/packaging"
 cp "$ROOT/tools/validate-json.py" "$ROOT/tools/build-intake-report.py" \
@@ -97,9 +105,11 @@ chmod +x "$package_root/install.sh" "$package_root/uninstall.sh" "$package_root/
     "$package_root/tools/import-revision-source.py" \
     "$package_root/tools/build-delivery.py" \
     "$package_root/tools/manage-shell-config.py"
-if [ "$platform" = "macos" ]; then
-    chmod +x "$package_root/runtime/python" "$package_root/macos/install.sh" "$package_root/macos/uninstall.sh"
-fi
+case "$platform" in
+    macos|macos-*)
+        chmod +x "$package_root/runtime/python" "$package_root/macos/install.sh" "$package_root/macos/uninstall.sh"
+        ;;
+esac
 
 (
     cd "$package_root"
