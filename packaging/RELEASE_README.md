@@ -25,7 +25,12 @@ Open a new PowerShell session after installation.
 
 ### macOS
 
-Extract `jl-mixing-<version>-macos.tar.gz`, then run:
+Download the package matching your Mac architecture:
+
+- Intel: `jl-mixing-<version>-macos-x86_64.tar.gz`
+- Apple Silicon: `jl-mixing-<version>-macos-arm64.tar.gz`
+
+After extracting the matching archive, run:
 
 ```bash
 ./macos/install.sh
@@ -35,6 +40,9 @@ The package contains its private runtime. The default prefix is `~/.local`.
 Open a new Terminal tab after installation so managed shell integration is
 active.
 
+To check your Mac architecture, run `uname -m`: `x86_64` means Intel and `arm64`
+means Apple Silicon.
+
 ### Linux/source compatibility path
 
 Extract the Linux archive and run:
@@ -43,7 +51,9 @@ Extract the Linux archive and run:
 ./install.sh
 ```
 
-This path requires Bash, Python 3.10+ with `venv`, and jq.
+This path requires Bash, Python 3.10+ with `venv`, and jq. The top-level
+`./install.sh` also remains available as a compatibility/fallback installation
+path on macOS when the host dependencies are present.
 
 Optional external `ffprobe`/`ffmpeg` tools enable enhanced intake QC. Checks that
 cannot run are reported as skipped.
