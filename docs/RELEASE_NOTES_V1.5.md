@@ -36,19 +36,26 @@ Human CLI command names, options, output semantics, and exit-code behavior remai
 compatible with v1.4. The v1.5.1 patch changes release packaging only; it does
 not change workflow behavior or machine API contracts.
 
-## v1.5.1 release candidate
+## v1.5.1 stable release
 
-`1.5.1-rc.1` fixes the v1.5.0 macOS self-contained packaging defect where a
+`1.5.1` corrects the v1.5.0 macOS self-contained packaging defect where a
 single architecture-specific PyInstaller runtime was published under the generic
-`macos` archive name. Use the package matching the test machine architecture:
+`macos` archive name. Stable releases now provide separate packages:
 
-- Intel: `jl-mixing-1.5.1-rc.1-macos-x86_64.tar.gz`
-- Apple Silicon: `jl-mixing-1.5.1-rc.1-macos-arm64.tar.gz`
+- Intel: `jl-mixing-1.5.1-macos-x86_64.tar.gz`
+- Apple Silicon: `jl-mixing-1.5.1-macos-arm64.tar.gz`
 
-For RC acceptance, verify that `./macos/install.sh` installs and runs successfully
-from the matching package on each architecture. Confirm `jl-mixing system-info
---json` reports Automation API 1.0 and the RC application version. Windows and
-Linux remain regression-only for this packaging patch.
+The `1.5.1-rc.1` release workflow successfully built, architecture-checked,
+smoke-tested, release-verified, and published both macOS packages along with the
+Linux and Windows packages. Packaged Intel acceptance then confirmed the
+x86_64 archive installs and runs correctly via `./macos/install.sh` once the
+verified unsigned download is removed from macOS quarantine.
+
+Current macOS packages are not Developer ID signed or notarized. Users should
+verify the archive checksum first and, when Gatekeeper blocks the bundled
+runtime or `Python.framework`, follow the documented quarantine-removal step for
+the verified extracted copy. Signing and notarization are tracked separately and
+are not part of this architecture-only patch.
 
 ## v1.5.0 stable baseline
 
