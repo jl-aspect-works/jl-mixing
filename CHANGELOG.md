@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.5.1
+
+- Split the self-contained macOS release into architecture-specific Intel
+  (`macos-x86_64`) and Apple Silicon (`macos-arm64`) packages.
+- Added a release-time architecture assertion for the bundled macOS PyInstaller
+  runtime so an archive cannot be published under the wrong CPU label.
+- Replaced the moving `macos-latest` release runner with explicit Intel and Apple
+  Silicon runner labels.
+- Kept Automation API 1.0, metadata schema 1.1.0, human CLI behavior, Windows
+  packaging, Linux packaging, and workspace semantics unchanged.
+
 ## 1.5.0
 
 - Replaced the authoritative Bash workflow implementation with one shared Python
