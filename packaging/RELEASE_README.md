@@ -30,7 +30,22 @@ Download the package matching your Mac architecture:
 - Intel: `jl-mixing-<version>-macos-x86_64.tar.gz`
 - Apple Silicon: `jl-mixing-<version>-macos-arm64.tar.gz`
 
-After extracting the matching archive, run:
+To check your Mac architecture, run `uname -m`: `x86_64` means Intel and `arm64`
+means Apple Silicon.
+
+The current macOS packages are unsigned and not notarized. After verifying the
+downloaded archive against its matching `.sha256` file, extract it and, if
+Gatekeeper blocks the bundled runtime or `Python.framework`, remove quarantine
+from that verified extracted copy:
+
+```bash
+xattr -dr com.apple.quarantine .
+```
+
+Do not remove quarantine from content whose source and checksum you have not
+verified.
+
+Then run:
 
 ```bash
 ./macos/install.sh
@@ -39,9 +54,6 @@ After extracting the matching archive, run:
 The package contains its private runtime. The default prefix is `~/.local`.
 Open a new Terminal tab after installation so managed shell integration is
 active.
-
-To check your Mac architecture, run `uname -m`: `x86_64` means Intel and `arm64`
-means Apple Silicon.
 
 ### Linux/source compatibility path
 
