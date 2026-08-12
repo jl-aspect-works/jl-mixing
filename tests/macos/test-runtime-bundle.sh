@@ -6,6 +6,18 @@ runtime="$ROOT/runtime/python"
 
 [ -x "$runtime" ] || { echo "[FAIL] bundled macOS runtime exists" >&2; exit 1; }
 
+expected_arch="${JL_MIXING_EXPECTED_ARCH:-$(uname -m)}"
+case "$expected_arch" in
+    x86_64|arm64) ;;
+    *) echo "[FAIL] unsupported expected macOS architecture: $expected_arch" >&2; exit 1 ;;
+esac
+actual_arch="$(lipo -archs "$runtime" 2>/dev/null || true)"
+[ "$actual_arch" = "$expected_arch" ] || {
+    echo "[FAIL] bundled runtime architecture: expected $expected_arch, found ${actual_arch:-unknown}" >&2
+    exit 1
+}
+echo "[PASS] bundled runtime architecture is $expected_arch"
+
 tmp="$(mktemp -d "${TMPDIR:-/tmp}/jl-mixing-macos-runtime.XXXXXX")"
 cleanup() { rm -rf -- "$tmp"; }
 trap cleanup EXIT HUP INT TERM
