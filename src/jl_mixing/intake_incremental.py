@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -68,6 +69,23 @@ def _annotate_cache(cache_path: Path, context: dict[str, Any]) -> None:
     temporary.replace(cache_path)
 
 
+def _preserve_human_report_compatibility(result: IntakeResult) -> IntakeResult:
+    report = result.report_markdown
+    for record in result.files:
+        relative = record.get("relative_path")
+        if not isinstance(relative, str):
+            continue
+        for finding in record.get("findings", []):
+            if not isinstance(finding, dict) or finding.get("code") != "FFPROBE_UNREADABLE":
+                continue
+            message = str(finding.get("message") or "")
+            generic = f"- `{relative}`: {message}"
+            detail = message.removeprefix("ffprobe could not inspect the audio file: ")
+            compatible = f"- Unreadable audio file `{relative}`: {detail}"
+            report = report.replace(generic, compatible)
+    return replace(result, report_markdown=report)
+
+
 def validate_intake_incremental(
     source: Path,
     *,
@@ -114,6 +132,7 @@ def validate_intake_incremental(
         cache_path=active_cache,
         update_cache=update_cache,
     )
+    result = _preserve_human_report_compatibility(result)
 
     if update_cache and active_cache is not None and active_cache.is_file():
         _annotate_cache(active_cache, context)
