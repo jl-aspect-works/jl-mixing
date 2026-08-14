@@ -14,8 +14,8 @@ Consumers should discover support through `system-info --json` rather than by ma
 
 - `intake.validate` — base operation
 - `intake.validate.report` — durable managed intake report
-- `intake.validate.incremental-cache` — unchanged files may reuse authoritative cached inspection results
-- `intake.validate.structured-files` — structured per-file validation records are returned in `data.files`
+- `intake.validate.incremental` — unchanged files may reuse authoritative cached inspection results
+- `intake.validate.structured` — structured per-file validation records are returned in `data.files`
 
 ## Request options
 
