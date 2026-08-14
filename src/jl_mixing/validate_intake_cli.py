@@ -9,7 +9,7 @@ from pathlib import Path
 
 from .context import resolve_project
 from .errors import ArgumentError, JLMixingError, ValidationError
-from .intake import validate_intake
+from .intake_incremental import validate_intake_incremental
 from .markdown import replace_managed_section
 from .validation import require_bit_depth, require_sample_rate
 
@@ -122,7 +122,7 @@ def command(args: Sequence[str] | None = None) -> int:
             raise ValidationError(f"Intake report not found or unsafe: {report}")
         cache_path = project / "00_Admin" / _CACHE_NAME
 
-        result = validate_intake(
+        result = validate_intake_incremental(
             source,
             expected_sample_rate=sample_rate,
             expected_bit_depth=bit_depth,
