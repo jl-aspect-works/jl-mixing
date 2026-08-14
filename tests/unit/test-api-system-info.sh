@@ -33,7 +33,20 @@ assert document["metadata"] == {
     "readable_schema_versions": ["1.1.0"],
     "writable_schema_version": "1.1.0",
 }
-assert document["capabilities"] == ["client.create", "delivery.create", "intake.validate", "intake.validate.report", "project.create", "project.create.artist", "revision.approve", "revision.create", "revision.create.description", "system.info"]
+assert document["capabilities"] == [
+    "client.create",
+    "delivery.create",
+    "intake.validate",
+    "intake.validate.incremental-cache",
+    "intake.validate.report",
+    "intake.validate.structured-files",
+    "project.create",
+    "project.create.artist",
+    "revision.approve",
+    "revision.create",
+    "revision.create.description",
+    "system.info",
+]
 assert Path(document["schemas"]["installed_path"]).resolve() == (
     root / "api" / "schemas" / f"v{api_version}"
 ).resolve()
