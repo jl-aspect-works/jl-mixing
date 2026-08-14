@@ -112,13 +112,27 @@ def _preserve_human_report_compatibility(
         if not isinstance(relative, str):
             continue
         for finding in record.get("findings", []):
-            if not isinstance(finding, dict) or finding.get("code") != "FFPROBE_UNREADABLE":
+            if not isinstance(finding, dict):
                 continue
+            code = finding.get("code")
             message = str(finding.get("message") or "")
             generic = f"- `{relative}`: {message}"
-            detail = message.removeprefix("ffprobe could not inspect the audio file: ")
-            compatible = f"- Unreadable audio file `{relative}`: {detail}"
-            report = report.replace(generic, compatible)
+            compatible: str | None = None
+            if code == "FFPROBE_UNREADABLE":
+                detail = message.removeprefix("ffprobe could not inspect the audio file: ")
+                compatible = f"- Unreadable audio file `{relative}`: {detail}"
+            elif code == "SAMPLE_RATE_MISMATCH":
+                actual = finding.get("actual")
+                expected = finding.get("expected")
+                if actual is not None and expected is not None:
+                    compatible = f"- `{relative}`: {actual} Hz; expected {expected} Hz."
+            elif code == "BIT_DEPTH_MISMATCH":
+                actual = finding.get("actual")
+                expected = finding.get("expected")
+                if actual is not None and expected is not None:
+                    compatible = f"- `{relative}`: {actual}-bit; expected {expected}-bit."
+            if compatible is not None:
+                report = report.replace(generic, compatible)
 
     duplicate_findings = _duplicate_basenames(result) if duplicate_check else []
     duplicate_lines = "\n".join(f"- {item}" for item in duplicate_findings) or "- None."
