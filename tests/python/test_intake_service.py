@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from jl_mixing.intake import validate_intake
+from jl_mixing.intake_incremental import validate_intake_incremental
 
 
 class IntakeServiceTests(unittest.TestCase):
@@ -14,7 +14,7 @@ class IntakeServiceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             source = Path(tmp) / "source"
             source.mkdir()
-            result = validate_intake(source, ffprobe_path="", ffmpeg_path="")
+            result = validate_intake_incremental(source, ffprobe_path="", ffmpeg_path="")
             self.assertTrue(result.blocked)
             self.assertEqual(result.files_discovered, 0)
             self.assertEqual(result.blocking_errors, 1)
@@ -25,7 +25,7 @@ class IntakeServiceTests(unittest.TestCase):
             source = Path(tmp) / "source"
             source.mkdir()
             (source / "Notes.txt").write_text("notes\n", encoding="utf-8")
-            result = validate_intake(source, ffprobe_path="", ffmpeg_path="")
+            result = validate_intake_incremental(source, ffprobe_path="", ffmpeg_path="")
             self.assertEqual(result.files_discovered, 1)
             self.assertEqual(result.files[0]["relative_path"], "Notes.txt")
             self.assertEqual(result.files[0]["status"], "not_applicable")
@@ -52,7 +52,7 @@ class IntakeServiceTests(unittest.TestCase):
                 patch("jl_mixing.intake.ffprobe_metadata", return_value=(metadata, None)) as probe,
                 patch("jl_mixing.intake.ffmpeg_decode_check", return_value=None) as decode,
             ):
-                first = validate_intake(
+                first = validate_intake_incremental(
                     source,
                     expected_sample_rate=48000,
                     expected_bit_depth=24,
@@ -71,7 +71,7 @@ class IntakeServiceTests(unittest.TestCase):
                 patch("jl_mixing.intake.ffmpeg_decode_check", side_effect=AssertionError("decode reran")),
                 patch("jl_mixing.intake.sha256_file", side_effect=AssertionError("hash reran")),
             ):
-                second = validate_intake(
+                second = validate_intake_incremental(
                     source,
                     expected_sample_rate=48000,
                     expected_bit_depth=24,
@@ -105,7 +105,7 @@ class IntakeServiceTests(unittest.TestCase):
                 patch("jl_mixing.intake.ffprobe_metadata", return_value=(metadata, None)),
                 patch("jl_mixing.intake.ffmpeg_decode_check", return_value=None),
             ):
-                validate_intake(
+                validate_intake_incremental(
                     source,
                     ffprobe_path="ffprobe",
                     ffmpeg_path="ffmpeg",
@@ -119,7 +119,7 @@ class IntakeServiceTests(unittest.TestCase):
                 patch("jl_mixing.intake.ffprobe_metadata", return_value=(metadata, None)) as probe,
                 patch("jl_mixing.intake.ffmpeg_decode_check", return_value=None) as decode,
             ):
-                result = validate_intake(
+                result = validate_intake_incremental(
                     source,
                     ffprobe_path="ffprobe",
                     ffmpeg_path="ffmpeg",
@@ -149,7 +149,7 @@ class IntakeServiceTests(unittest.TestCase):
                 patch("jl_mixing.intake.ffprobe_metadata", return_value=(metadata, None)),
                 patch("jl_mixing.intake.ffmpeg_decode_check", return_value=None),
             ):
-                result = validate_intake(
+                result = validate_intake_incremental(
                     source,
                     expected_sample_rate=48000,
                     expected_bit_depth=24,
@@ -164,7 +164,7 @@ class IntakeServiceTests(unittest.TestCase):
                 self.assertEqual(record["status"], "info")
                 self.assertEqual(len(duplicates[0]["related_paths"]), 1)
 
-    def test_current_project_expectations_drive_mismatch_findings(self) -> None:
+    def test_current_project_expectations_invalidate_policy_context(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             source = root / "source"
@@ -183,7 +183,7 @@ class IntakeServiceTests(unittest.TestCase):
                 patch("jl_mixing.intake.ffprobe_metadata", return_value=(metadata, None)),
                 patch("jl_mixing.intake.ffmpeg_decode_check", return_value=None),
             ):
-                first = validate_intake(
+                first = validate_intake_incremental(
                     source,
                     expected_sample_rate=48000,
                     expected_bit_depth=24,
@@ -194,15 +194,23 @@ class IntakeServiceTests(unittest.TestCase):
                 )
             self.assertEqual(first.files[0]["status"], "valid")
 
-            second = validate_intake(
-                source,
-                expected_sample_rate=44100,
-                expected_bit_depth=16,
-                expected_format="AIFF",
-                ffprobe_path="ffprobe",
-                ffmpeg_path="ffmpeg",
-                cache_path=cache,
-            )
+            with (
+                patch("jl_mixing.intake.ffprobe_metadata", return_value=(metadata, None)) as probe,
+                patch("jl_mixing.intake.ffmpeg_decode_check", return_value=None) as decode,
+            ):
+                second = validate_intake_incremental(
+                    source,
+                    expected_sample_rate=44100,
+                    expected_bit_depth=16,
+                    expected_format="AIFF",
+                    ffprobe_path="ffprobe",
+                    ffmpeg_path="ffmpeg",
+                    cache_path=cache,
+                )
+            self.assertEqual(second.files_validated, 1)
+            self.assertEqual(second.cache_reused, 0)
+            self.assertEqual(probe.call_count, 1)
+            self.assertEqual(decode.call_count, 1)
             codes = {finding["code"] for finding in second.files[0]["findings"]}
             self.assertIn("SAMPLE_RATE_MISMATCH", codes)
             self.assertIn("BIT_DEPTH_MISMATCH", codes)
