@@ -9,7 +9,7 @@ from typing import Any
 
 from ..context import resolve_project
 from ..errors import ArgumentError, ContextError, JLMixingError, ValidationError
-from ..intake import validate_intake
+from ..intake_incremental import validate_intake_incremental
 from ..markdown import replace_managed_section
 from ..validation import require_bit_depth, require_sample_rate
 from ..versions import api_version
@@ -77,7 +77,7 @@ def execute(request: IntakeRequest) -> tuple[dict[str, Any], int]:
         source = (request.source or (project / "01_Client_Files" / "Original_Delivery")).resolve()
         report_path = project / "00_Admin" / "Intake_Report.md"
         cache_path = project / "00_Admin" / _CACHE_NAME
-        result = validate_intake(
+        result = validate_intake_incremental(
             source,
             expected_sample_rate=sample_rate,
             expected_bit_depth=bit_depth,
