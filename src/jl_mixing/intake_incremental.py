@@ -69,7 +69,43 @@ def _annotate_cache(cache_path: Path, context: dict[str, Any]) -> None:
     temporary.replace(cache_path)
 
 
-def _preserve_human_report_compatibility(result: IntakeResult) -> IntakeResult:
+def _duplicate_basenames(result: IntakeResult) -> list[str]:
+    by_name: dict[str, list[str]] = {}
+    for record in result.files:
+        relative = record.get("relative_path")
+        if not isinstance(relative, str) or not relative:
+            continue
+        by_name.setdefault(Path(relative).name.lower(), []).append(relative)
+    return [
+        ", ".join(f"`{relative}`" for relative in relatives)
+        for relatives in by_name.values()
+        if len(relatives) > 1
+    ]
+
+
+def _legacy_warning_count(result: IntakeResult, duplicate_findings: list[str]) -> int:
+    mismatch_codes = {"SAMPLE_RATE_MISMATCH", "BIT_DEPTH_MISMATCH", "FILE_FORMAT_MISMATCH"}
+    mismatch_count = 0
+    unsupported_count = 0
+    for record in result.files:
+        if not record.get("is_audio"):
+            unsupported_count += 1
+        for finding in record.get("findings", []):
+            if isinstance(finding, dict) and finding.get("code") in mismatch_codes:
+                mismatch_count += 1
+    return (
+        len(duplicate_findings)
+        + mismatch_count
+        + unsupported_count
+        + (0 if result.ffprobe_available else 1)
+    )
+
+
+def _preserve_human_report_compatibility(
+    result: IntakeResult,
+    *,
+    duplicate_check: bool,
+) -> IntakeResult:
     report = result.report_markdown
     for record in result.files:
         relative = record.get("relative_path")
@@ -83,7 +119,38 @@ def _preserve_human_report_compatibility(result: IntakeResult) -> IntakeResult:
             detail = message.removeprefix("ffprobe could not inspect the audio file: ")
             compatible = f"- Unreadable audio file `{relative}`: {detail}"
             report = report.replace(generic, compatible)
-    return replace(result, report_markdown=report)
+
+    duplicate_findings = _duplicate_basenames(result) if duplicate_check else []
+    duplicate_lines = "\n".join(f"- {item}" for item in duplicate_findings) or "- None."
+    legacy_section = f"## Duplicate Filenames\n\n{duplicate_lines}\n\n"
+    marker = "## Exact Duplicate Files"
+    if marker in report and "## Duplicate Filenames" not in report:
+        report = report.replace(marker, legacy_section + marker, 1)
+
+    if not duplicate_check:
+        report = report.replace(
+            "Exact duplicate-content detection was skipped.",
+            "Duplicate-basename detection was skipped. Exact duplicate-content detection was skipped.",
+        )
+
+    if duplicate_findings:
+        recommendation_marker = "## Preparation Recommendations\n\n"
+        legacy_recommendation = "- Review duplicate filenames to avoid ambiguous DAW imports.\n"
+        if recommendation_marker in report and legacy_recommendation not in report:
+            report = report.replace(
+                recommendation_marker,
+                recommendation_marker + legacy_recommendation,
+                1,
+            )
+
+    warning_count = _legacy_warning_count(result, duplicate_findings)
+    report_lines = report.splitlines()
+    for index, line in enumerate(report_lines):
+        if line.startswith("- Warnings: "):
+            report_lines[index] = f"- Warnings: {warning_count}"
+            break
+    report = "\n".join(report_lines).rstrip() + "\n"
+    return replace(result, report_markdown=report, warnings=warning_count)
 
 
 def validate_intake_incremental(
@@ -132,7 +199,7 @@ def validate_intake_incremental(
         cache_path=active_cache,
         update_cache=update_cache,
     )
-    result = _preserve_human_report_compatibility(result)
+    result = _preserve_human_report_compatibility(result, duplicate_check=duplicate_check)
 
     if update_cache and active_cache is not None and active_cache.is_file():
         _annotate_cache(active_cache, context)
