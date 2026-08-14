@@ -16,6 +16,7 @@ from ..versions import api_version
 
 _BEGIN = "<!-- BEGIN AUTOMATED SECTION -->"
 _END = "<!-- END AUTOMATED SECTION -->"
+_CACHE_NAME = "intake-validation-cache.json"
 
 
 @dataclass(frozen=True)
@@ -71,15 +72,20 @@ def execute(request: IntakeRequest) -> tuple[dict[str, Any], int]:
         bit_depth = require_bit_depth(
             request.expected_bit_depth if request.expected_bit_depth is not None else audio.get("bit_depth")
         )
+        expected_format = audio.get("file_format") if isinstance(audio.get("file_format"), str) else None
 
         source = (request.source or (project / "01_Client_Files" / "Original_Delivery")).resolve()
+        report_path = project / "00_Admin" / "Intake_Report.md"
+        cache_path = project / "00_Admin" / _CACHE_NAME
         result = validate_intake(
             source,
             expected_sample_rate=sample_rate,
             expected_bit_depth=bit_depth,
+            expected_format=expected_format,
             duplicate_check=request.duplicate_check,
+            cache_path=cache_path,
+            update_cache=not request.dry_run,
         )
-        report_path = project / "00_Admin" / "Intake_Report.md"
         if request.dry_run:
             report_markdown = result.report_markdown
         else:
@@ -95,6 +101,7 @@ def execute(request: IntakeRequest) -> tuple[dict[str, Any], int]:
             "project": {"id": project_id, "path": str(project)},
             "manifest_path": str(project / "00_Admin" / "project-manifest.json"),
             "intake_report_path": str(report_path),
+            "validation_cache_path": str(cache_path),
             "workspace_path": str(_workspace_path(project)),
             "source_path": str(source),
             "report_markdown": report_markdown,
@@ -103,7 +110,11 @@ def execute(request: IntakeRequest) -> tuple[dict[str, Any], int]:
                 "blocking_errors": result.blocking_errors,
                 "warnings": result.warnings,
                 "ffprobe_available": result.ffprobe_available,
+                "ffmpeg_available": result.ffmpeg_available,
+                "cache_reused": result.cache_reused,
+                "files_validated": result.files_validated,
             },
+            "files": list(result.files),
         }
         if request.dry_run:
             data["would_update"] = [str(report_path)]
