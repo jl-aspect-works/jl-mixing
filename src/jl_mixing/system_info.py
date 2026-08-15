@@ -5,6 +5,8 @@ from __future__ import annotations
 from .versions import api_version, application_version, schema_root
 
 _CAPABILITIES = [
+    "audio-prep.provenance.exact-content",
+    "audio-prep.validation.structured",
     "client.create",
     "delivery.create",
     "intake.validate",
