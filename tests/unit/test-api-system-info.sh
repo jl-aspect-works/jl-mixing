@@ -47,7 +47,7 @@ assert document["capabilities"] == [
     "revision.approve",
     "revision.create",
     "revision.create.description",
-    "revision.update-description",
+    "revision.update.description",
     "system.info",
 ]
 assert Path(document["schemas"]["installed_path"]).resolve() == (
