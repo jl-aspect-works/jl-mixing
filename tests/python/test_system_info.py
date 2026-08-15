@@ -30,6 +30,8 @@ class SystemInfoTests(unittest.TestCase):
         self.assertEqual(
             info["capabilities"],
             [
+                "audio.prep.provenance.sha256",
+                "audio.prep.validation.structured",
                 "client.create",
                 "delivery.create",
                 "intake.validate",
