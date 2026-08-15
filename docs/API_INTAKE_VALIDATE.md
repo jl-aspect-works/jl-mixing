@@ -16,8 +16,8 @@ Consumers should discover support through `system-info --json` rather than by ma
 - `intake.validate.report` — durable managed intake report
 - `intake.validate.incremental` — unchanged files may reuse authoritative cached inspection results
 - `intake.validate.structured` — structured per-file validation records are returned in `data.files`
-- `audio-prep.validation.structured` — structured validation for `02_Audio_Preparation/Working_Audio` is returned in `data.audio_prep`
-- `audio-prep.provenance.exact-content` — an Audio Prep file may identify its Original Delivery source when one unique exact SHA-256 content match exists
+- `audio.prep.validation.structured` — structured validation for `02_Audio_Preparation/Working_Audio` is returned in `data.audio_prep`
+- `audio.prep.provenance.sha256` — an Audio Prep file may identify its Original Delivery source when one unique exact SHA-256 content match exists
 
 ## Request options
 
@@ -74,7 +74,7 @@ Each finding has a stable `code`, `severity`, and `message`, with `expected` / `
 
 ## Audio Prep status and provenance
 
-When `audio-prep.validation.structured` is advertised, `data.audio_prep` describes the current `02_Audio_Preparation/Working_Audio` tree. It has its own `working_path`, `validation_cache_path`, `summary`, and `files` collection. Audio Prep validation uses the same project sample-rate, bit-depth, and expected-format policy as Original Delivery.
+When `audio.prep.validation.structured` is advertised, `data.audio_prep` describes the current `02_Audio_Preparation/Working_Audio` tree. It has its own `working_path`, `validation_cache_path`, `summary`, and `files` collection. Audio Prep validation uses the same project sample-rate, bit-depth, and expected-format policy as Original Delivery.
 
 Audio Prep findings do **not** change the top-level `intake.validate` status or exit code. The top-level result remains the intake/Original Delivery contract; Studio consumes `data.audio_prep.summary` and each Audio Prep file's own `status` separately.
 
