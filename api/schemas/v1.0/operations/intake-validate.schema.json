@@ -22,6 +22,7 @@
         },
         "manifest_path": {"type": "string", "minLength": 1},
         "intake_report_path": {"type": "string", "minLength": 1},
+        "validation_cache_path": {"type": "string", "minLength": 1},
         "workspace_path": {"type": "string", "minLength": 1},
         "source_path": {"type": "string", "minLength": 1},
         "summary": {
@@ -31,7 +32,43 @@
             "files_discovered": {"type": "integer", "minimum": 0},
             "blocking_errors": {"type": "integer", "minimum": 0},
             "warnings": {"type": "integer", "minimum": 0},
-            "ffprobe_available": {"type": ["boolean", "null"]}
+            "ffprobe_available": {"type": ["boolean", "null"]},
+            "ffmpeg_available": {"type": ["boolean", "null"]},
+            "cache_reused": {"type": "integer", "minimum": 0},
+            "files_validated": {"type": "integer", "minimum": 0}
+          }
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "required": ["relative_path", "is_audio", "status", "cache_state", "findings"],
+            "properties": {
+              "relative_path": {"type": "string", "minLength": 1},
+              "is_audio": {"type": "boolean"},
+              "status": {"enum": ["valid", "needs_attention", "blocked", "info", "not_applicable"]},
+              "cache_state": {"enum": ["validated", "reused"]},
+              "sha256": {"type": ["string", "null"]},
+              "metadata": {"type": ["object", "null"]},
+              "decode_ok": {"type": ["boolean", "null"]},
+              "dual_mono": {"type": ["boolean", "null"]},
+              "findings": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["code", "severity", "message"],
+                  "properties": {
+                    "code": {"type": "string", "minLength": 1},
+                    "severity": {"enum": ["critical", "warning", "info"]},
+                    "message": {"type": "string", "minLength": 1},
+                    "expected": {},
+                    "actual": {},
+                    "related_paths": {"type": "array", "items": {"type": "string", "minLength": 1}}
+                  }
+                }
+              }
+            }
           }
         },
         "would_update": {"type": "array", "items": {"type": "string", "minLength": 1}}

@@ -9,12 +9,13 @@ from pathlib import Path
 
 from .context import resolve_project
 from .errors import ArgumentError, JLMixingError, ValidationError
-from .intake import validate_intake
+from .intake_incremental import validate_intake_incremental
 from .markdown import replace_managed_section
 from .validation import require_bit_depth, require_sample_rate
 
 _BEGIN = "<!-- BEGIN AUTOMATED SECTION -->"
 _END = "<!-- END AUTOMATED SECTION -->"
+_CACHE_NAME = "intake-validation-cache.json"
 
 _USAGE = """Usage: validate-intake [options]
 
@@ -23,8 +24,8 @@ Options:
   --source PATH              Intake source directory
   --expected-sample-rate HZ  Override expected sample rate
   --expected-bit-depth BITS  Override expected bit depth
-  --no-duplicate-check       Skip duplicate-basename detection
-  --dry-run                  Build and print a temporary report
+  --no-duplicate-check       Skip exact duplicate-content checking
+  --dry-run                  Build and print a temporary report without updating cache
   -h, --help                 Show this help
 """
 
@@ -108,6 +109,7 @@ def command(args: Sequence[str] | None = None) -> int:
         bit_depth = require_bit_depth(
             bit_depth_override if bit_depth_override is not None else audio.get("bit_depth")
         )
+        expected_format = audio.get("file_format") if isinstance(audio.get("file_format"), str) else None
         source = (source_ref or (project / "01_Client_Files" / "Original_Delivery")).expanduser()
         if not source.is_absolute():
             source = Path.cwd() / source
@@ -118,12 +120,16 @@ def command(args: Sequence[str] | None = None) -> int:
         report = project / "00_Admin" / "Intake_Report.md"
         if report.is_symlink() or not report.is_file():
             raise ValidationError(f"Intake report not found or unsafe: {report}")
+        cache_path = project / "00_Admin" / _CACHE_NAME
 
-        result = validate_intake(
+        result = validate_intake_incremental(
             source,
             expected_sample_rate=sample_rate,
             expected_bit_depth=bit_depth,
+            expected_format=expected_format,
             duplicate_check=duplicate_check,
+            cache_path=cache_path,
+            update_cache=not dry_run,
         )
         exit_code = 5 if result.blocked else 0
         if dry_run:
@@ -138,6 +144,8 @@ def command(args: Sequence[str] | None = None) -> int:
         print(f"Project:         {project_name}")
         print(f"Source:          {source}")
         print(f"Files inspected: {result.files_discovered}")
+        print(f"Cache reused:    {result.cache_reused}")
+        print(f"Files validated: {result.files_validated}")
         print(f"Blocking errors: {result.blocking_errors}")
         print(f"Warnings:        {result.warnings}")
         print(f"Report:          {report}")

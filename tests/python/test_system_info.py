@@ -15,7 +15,7 @@ from jl_mixing.system_info import document
 
 
 class SystemInfoTests(unittest.TestCase):
-    def test_document_preserves_v14_contract(self) -> None:
+    def test_document_preserves_v14_contract_with_additive_capabilities(self) -> None:
         info = document()
         self.assertEqual(info["api_version"], "1.0")
         self.assertEqual(info["application"]["name"], "jl-mixing")
@@ -33,7 +33,9 @@ class SystemInfoTests(unittest.TestCase):
                 "client.create",
                 "delivery.create",
                 "intake.validate",
+                "intake.validate.incremental",
                 "intake.validate.report",
+                "intake.validate.structured",
                 "project.create",
                 "project.create.artist",
                 "revision.approve",

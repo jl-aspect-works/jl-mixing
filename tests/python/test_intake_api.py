@@ -29,7 +29,7 @@ def write_project(root: Path) -> Path:
         },
         "project_id": "intake-project",
         "project_name": "Intake Project",
-        "audio": {"sample_rate": 48000, "bit_depth": 24},
+        "audio": {"sample_rate": 48000, "bit_depth": 24, "file_format": "WAV"},
     }
     (admin / "project-manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     (admin / "Intake_Report.md").write_text(
@@ -59,6 +59,7 @@ class IntakeApiTests(unittest.TestCase):
             source = project / "01_Client_Files" / "Original_Delivery"
             (source / "Notes.txt").write_text("notes\n", encoding="utf-8")
             report = project / "00_Admin" / "Intake_Report.md"
+            cache = project / "00_Admin" / "intake-validation-cache.json"
             before = report.read_bytes()
             proc = run_cli("intake", "validate", "--json", "--project", str(project), "--dry-run")
             self.assertEqual(proc.returncode, 0, proc.stderr)
@@ -68,16 +69,22 @@ class IntakeApiTests(unittest.TestCase):
             self.assertEqual(payload["status"], "planned")
             self.assertEqual(payload["data"]["project"]["id"], "intake-project")
             self.assertEqual(payload["data"]["summary"]["files_discovered"], 1)
+            self.assertIn("ffmpeg_available", payload["data"]["summary"])
+            self.assertEqual(payload["data"]["files"][0]["relative_path"], "Notes.txt")
+            self.assertEqual(payload["data"]["files"][0]["status"], "not_applicable")
             self.assertIn("Notes.txt", payload["data"]["report_markdown"])
+            self.assertEqual(payload["data"]["validation_cache_path"], str(cache.resolve()))
             self.assertEqual(payload["data"]["would_update"], [str(report.resolve())])
             self.assertEqual(report.read_bytes(), before)
+            self.assertFalse(cache.exists())
 
-    def test_success_updates_only_managed_report_region(self) -> None:
+    def test_success_updates_report_and_persists_validation_cache(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project = write_project(Path(tmp))
             source = project / "01_Client_Files" / "Original_Delivery"
             (source / "Notes.txt").write_text("notes\n", encoding="utf-8")
             report = project / "00_Admin" / "Intake_Report.md"
+            cache = project / "00_Admin" / "intake-validation-cache.json"
             proc = run_cli("intake", "validate", "--json", "--project", str(project))
             self.assertEqual(proc.returncode, 0, proc.stderr)
             payload = json.loads(proc.stdout)
@@ -86,6 +93,15 @@ class IntakeApiTests(unittest.TestCase):
             self.assertTrue(persisted.startswith("# Intake Report\n"))
             self.assertIn(payload["data"]["report_markdown"].rstrip(), persisted)
             self.assertEqual(payload["errors"], [])
+            self.assertTrue(cache.is_file())
+            cache_document = json.loads(cache.read_text(encoding="utf-8"))
+            self.assertIn("validation_context", cache_document)
+
+            second = run_cli("intake", "validate", "--json", "--project", str(project))
+            self.assertEqual(second.returncode, 0, second.stderr)
+            second_payload = json.loads(second.stdout)
+            self.assertEqual(second_payload["data"]["summary"]["cache_reused"], 1)
+            self.assertEqual(second_payload["data"]["summary"]["files_validated"], 0)
 
     def test_empty_source_returns_blocked_contract_and_updates_report(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
