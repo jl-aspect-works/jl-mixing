@@ -34,8 +34,8 @@ assert document["metadata"] == {
     "writable_schema_version": "1.1.0",
 }
 assert document["capabilities"] == [
-    "audio-prep.provenance.exact-content",
-    "audio-prep.validation.structured",
+    "audio.prep.provenance.sha256",
+    "audio.prep.validation.structured",
     "client.create",
     "delivery.create",
     "intake.validate",
