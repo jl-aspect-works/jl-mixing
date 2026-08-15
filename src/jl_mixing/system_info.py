@@ -18,6 +18,7 @@ _CAPABILITIES = [
     "revision.approve",
     "revision.create",
     "revision.create.description",
+    "revision.update-description",
     "system.info",
 ]
 
