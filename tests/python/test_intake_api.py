@@ -75,6 +75,7 @@ class IntakeApiTests(unittest.TestCase):
             self.assertIn("Notes.txt", payload["data"]["report_markdown"])
             self.assertEqual(payload["data"]["validation_cache_path"], str(cache.resolve()))
             self.assertEqual(payload["data"]["would_update"], [str(report.resolve())])
+            self.assertEqual(payload["data"]["audio_prep"]["files"], [])
             self.assertEqual(report.read_bytes(), before)
             self.assertFalse(cache.exists())
 
@@ -102,6 +103,45 @@ class IntakeApiTests(unittest.TestCase):
             second_payload = json.loads(second.stdout)
             self.assertEqual(second_payload["data"]["summary"]["cache_reused"], 1)
             self.assertEqual(second_payload["data"]["summary"]["files_validated"], 0)
+
+    def test_audio_prep_reports_validation_and_unique_exact_content_provenance(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = write_project(Path(tmp))
+            original = project / "01_Client_Files" / "Original_Delivery"
+            working = project / "02_Audio_Preparation" / "Working_Audio"
+            working.mkdir(parents=True)
+            (original / "Original Name.txt").write_text("same content\n", encoding="utf-8")
+            (working / "Renamed Working Copy.txt").write_text("same content\n", encoding="utf-8")
+
+            proc = run_cli("intake", "validate", "--json", "--project", str(project))
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            payload = json.loads(proc.stdout)
+            audio_prep = payload["data"]["audio_prep"]
+            self.assertEqual(audio_prep["summary"]["files_discovered"], 1)
+            self.assertEqual(audio_prep["files"][0]["relative_path"], "Renamed Working Copy.txt")
+            self.assertEqual(audio_prep["files"][0]["status"], "not_applicable")
+            self.assertEqual(audio_prep["files"][0]["original_filename"], "Original Name.txt")
+            self.assertEqual(audio_prep["files"][0]["original_delivery_relative_path"], "Original Name.txt")
+            self.assertEqual(audio_prep["files"][0]["provenance_state"], "exact_content")
+            self.assertTrue((project / "00_Admin" / "audio-prep-validation-cache.json").is_file())
+
+    def test_audio_prep_ambiguous_exact_content_does_not_guess_original(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = write_project(Path(tmp))
+            original = project / "01_Client_Files" / "Original_Delivery"
+            working = project / "02_Audio_Preparation" / "Working_Audio"
+            working.mkdir(parents=True)
+            (original / "First.txt").write_text("duplicate\n", encoding="utf-8")
+            (original / "Second.txt").write_text("duplicate\n", encoding="utf-8")
+            (working / "Working.txt").write_text("duplicate\n", encoding="utf-8")
+
+            proc = run_cli("intake", "validate", "--json", "--project", str(project))
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            payload = json.loads(proc.stdout)
+            record = payload["data"]["audio_prep"]["files"][0]
+            self.assertIsNone(record["original_filename"])
+            self.assertIsNone(record["original_delivery_relative_path"])
+            self.assertEqual(record["provenance_state"], "ambiguous")
 
     def test_empty_source_returns_blocked_contract_and_updates_report(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
