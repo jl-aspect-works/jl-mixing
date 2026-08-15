@@ -24,6 +24,11 @@ from .api.revision_approve import parse_args as parse_approval_args
 from .api.revision_create import _error_envelope as revision_error_envelope
 from .api.revision_create import execute as revision_execute
 from .api.revision_create import parse_args as parse_revision_args
+from .api.revision_update_description import (
+    _error_envelope as revision_description_error_envelope,
+)
+from .api.revision_update_description import execute as revision_description_execute
+from .api.revision_update_description import parse_args as parse_revision_description_args
 from .errors import ArgumentError, ValidationError
 from .system_info import document as system_info_document
 
@@ -83,6 +88,30 @@ def main(argv: Sequence[str] | None = None) -> int:
             _emit_json(revision_error_envelope("VALIDATION_FAILED", str(exc), exc.exit_code, status="blocked"))
             return exc.exit_code
         payload, status = revision_execute(request)
+        _emit_json(payload)
+        return status
+
+    if len(args) >= 2 and args[0:2] == ["revision", "update-description"]:
+        try:
+            request = parse_revision_description_args(args[2:])
+        except ArgumentError as exc:
+            _emit_json(
+                revision_description_error_envelope(
+                    "INVALID_REQUEST", str(exc), exc.exit_code
+                )
+            )
+            return exc.exit_code
+        except ValidationError as exc:
+            _emit_json(
+                revision_description_error_envelope(
+                    "VALIDATION_FAILED",
+                    str(exc),
+                    exc.exit_code,
+                    status="blocked",
+                )
+            )
+            return exc.exit_code
+        payload, status = revision_description_execute(request)
         _emit_json(payload)
         return status
 
