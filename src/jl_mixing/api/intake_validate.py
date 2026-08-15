@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from ..audio_prep_status import build_audio_prep_status
 from ..context import resolve_project
 from ..errors import ArgumentError, ContextError, JLMixingError, ValidationError
 from ..intake_incremental import validate_intake_incremental
@@ -86,6 +87,14 @@ def execute(request: IntakeRequest) -> tuple[dict[str, Any], int]:
             cache_path=cache_path,
             update_cache=not request.dry_run,
         )
+        audio_prep = build_audio_prep_status(
+            project,
+            original_files=result.files,
+            expected_sample_rate=sample_rate,
+            expected_bit_depth=bit_depth,
+            expected_format=expected_format,
+            update_cache=not request.dry_run,
+        )
         if request.dry_run:
             report_markdown = result.report_markdown
         else:
@@ -115,6 +124,7 @@ def execute(request: IntakeRequest) -> tuple[dict[str, Any], int]:
                 "files_validated": result.files_validated,
             },
             "files": list(result.files),
+            "audio_prep": audio_prep,
         }
         if request.dry_run:
             data["would_update"] = [str(report_path)]
