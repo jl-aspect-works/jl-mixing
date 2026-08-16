@@ -12,6 +12,11 @@ from .api.client_create import parse_args as parse_client_args
 from .api.delivery_create import _error_envelope as delivery_error_envelope
 from .api.delivery_create import execute as delivery_execute
 from .api.delivery_create import parse_args as parse_delivery_args
+from .api.delivery_management import _error_envelope as delivery_management_error_envelope
+from .api.delivery_management import execute_delete_package as delivery_delete_package_execute
+from .api.delivery_management import execute_status as delivery_status_execute
+from .api.delivery_management import parse_delete_package_args as parse_delivery_delete_package_args
+from .api.delivery_management import parse_status_args as parse_delivery_status_args
 from .api.intake_validate import _error_envelope as intake_error_envelope
 from .api.intake_validate import execute as intake_execute
 from .api.intake_validate import parse_args as parse_intake_args
@@ -138,6 +143,28 @@ def main(argv: Sequence[str] | None = None) -> int:
             _emit_json(delivery_error_envelope("DELIVERY_VALIDATION_FAILED", str(exc), exc.exit_code, status="blocked"))
             return exc.exit_code
         payload, status = delivery_execute(request)
+        _emit_json(payload)
+        return status
+
+    if len(args) >= 2 and args[0:2] == ["delivery", "status"]:
+        operation = "delivery.status"
+        try:
+            request = parse_delivery_status_args(args[2:])
+        except ArgumentError as exc:
+            _emit_json(delivery_management_error_envelope(operation, "INVALID_REQUEST", str(exc), exc.exit_code))
+            return exc.exit_code
+        payload, status = delivery_status_execute(request)
+        _emit_json(payload)
+        return status
+
+    if len(args) >= 2 and args[0:2] == ["delivery", "delete-package"]:
+        operation = "delivery.delete-package"
+        try:
+            request = parse_delivery_delete_package_args(args[2:])
+        except ArgumentError as exc:
+            _emit_json(delivery_management_error_envelope(operation, "INVALID_REQUEST", str(exc), exc.exit_code))
+            return exc.exit_code
+        payload, status = delivery_delete_package_execute(request)
         _emit_json(payload)
         return status
 
