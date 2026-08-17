@@ -1,10 +1,10 @@
 # Build and publish JL Mixing Automation release packages.
 #
 # Normal use:
-#   Push an annotated tag such as v1.5.0-rc.1.
+#   Push an annotated tag such as v2.0.0-rc.1.
 #
 # Recovery use:
-#   Run this workflow manually and enter an existing tag, such as v1.5.0-rc.1.
+#   Run this workflow manually and enter an existing tag, such as v2.0.0-rc.1.
 #   This is useful when package builds succeeded but the publish job failed.
 
 name: Release
@@ -17,7 +17,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Existing release tag to build and publish, such as v1.5.0-rc.1"
+        description: "Existing release tag to build and publish, such as v2.0.0-rc.1"
         required: true
         type: string
 
@@ -273,7 +273,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ env.RELEASE_TAG }}
-          sparse-checkout: docs/RELEASE_NOTES_V1.5.md
+          sparse-checkout: docs/RELEASE_NOTES_V2.0.md
           sparse-checkout-cone-mode: false
 
       - name: Download release assets
@@ -325,6 +325,6 @@ jobs:
                   --repo "$GITHUB_REPOSITORY" \
                   --verify-tag \
                   --title "JL Mixing Automation ${tag#v}" \
-                  --notes-file docs/RELEASE_NOTES_V1.5.md \
+                  --notes-file docs/RELEASE_NOTES_V2.0.md \
                   "${prerelease_args[@]}"
           fi
