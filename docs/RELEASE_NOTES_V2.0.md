@@ -2,6 +2,77 @@
 
 JL Mixing Automation 2.0 supplies the authoritative workflow and machine-readable API support used by the JL Mixing Studio 2.0 Daily Workflow release.
 
+## Installation
+
+Download the release archive for your platform from the Assets section below, then verify its accompanying SHA-256 checksum before installing.
+
+### macOS
+
+Choose the archive that matches your Mac:
+
+- `macos-arm64` for Apple Silicon Macs.
+- `macos-x86_64` for Intel Macs.
+
+Extract the archive. JL Mixing Automation release candidates are currently unsigned and not notarized. macOS may therefore block the bundled Python runtime with a message such as **“Python cannot be opened because Apple cannot check it for malicious software.”**
+
+Before running the installer, remove the macOS quarantine attribute recursively from the extracted release directory:
+
+```bash
+xattr -dr com.apple.quarantine /path/to/jl-mixing-2.0.0-rc.1
+```
+
+For example, if the extracted folder is in Downloads:
+
+```bash
+xattr -dr com.apple.quarantine "$HOME/Downloads/jl-mixing-2.0.0-rc.1"
+```
+
+Then run the installer from the extracted directory:
+
+```bash
+cd "$HOME/Downloads/jl-mixing-2.0.0-rc.1"
+./macos/install.sh
+```
+
+The recursive quarantine removal is important because the release contains a bundled Python runtime; clearing quarantine only from `install.sh` is not sufficient.
+
+After installation, verify the installed command surface:
+
+```bash
+jl-mixing --version
+```
+
+### Windows
+
+Download and extract the `windows.zip` release asset. Open PowerShell in the extracted release directory and run:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+.\windows\install.ps1
+```
+
+The process-scoped execution-policy change applies only to the current PowerShell session and avoids changing the machine-wide policy.
+
+After installation, open a new PowerShell window and verify:
+
+```powershell
+jl-mixing --version
+```
+
+### Linux
+
+Download and extract the Linux release archive, then run the installer from the extracted directory:
+
+```bash
+./linux/install.sh
+```
+
+After installation, verify:
+
+```bash
+jl-mixing --version
+```
+
 ## Highlights
 
 - Structured incremental intake validation for Studio, including cached file-level findings and technical metadata.
