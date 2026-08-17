@@ -36,7 +36,7 @@ cd "$HOME/Downloads/jl-mixing-2.0.0-rc.1"
 
 The recursive quarantine removal is important because the release contains a bundled Python runtime; clearing quarantine only from `install.sh` is not sufficient.
 
-After installation, verify the installed command surface:
+The macOS package includes its private Python runtime and installs to `~/.local` by default. Open a new Terminal session after installation if needed, then verify:
 
 ```bash
 jl-mixing --version
@@ -44,16 +44,15 @@ jl-mixing --version
 
 ### Windows
 
-Download and extract the `windows.zip` release asset. Open PowerShell in the extracted release directory and run:
+Download and extract the Windows ZIP, then run the included PowerShell installer from the extracted release directory:
 
 ```powershell
-Set-ExecutionPolicy -Scope Process Bypass
 .\windows\install.ps1
 ```
 
-The process-scoped execution-policy change applies only to the current PowerShell session and avoids changing the machine-wide policy.
+The Windows package includes its private Python runtime. End users do not need to install Python, Bash, or jq separately. The default installation is beneath `%LOCALAPPDATA%\Programs\JL Mixing\`.
 
-After installation, open a new PowerShell window and verify:
+Open a new PowerShell session after installation so the managed PATH and shell integration are active, then verify:
 
 ```powershell
 jl-mixing --version
@@ -61,17 +60,19 @@ jl-mixing --version
 
 ### Linux
 
-Download and extract the Linux release archive, then run the installer from the extracted directory:
+Download and extract the Linux release archive, then run the compatibility installer from the extracted directory:
 
 ```bash
-./linux/install.sh
+./install.sh
 ```
 
-After installation, verify:
+Linux/source installs require Bash, Python 3.10+ with `venv`, and jq. After installation, verify:
 
 ```bash
 jl-mixing --version
 ```
+
+`ffprobe`/`ffmpeg` are optional external tools used for enhanced audio intake QC. When unavailable, affected checks are reported as skipped rather than silently assumed to have passed.
 
 ## Highlights
 
