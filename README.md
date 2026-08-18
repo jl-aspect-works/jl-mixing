@@ -1,13 +1,8 @@
 # JL Mixing Automation
 
-JL Mixing Automation v1.5 is a cross-platform workflow engine for professional
-mixing projects. It creates consistent workspaces, preserves original client
-files, manages revisions and approval, validates intake, and builds verified
-final-delivery packages.
+JL Mixing Automation v2.0 is the cross-platform workflow engine behind JL Mixing Studio. It creates consistent workspaces, preserves original client files, validates intake, manages revisions/approval, exposes the Automation API used by Studio, and builds verified final-delivery packages.
 
-The authoritative v1.5 runtime is Python and is shared across Windows and macOS.
-The Automation API remains version `1.0`, while workspace metadata schemas remain
-version `1.1.0`.
+The authoritative runtime is Python and is shared across Windows and macOS. Automation API remains version `1.0`, while workspace metadata schemas remain version `1.1.0`.
 
 ## Workflow
 
@@ -22,71 +17,50 @@ new-studio
   -> create-delivery
 ```
 
-The default workspace is `~/Music/Mixes/`. Projects live directly beneath
-`Clients/<Client>/Projects/<Project>/`; there are no `Active/` or `Completed/`
-directories.
+The default workspace is `~/Music/Mixes/`. Projects live directly beneath `Clients/<Client>/Projects/<Project>/`; there are no `Active/` or `Completed/` directories.
 
 ## Installation
 
 ### Windows
 
-Download and extract the Windows ZIP, then run the included PowerShell installer:
+Download and extract `jl-mixing-2.0.0-windows.zip`, then run:
 
 ```powershell
 .\windows\install.ps1
 ```
 
-The Windows package includes its private Python runtime. End users do not need to
-install Python, Bash, or jq separately. The default installation is beneath:
+If Windows marks the downloaded installer script as blocked:
 
-```text
-%LOCALAPPDATA%\Programs\JL Mixing\
+```powershell
+Unblock-File .\windows\install.ps1
+.\windows\install.ps1
 ```
 
-Open a new PowerShell session after installation so the managed PATH and shell
-integration are active.
+The package includes its private Python runtime. The default installation is beneath `%LOCALAPPDATA%\Programs\JL Mixing\`. Open a new PowerShell session after installation, then verify with `jl-mixing --version`.
 
 ### macOS
 
-Download and extract the macOS archive, then run:
+Choose the release archive for your architecture (`macos-x86_64` for Intel or `macos-arm64` for Apple Silicon) and extract it. The 2.0 packages are unsigned and not notarized, so after verifying the release checksum remove quarantine recursively from the extracted folder before installing:
 
 ```bash
+xattr -dr com.apple.quarantine /path/to/jl-mixing-2.0.0
+cd /path/to/jl-mixing-2.0.0
 ./macos/install.sh
 ```
 
-The macOS package includes its private Python runtime. End users do not need a
-separate Python or jq installation. The default prefix is `~/.local`.
+Recursive quarantine removal is required because the package contains a bundled Python framework/runtime. The default prefix is `~/.local`. Open a new Terminal session after installation if needed, then verify with `jl-mixing --version`.
 
 ### Linux and source/developer installs
 
-The Linux/source installer remains the compatibility path:
+The Linux/source compatibility installer remains:
 
 ```bash
 ./install.sh
 ```
 
-It requires Bash, Python 3.10+ with `venv`, and jq. See
-[`docs/INSTALLATION_GUIDE.md`](docs/INSTALLATION_GUIDE.md) for platform-specific
-details and custom-prefix options.
+It requires Bash, Python 3.10+ with `venv`, and jq. See [`docs/INSTALLATION_GUIDE.md`](docs/INSTALLATION_GUIDE.md) for platform-specific details and custom-prefix options.
 
-`ffprobe`/`ffmpeg` are optional external tools used for enhanced audio intake QC.
-When unavailable, affected checks are reported as skipped rather than silently
-assumed to have passed.
-
-## Start
-
-```bash
-new-studio
-new-client acme --name "Acme Records"
-new-mix "Blue Sky" --client acme
-```
-
-`new-client` can be run from anywhere. Studio-root resolution uses this order:
-
-1. explicit `--root PATH`
-2. `JL_MIXING_ROOT`
-3. current-directory studio context
-4. the default `~/Music/Mixes` workspace
+`ffprobe`/`ffmpeg` are optional external tools used for enhanced audio intake QC. When unavailable, affected checks are reported as skipped rather than silently assumed to have passed.
 
 ## Automation API
 
@@ -96,40 +70,22 @@ Machine clients discover the installed provider with:
 jl-mixing system-info --json
 ```
 
-API 1.0 advertises capability-backed operations including:
+Studio 2.0 consumes additive API 1.0 capabilities for structured cached intake validation, Audio Prep validation/provenance, revision-description updates, managed Delivery status, and package reconciliation in addition to the established client/project/revision/approval/delivery operations.
 
-```text
-client.create
-project.create
-project.create.artist
-intake.validate
-intake.validate.report
-revision.create
-revision.create.description
-revision.approve
-delivery.create
-system.info
-```
-
-Clients must use the reported `api_version` and `capabilities`; they must not
-infer API compatibility from the Automation product release number.
+Clients must use the reported `api_version` and `capabilities`; they must not infer compatibility from the Automation product release number.
 
 ## Compatibility
 
-- Automation application release: v1.5
+- Automation application release: v2.0
 - Automation API: `1.0`
 - readable metadata schemas: `1.1.0`
 - writable metadata schema: `1.1.0`
-- no v1.0 workspace migration
+- existing valid v1.1 workspaces remain compatible
 
-v1.5 is compatible with valid v1.1 workspaces and later compatible 1.1.0-schema
-records. New records identify the current application release in `created_with`
-without changing the metadata schema identity.
+New records identify the current application release in `created_with` without changing metadata schema identity.
 
 ## Documentation
 
-Start with [`docs/README.md`](docs/README.md), the
-[`User Guide`](docs/USER_GUIDE.md), and the
-[`Installation Guide`](docs/INSTALLATION_GUIDE.md).
+Start with [`docs/README.md`](docs/README.md), the [`User Guide`](docs/USER_GUIDE.md), the [`Installation Guide`](docs/INSTALLATION_GUIDE.md), and the [`2.0 release notes`](docs/RELEASE_NOTES_V2.0.md).
 
 JL Mixing Automation is licensed under Apache-2.0. See [LICENSE](LICENSE).
