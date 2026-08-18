@@ -1,5 +1,10 @@
-# JL Mixing Automation
-
+<p align="left">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jl-aspect-works/jl-brand/main/jl-mixing-automation-dark-product.png">
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/jl-aspect-works/jl-brand/main/jl-mixing-automation-light-product.png">
+    <img alt="JL Mixing Automation by JL Aspect Works" width="420" src="https://raw.githubusercontent.com/jl-aspect-works/jl-brand/main/jl-mixing-automation-light-product.png">
+  </picture>
+</p>
 JL Mixing Automation v2.0 is the cross-platform workflow engine behind JL Mixing Studio. It creates consistent workspaces, preserves original client files, validates intake, manages revisions/approval, exposes the Automation API used by Studio, and builds verified final-delivery packages.
 
 The authoritative runtime is Python and is shared across Windows and macOS. Automation API remains version `1.0`, while workspace metadata schemas remain version `1.1.0`.
