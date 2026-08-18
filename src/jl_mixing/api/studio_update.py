@@ -32,27 +32,40 @@ def _error_envelope(code: str, message: str, exit_code: int, *, status: str = "e
         "status": status,
         "data": {},
         "warnings": [],
-        "errors": [{"code": code, "message": message, "details": {"exit_code": exit_code}, "retryable": False}],
+        "errors": [
+            {
+                "code": code,
+                "message": message,
+                "details": {"exit_code": exit_code},
+                "retryable": False,
+            }
+        ],
     }
 
 
 def execute(request: StudioUpdateApiRequest) -> tuple[dict[str, Any], int]:
     try:
         root = studio_root(request.studio or Path.cwd())
-        result = update_studio(StudioUpdateRequest(
-            studio_root=root,
-            studio_name=request.studio_name,
-            mix_engineer=request.mix_engineer,
-            sample_rate=request.sample_rate,
-            bit_depth=request.bit_depth,
-            file_format=request.file_format,
-            delivery_method=request.delivery_method,
-            requested_deliverables=request.requested_deliverables,
-            dry_run=request.dry_run,
-        ))
+        result = update_studio(
+            StudioUpdateRequest(
+                studio_root=root,
+                studio_name=request.studio_name,
+                mix_engineer=request.mix_engineer,
+                sample_rate=request.sample_rate,
+                bit_depth=request.bit_depth,
+                file_format=request.file_format,
+                delivery_method=request.delivery_method,
+                requested_deliverables=request.requested_deliverables,
+                dry_run=request.dry_run,
+            )
+        )
         doc = result.document
         data: dict[str, Any] = {
-            "studio": {"id": doc["studio_id"], "path": str(result.studio_root), "configuration_path": str(result.studio_config)},
+            "studio": {
+                "id": doc["studio_id"],
+                "path": str(result.studio_root),
+                "configuration_path": str(result.studio_config),
+            },
             "changed_fields": list(result.changed_fields),
             "editable": {
                 "studio_name": doc["studio_name"],
@@ -82,7 +95,7 @@ def execute(request: StudioUpdateApiRequest) -> tuple[dict[str, Any], int]:
     except JLMixingError as exc:
         return _error_envelope("INTERNAL_ERROR", str(exc), exc.exit_code), exc.exit_code
     except OSError as exc:
-        return _error_envelope("FILESYSTEM_ERROR", str(exc), 7), 7
+        return _error_envelope("FILESYSTEM_ERROR", str(exc), 1), 1
 
 
 def parse_args(args: list[str]) -> StudioUpdateApiRequest:
@@ -95,23 +108,42 @@ def parse_args(args: list[str]) -> StudioUpdateApiRequest:
             json_seen += 1
         elif arg == "--dry-run":
             values["dry_run"] = True
-        elif arg in {"--studio", "--name", "--engineer", "--sample-rate", "--bit-depth", "--file-format", "--delivery-method", "--deliverables"}:
+        elif arg in {
+            "--studio",
+            "--name",
+            "--engineer",
+            "--sample-rate",
+            "--bit-depth",
+            "--file-format",
+            "--delivery-method",
+            "--deliverables",
+        }:
             index += 1
             if index >= len(args):
                 raise ArgumentError(f"{arg} requires a value.")
             value = args[index]
-            if arg == "--studio": values["studio"] = Path(value)
-            elif arg == "--name": values["studio_name"] = value
-            elif arg == "--engineer": values["mix_engineer"] = value
+            if arg == "--studio":
+                values["studio"] = Path(value)
+            elif arg == "--name":
+                values["studio_name"] = value
+            elif arg == "--engineer":
+                values["mix_engineer"] = value
             elif arg == "--sample-rate":
-                try: values["sample_rate"] = int(value)
-                except ValueError as exc: raise ArgumentError("--sample-rate requires an integer.") from exc
+                try:
+                    values["sample_rate"] = int(value)
+                except ValueError as exc:
+                    raise ArgumentError("--sample-rate requires an integer.") from exc
             elif arg == "--bit-depth":
-                try: values["bit_depth"] = int(value)
-                except ValueError as exc: raise ArgumentError("--bit-depth requires an integer.") from exc
-            elif arg == "--file-format": values["file_format"] = value
-            elif arg == "--delivery-method": values["delivery_method"] = value
-            else: values["requested_deliverables"] = tuple(part.strip() for part in value.split(","))
+                try:
+                    values["bit_depth"] = int(value)
+                except ValueError as exc:
+                    raise ArgumentError("--bit-depth requires an integer.") from exc
+            elif arg == "--file-format":
+                values["file_format"] = value
+            elif arg == "--delivery-method":
+                values["delivery_method"] = value
+            else:
+                values["requested_deliverables"] = tuple(part.strip() for part in value.split(","))
         elif arg.startswith("-"):
             raise ArgumentError(f"Unknown option: {arg}")
         else:
@@ -119,7 +151,15 @@ def parse_args(args: list[str]) -> StudioUpdateApiRequest:
         index += 1
     if json_seen != 1:
         raise ArgumentError("studio update requires exactly one --json option.")
-    editable_keys = {"studio_name", "mix_engineer", "sample_rate", "bit_depth", "file_format", "delivery_method", "requested_deliverables"}
+    editable_keys = {
+        "studio_name",
+        "mix_engineer",
+        "sample_rate",
+        "bit_depth",
+        "file_format",
+        "delivery_method",
+        "requested_deliverables",
+    }
     if not any(key in values for key in editable_keys):
         raise ArgumentError("studio update requires at least one editable field.")
     return StudioUpdateApiRequest(**values)
