@@ -85,7 +85,7 @@ assert_contains "$(cat "$ROOT/docs/INSTALLATION_GUIDE.md")" \
 assert_contains "$(cat "$ROOT/docs/RELEASE_NOTES_V2.0.md")" \
     'xattr -dr com.apple.quarantine /path/to/jl-mixing-2.0.0' "v2.0 release notes document bundled-runtime quarantine workaround"
 assert_contains "$(cat "$ROOT/docs/RELEASE_NOTES_V2.0.md")" \
-    'Unblock-File .\\windows\\install.ps1' "v2.0 release notes document Windows downloaded-script unblock"
+    'Unblock-File .\windows\install.ps1' "v2.0 release notes document Windows downloaded-script unblock"
 assert_contains "$(cat "$ROOT/docs/USER_GUIDE.md")" \
     'create-delivery --clean' "user guide documents destructive clean"
 assert_contains "$(cat "$ROOT/docs/USER_GUIDE.md")" \
