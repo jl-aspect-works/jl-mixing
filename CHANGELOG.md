@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.0.0
+
+- Added incremental cached intake validation with structured per-file findings and technical metadata for Studio.
+- Added structured Audio Prep validation and exact-content provenance for unchanged Working Audio files.
+- Added Automation-owned revision-description mutation through API 1.0.
+- Added managed Delivery status/reconciliation, generated-package current/stale detection, safe generated-package deletion, and authoritative rebuild support.
+- Added failure-safety regression coverage proving failed package deletion preserves existing authoritative Delivery state.
+- Preserved Automation API `1.0`, workspace metadata schema `1.1.0`, existing valid v1.1 workspaces, and the cross-platform runtime/install architecture established in the 1.5 line.
+- Added stable 2.0 installation guidance, including the recursive macOS quarantine workaround required by the unsigned bundled Python runtime and Windows downloaded-script unblock guidance.
+
 ## 1.5.1
 
 - Split the self-contained macOS release into architecture-specific Intel
