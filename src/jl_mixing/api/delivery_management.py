@@ -12,6 +12,7 @@ from ..delivery_management import (
     delete_generated_package,
     inspect_delivery,
 )
+from ..delivery_requirements import reconcile_delivery_requirements
 from ..errors import ArgumentError, ContextError, JLMixingError, UnsafeOperationError, ValidationError
 from ..versions import api_version
 
@@ -47,6 +48,7 @@ def execute_status(request: DeliveryStatusApiRequest) -> tuple[dict[str, Any], i
     operation = "delivery.status"
     try:
         data = inspect_delivery(DeliveryStatusRequest(request.project))
+        data = reconcile_delivery_requirements(Path(data["project"]["path"]), data)
         return {
             "api_version": api_version(),
             "operation": operation,

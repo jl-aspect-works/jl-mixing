@@ -23,7 +23,7 @@ assert d['capabilities']==[
 'audio.prep.provenance.sha256','audio.prep.validation.structured','client.create','client.update',
 'delivery.create','delivery.package.delete','delivery.package.rebuild','delivery.status','intake.validate',
 'intake.validate.incremental','intake.validate.report','intake.validate.structured','project.create','project.create.artist',
-'revision.approve','revision.create','revision.create.description','revision.update.description','studio.update','system.info']
+'project.update','revision.approve','revision.create','revision.create.description','revision.update.description','studio.update','system.info']
 assert Path(d['schemas']['installed_path']).resolve()==(root/'api'/'schemas'/f'v{av}').resolve()
 assert d['schemas']['public_base_url']==f'https://jlaudio.github.io/jl-mixing/api/v{av}/schemas/'
 PY_ASSERT

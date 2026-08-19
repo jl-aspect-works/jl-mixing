@@ -19,6 +19,7 @@ _CAPABILITIES = [
     "intake.validate.structured",
     "project.create",
     "project.create.artist",
+    "project.update",
     "revision.approve",
     "revision.create",
     "revision.create.description",

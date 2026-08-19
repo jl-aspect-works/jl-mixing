@@ -26,7 +26,7 @@ class SystemInfoTests(unittest.TestCase):
             "client.create", "client.update", "delivery.create", "delivery.package.delete",
             "delivery.package.rebuild", "delivery.status", "intake.validate",
             "intake.validate.incremental", "intake.validate.report", "intake.validate.structured",
-            "project.create", "project.create.artist", "revision.approve", "revision.create",
+            "project.create", "project.create.artist", "project.update", "revision.approve", "revision.create",
             "revision.create.description", "revision.update.description", "studio.update", "system.info",
         ])
         self.assertEqual(Path(info["schemas"]["installed_path"]), (ROOT / "api" / "schemas" / "v1.0").resolve())
