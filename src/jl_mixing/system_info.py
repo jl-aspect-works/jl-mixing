@@ -8,6 +8,7 @@ _CAPABILITIES = [
     "audio.prep.provenance.sha256",
     "audio.prep.validation.structured",
     "client.create",
+    "client.update",
     "delivery.create",
     "delivery.package.delete",
     "delivery.package.rebuild",

@@ -9,6 +9,9 @@ from collections.abc import Sequence
 from .api.client_create import _error_envelope as client_error_envelope
 from .api.client_create import execute as client_execute
 from .api.client_create import parse_args as parse_client_args
+from .api.client_update import _error_envelope as client_update_error_envelope
+from .api.client_update import execute as client_update_execute
+from .api.client_update import parse_args as parse_client_update_args
 from .api.delivery_create import _error_envelope as delivery_error_envelope
 from .api.delivery_create import execute as delivery_execute
 from .api.delivery_create import parse_args as parse_delivery_args
@@ -81,6 +84,19 @@ def main(argv: Sequence[str] | None = None) -> int:
             _emit_json(client_error_envelope("VALIDATION_FAILED", str(exc), exc.exit_code, status="blocked"))
             return exc.exit_code
         payload, status = client_execute(request)
+        _emit_json(payload)
+        return status
+
+    if len(args) >= 2 and args[0:2] == ["client", "update"]:
+        try:
+            request = parse_client_update_args(args[2:])
+        except ArgumentError as exc:
+            _emit_json(client_update_error_envelope("INVALID_REQUEST", str(exc), exc.exit_code))
+            return exc.exit_code
+        except ValidationError as exc:
+            _emit_json(client_update_error_envelope("VALIDATION_FAILED", str(exc), exc.exit_code, status="blocked"))
+            return exc.exit_code
+        payload, status = client_update_execute(request)
         _emit_json(payload)
         return status
 
