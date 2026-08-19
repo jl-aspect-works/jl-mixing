@@ -20,57 +20,24 @@ class SystemInfoTests(unittest.TestCase):
         self.assertEqual(info["api_version"], "1.0")
         self.assertEqual(info["application"]["name"], "jl-mixing")
         self.assertEqual(info["application"]["version"], (ROOT / "VERSION").read_text().strip())
-        self.assertEqual(
-            info["metadata"],
-            {
-                "readable_schema_versions": ["1.1.0"],
-                "writable_schema_version": "1.1.0",
-            },
-        )
-        self.assertEqual(
-            info["capabilities"],
-            [
-                "audio.prep.provenance.sha256",
-                "audio.prep.validation.structured",
-                "client.create",
-                "delivery.create",
-                "delivery.package.delete",
-                "delivery.package.rebuild",
-                "delivery.status",
-                "intake.validate",
-                "intake.validate.incremental",
-                "intake.validate.report",
-                "intake.validate.structured",
-                "project.create",
-                "project.create.artist",
-                "revision.approve",
-                "revision.create",
-                "revision.create.description",
-                "revision.update.description",
-                "studio.update",
-                "system.info",
-            ],
-        )
-        self.assertEqual(
-            Path(info["schemas"]["installed_path"]),
-            (ROOT / "api" / "schemas" / "v1.0").resolve(),
-        )
+        self.assertEqual(info["metadata"], {"readable_schema_versions": ["1.1.0"], "writable_schema_version": "1.1.0"})
+        self.assertEqual(info["capabilities"], [
+            "audio.prep.provenance.sha256", "audio.prep.validation.structured",
+            "client.create", "client.update", "delivery.create", "delivery.package.delete",
+            "delivery.package.rebuild", "delivery.status", "intake.validate",
+            "intake.validate.incremental", "intake.validate.report", "intake.validate.structured",
+            "project.create", "project.create.artist", "revision.approve", "revision.create",
+            "revision.create.description", "revision.update.description", "studio.update", "system.info",
+        ])
+        self.assertEqual(Path(info["schemas"]["installed_path"]), (ROOT / "api" / "schemas" / "v1.0").resolve())
 
     def test_cli_emits_machine_json(self) -> None:
         env = os.environ.copy()
         env["PYTHONPATH"] = str(SRC)
-        proc = subprocess.run(
-            [sys.executable, "-m", "jl_mixing.cli", "system-info", "--json"],
-            cwd=ROOT,
-            env=env,
-            text=True,
-            capture_output=True,
-            check=False,
-        )
+        proc = subprocess.run([sys.executable, "-m", "jl_mixing.cli", "system-info", "--json"], cwd=ROOT, env=env, text=True, capture_output=True, check=False)
         self.assertEqual(proc.returncode, 0, proc.stderr)
         self.assertEqual(proc.stderr, "")
-        payload = json.loads(proc.stdout)
-        self.assertEqual(payload, document())
+        self.assertEqual(json.loads(proc.stdout), document())
 
 
 if __name__ == "__main__":
