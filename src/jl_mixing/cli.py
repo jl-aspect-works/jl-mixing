@@ -26,6 +26,9 @@ from .api.intake_validate import parse_args as parse_intake_args
 from .api.project_create import _error_envelope as project_error_envelope
 from .api.project_create import execute as project_execute
 from .api.project_create import parse_args as parse_project_args
+from .api.project_update import _error_envelope as project_update_error_envelope
+from .api.project_update import execute as project_update_execute
+from .api.project_update import parse_args as parse_project_update_args
 from .api.revision_approve import _error_envelope as approval_error_envelope
 from .api.revision_approve import execute as approval_execute
 from .api.revision_approve import parse_args as parse_approval_args
@@ -62,140 +65,96 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
 
     if len(args) >= 2 and args[0:2] == ["studio", "update"]:
-        try:
-            request = parse_studio_update_args(args[2:])
+        try: request = parse_studio_update_args(args[2:])
         except ArgumentError as exc:
-            _emit_json(studio_update_error_envelope("INVALID_REQUEST", str(exc), exc.exit_code))
-            return exc.exit_code
+            _emit_json(studio_update_error_envelope("INVALID_REQUEST", str(exc), exc.exit_code)); return exc.exit_code
         except ValidationError as exc:
-            _emit_json(studio_update_error_envelope("VALIDATION_FAILED", str(exc), exc.exit_code, status="blocked"))
-            return exc.exit_code
-        payload, status = studio_update_execute(request)
-        _emit_json(payload)
-        return status
+            _emit_json(studio_update_error_envelope("VALIDATION_FAILED", str(exc), exc.exit_code, status="blocked")); return exc.exit_code
+        payload, status = studio_update_execute(request); _emit_json(payload); return status
 
     if len(args) >= 2 and args[0:2] == ["client", "create"]:
-        try:
-            request = parse_client_args(args[2:])
+        try: request = parse_client_args(args[2:])
         except ArgumentError as exc:
-            _emit_json(client_error_envelope("INVALID_REQUEST", str(exc), exc.exit_code))
-            return exc.exit_code
+            _emit_json(client_error_envelope("INVALID_REQUEST", str(exc), exc.exit_code)); return exc.exit_code
         except ValidationError as exc:
-            _emit_json(client_error_envelope("VALIDATION_FAILED", str(exc), exc.exit_code, status="blocked"))
-            return exc.exit_code
-        payload, status = client_execute(request)
-        _emit_json(payload)
-        return status
+            _emit_json(client_error_envelope("VALIDATION_FAILED", str(exc), exc.exit_code, status="blocked")); return exc.exit_code
+        payload, status = client_execute(request); _emit_json(payload); return status
 
     if len(args) >= 2 and args[0:2] == ["client", "update"]:
-        try:
-            request = parse_client_update_args(args[2:])
+        try: request = parse_client_update_args(args[2:])
         except ArgumentError as exc:
-            _emit_json(client_update_error_envelope("INVALID_REQUEST", str(exc), exc.exit_code))
-            return exc.exit_code
+            _emit_json(client_update_error_envelope("INVALID_REQUEST", str(exc), exc.exit_code)); return exc.exit_code
         except ValidationError as exc:
-            _emit_json(client_update_error_envelope("VALIDATION_FAILED", str(exc), exc.exit_code, status="blocked"))
-            return exc.exit_code
-        payload, status = client_update_execute(request)
-        _emit_json(payload)
-        return status
+            _emit_json(client_update_error_envelope("VALIDATION_FAILED", str(exc), exc.exit_code, status="blocked")); return exc.exit_code
+        payload, status = client_update_execute(request); _emit_json(payload); return status
 
     if len(args) >= 2 and args[0:2] == ["project", "create"]:
-        try:
-            request = parse_project_args(args[2:])
+        try: request = parse_project_args(args[2:])
         except ArgumentError as exc:
-            _emit_json(project_error_envelope("INVALID_REQUEST", str(exc), exc.exit_code))
-            return exc.exit_code
+            _emit_json(project_error_envelope("INVALID_REQUEST", str(exc), exc.exit_code)); return exc.exit_code
         except ValidationError as exc:
-            _emit_json(project_error_envelope("VALIDATION_FAILED", str(exc), exc.exit_code, status="blocked"))
-            return exc.exit_code
-        payload, status = project_execute(request)
-        _emit_json(payload)
-        return status
+            _emit_json(project_error_envelope("VALIDATION_FAILED", str(exc), exc.exit_code, status="blocked")); return exc.exit_code
+        payload, status = project_execute(request); _emit_json(payload); return status
+
+    if len(args) >= 2 and args[0:2] == ["project", "update"]:
+        try: request = parse_project_update_args(args[2:])
+        except ArgumentError as exc:
+            _emit_json(project_update_error_envelope("INVALID_REQUEST", str(exc), exc.exit_code)); return exc.exit_code
+        except ValidationError as exc:
+            _emit_json(project_update_error_envelope("VALIDATION_FAILED", str(exc), exc.exit_code, status="blocked")); return exc.exit_code
+        payload, status = project_update_execute(request); _emit_json(payload); return status
 
     if len(args) >= 2 and args[0:2] == ["revision", "create"]:
-        try:
-            request = parse_revision_args(args[2:])
+        try: request = parse_revision_args(args[2:])
         except ArgumentError as exc:
-            _emit_json(revision_error_envelope("INVALID_REQUEST", str(exc), exc.exit_code))
-            return exc.exit_code
+            _emit_json(revision_error_envelope("INVALID_REQUEST", str(exc), exc.exit_code)); return exc.exit_code
         except ValidationError as exc:
-            _emit_json(revision_error_envelope("VALIDATION_FAILED", str(exc), exc.exit_code, status="blocked"))
-            return exc.exit_code
-        payload, status = revision_execute(request)
-        _emit_json(payload)
-        return status
+            _emit_json(revision_error_envelope("VALIDATION_FAILED", str(exc), exc.exit_code, status="blocked")); return exc.exit_code
+        payload, status = revision_execute(request); _emit_json(payload); return status
 
     if len(args) >= 2 and args[0:2] == ["revision", "update-description"]:
-        try:
-            request = parse_revision_description_args(args[2:])
+        try: request = parse_revision_description_args(args[2:])
         except ArgumentError as exc:
-            _emit_json(revision_description_error_envelope("INVALID_REQUEST", str(exc), exc.exit_code))
-            return exc.exit_code
+            _emit_json(revision_description_error_envelope("INVALID_REQUEST", str(exc), exc.exit_code)); return exc.exit_code
         except ValidationError as exc:
-            _emit_json(revision_description_error_envelope("VALIDATION_FAILED", str(exc), exc.exit_code, status="blocked"))
-            return exc.exit_code
-        payload, status = revision_description_execute(request)
-        _emit_json(payload)
-        return status
+            _emit_json(revision_description_error_envelope("VALIDATION_FAILED", str(exc), exc.exit_code, status="blocked")); return exc.exit_code
+        payload, status = revision_description_execute(request); _emit_json(payload); return status
 
     if len(args) >= 2 and args[0:2] == ["revision", "approve"]:
-        try:
-            request = parse_approval_args(args[2:])
+        try: request = parse_approval_args(args[2:])
         except ArgumentError as exc:
-            _emit_json(approval_error_envelope("INVALID_REQUEST", str(exc), exc.exit_code))
-            return exc.exit_code
+            _emit_json(approval_error_envelope("INVALID_REQUEST", str(exc), exc.exit_code)); return exc.exit_code
         except ValidationError as exc:
-            _emit_json(approval_error_envelope("VALIDATION_FAILED", str(exc), exc.exit_code, status="blocked"))
-            return exc.exit_code
-        payload, status = approval_execute(request)
-        _emit_json(payload)
-        return status
+            _emit_json(approval_error_envelope("VALIDATION_FAILED", str(exc), exc.exit_code, status="blocked")); return exc.exit_code
+        payload, status = approval_execute(request); _emit_json(payload); return status
 
     if len(args) >= 2 and args[0:2] == ["delivery", "create"]:
-        try:
-            request = parse_delivery_args(args[2:])
+        try: request = parse_delivery_args(args[2:])
         except ArgumentError as exc:
-            _emit_json(delivery_error_envelope("INVALID_REQUEST", str(exc), exc.exit_code))
-            return exc.exit_code
+            _emit_json(delivery_error_envelope("INVALID_REQUEST", str(exc), exc.exit_code)); return exc.exit_code
         except ValidationError as exc:
-            _emit_json(delivery_error_envelope("DELIVERY_VALIDATION_FAILED", str(exc), exc.exit_code, status="blocked"))
-            return exc.exit_code
-        payload, status = delivery_execute(request)
-        _emit_json(payload)
-        return status
+            _emit_json(delivery_error_envelope("DELIVERY_VALIDATION_FAILED", str(exc), exc.exit_code, status="blocked")); return exc.exit_code
+        payload, status = delivery_execute(request); _emit_json(payload); return status
 
     if len(args) >= 2 and args[0:2] == ["delivery", "status"]:
         operation = "delivery.status"
-        try:
-            request = parse_delivery_status_args(args[2:])
+        try: request = parse_delivery_status_args(args[2:])
         except ArgumentError as exc:
-            _emit_json(delivery_management_error_envelope(operation, "INVALID_REQUEST", str(exc), exc.exit_code))
-            return exc.exit_code
-        payload, status = delivery_status_execute(request)
-        _emit_json(payload)
-        return status
+            _emit_json(delivery_management_error_envelope(operation, "INVALID_REQUEST", str(exc), exc.exit_code)); return exc.exit_code
+        payload, status = delivery_status_execute(request); _emit_json(payload); return status
 
     if len(args) >= 2 and args[0:2] == ["delivery", "delete-package"]:
         operation = "delivery.delete-package"
-        try:
-            request = parse_delivery_delete_package_args(args[2:])
+        try: request = parse_delivery_delete_package_args(args[2:])
         except ArgumentError as exc:
-            _emit_json(delivery_management_error_envelope(operation, "INVALID_REQUEST", str(exc), exc.exit_code))
-            return exc.exit_code
-        payload, status = delivery_delete_package_execute(request)
-        _emit_json(payload)
-        return status
+            _emit_json(delivery_management_error_envelope(operation, "INVALID_REQUEST", str(exc), exc.exit_code)); return exc.exit_code
+        payload, status = delivery_delete_package_execute(request); _emit_json(payload); return status
 
     if len(args) >= 2 and args[0:2] == ["intake", "validate"]:
-        try:
-            request = parse_intake_args(args[2:])
+        try: request = parse_intake_args(args[2:])
         except ArgumentError as exc:
-            _emit_json(intake_error_envelope("INVALID_REQUEST", str(exc), exc.exit_code))
-            return exc.exit_code
-        payload, status = intake_execute(request)
-        _emit_json(payload)
-        return status
+            _emit_json(intake_error_envelope("INVALID_REQUEST", str(exc), exc.exit_code)); return exc.exit_code
+        payload, status = intake_execute(request); _emit_json(payload); return status
 
     print("Error: command has not yet been migrated to the v1.5 Python runtime.", file=sys.stderr)
     return EXIT_ARGUMENTS
