@@ -22,6 +22,7 @@ _CAPABILITIES = [
     "revision.create",
     "revision.create.description",
     "revision.update.description",
+    "studio.update",
     "system.info",
 ]
 
