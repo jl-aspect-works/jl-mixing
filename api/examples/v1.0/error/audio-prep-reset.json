@@ -1,6 +1,6 @@
 {
   "api_version":"1.0",
-  "operation":"audio_prep.reset.execute",
+  "operation":"audio.prep.reset.execute",
   "status":"error",
   "data":{},
   "warnings":[],
