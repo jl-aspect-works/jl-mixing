@@ -9,7 +9,7 @@ from typing import Any
 
 from ..context import resolve_project, studio_root
 from ..errors import ArgumentError, ContextError, JLMixingError, UnsafeOperationError, ValidationError
-from ..managed_client_files import execute_plan, plan_import, plan_reset
+from ..managed_client_file_provenance import execute_plan, plan_import, plan_reset
 from ..versions import api_version
 
 
