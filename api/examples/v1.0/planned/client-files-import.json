@@ -1,11 +1,11 @@
 {
   "api_version":"1.0",
-  "operation":"client_files.import.plan",
+  "operation":"client.files.import.plan",
   "status":"planned",
   "data":{
     "project":{"path":"/Mixes/Clients/Acme/Projects/Song","workspace_path":"/Mixes"},
     "plan":{
-      "operation":"client_files.import","source_kind":"folder","sources":["/Incoming/Client Delivery"],
+      "operation":"client.files.import","source_kind":"folder","sources":["/Incoming/Client Delivery"],
       "plan_id":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
       "files":[{"relative_path":"Stems/Bass.wav","source_path":"/Incoming/Client Delivery/Stems/Bass.wav","zip_member":null,"size":1024,"fingerprint":"file:1024:123456"}],
       "items":[
