@@ -87,6 +87,9 @@ class ManagedClientFileProvenanceTests(unittest.TestCase):
 
             original = project / "01_Client_Files" / "Original_Delivery" / "Lead.wav"
             audio = project / "02_Audio_Preparation" / "Working_Audio" / "Lead.wav"
+
+            # A validator repair may legitimately change working bytes. Identity stays
+            # anchored to the Original Delivery source while the known working path survives.
             audio.write_bytes(b"repaired-working-audio")
             original.write_bytes(b"version-two")
 
