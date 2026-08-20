@@ -84,6 +84,37 @@ class ManagedClientFilesApiTests(unittest.TestCase):
             self.assertEqual(original.read_bytes(), b"source")
             self.assertFalse(cache.exists())
 
+    def test_reset_targets_renamed_audio_prep_file_by_sha256(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project = fixture(Path(tmp))
+            original = project / "01_Client_Files" / "Original_Delivery" / "Lead Vocal.wav"
+            original.write_bytes(b"same-audio-content")
+            renamed = project / "02_Audio_Preparation" / "Working_Audio" / "Vox Lead.wav"
+            renamed.write_bytes(b"same-audio-content")
+
+            planned = run(project, "audio-prep", "reset-plan", "--json", "--relative-path", "Lead Vocal.wav")
+            self.assertEqual(planned.returncode, 0, planned.stdout + planned.stderr)
+            plan = json.loads(planned.stdout)["data"]["plan"]
+            item = plan["items"][0]
+            self.assertTrue(item["conflict"])
+            self.assertEqual(item["destination_relative_path"], "02_Audio_Preparation/Working_Audio/Vox Lead.wav")
+
+            executed = run(project, "audio-prep", "reset-execute", "--json", "--relative-path", "Lead Vocal.wav", "--plan-id", plan["plan_id"], "--decisions-json", json.dumps({item["id"]:"replace"}))
+            self.assertEqual(executed.returncode, 0, executed.stdout + executed.stderr)
+            self.assertTrue(renamed.exists())
+            self.assertFalse((project / "02_Audio_Preparation" / "Working_Audio" / "Lead Vocal.wav").exists())
+
+    def test_reset_refuses_ambiguous_duplicate_audio_prep_content(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project = fixture(Path(tmp))
+            original = project / "01_Client_Files" / "Original_Delivery" / "mix.wav"; original.write_bytes(b"same")
+            audio_root = project / "02_Audio_Preparation" / "Working_Audio"
+            (audio_root / "one.wav").write_bytes(b"same")
+            (audio_root / "two.wav").write_bytes(b"same")
+            planned = run(project, "audio-prep", "reset-plan", "--json", "--relative-path", "mix.wav")
+            self.assertEqual(planned.returncode, 5)
+            self.assertIn("Multiple Audio Prep files match", planned.stdout)
+
     def test_zip_traversal_and_stale_plan_are_blocked(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp); project = fixture(root / "studio")
