@@ -72,6 +72,30 @@ def _source_objects(plan: dict[str, Any]) -> list[base.SourceFile]:
     ]
 
 
+def _working_hash_match(project_root: Path, working_sha256: str) -> str | None:
+    audio_root = project_root / base.AUDIO_ROOT
+    if not audio_root.exists():
+        return None
+    if audio_root.is_symlink() or not audio_root.is_dir():
+        raise UnsafeOperationError(f"Audio Prep root is unavailable or unsafe: {audio_root}")
+    matches: list[str] = []
+    for current, dirs, names in os.walk(audio_root, followlinks=False):
+        current_path = Path(current)
+        for directory in dirs:
+            if (current_path / directory).is_symlink():
+                raise UnsafeOperationError(f"Audio Prep does not allow symlink traversal: {current_path / directory}")
+        for name in names:
+            candidate = current_path / name
+            if candidate.is_symlink() or not candidate.is_file():
+                continue
+            if base._sha256_file(candidate) == working_sha256:
+                relative = candidate.relative_to(audio_root).as_posix()
+                matches.append((base.AUDIO_ROOT / Path(relative)).as_posix())
+    if len(matches) > 1:
+        raise ValidationError("Multiple Audio Prep files match recorded working-file provenance; repair is required.")
+    return matches[0] if matches else None
+
+
 def _lineage_destination(project_root: Path, source_relative: str) -> str | None:
     document = _load(project_root)
     matches = [
@@ -82,9 +106,15 @@ def _lineage_destination(project_root: Path, source_relative: str) -> str | None
         raise ValidationError(f"Multiple Audio Prep lineage entries exist for {source_relative}; repair is required.")
     if not matches:
         return None
-    working = base._safe_relative(str(matches[0]["working_relative_path"]))
+    entry = matches[0]
+    working = base._safe_relative(str(entry["working_relative_path"]))
     destination = base._managed_destination(project_root, working)
-    return working if destination.is_file() else None
+    if destination.is_file():
+        return working
+    recorded_hash = entry.get("working_sha256")
+    if isinstance(recorded_hash, str) and recorded_hash:
+        return _working_hash_match(project_root, recorded_hash)
+    return None
 
 
 def _fallback_match(project_root: Path, source_relative: str, candidate: Path | None) -> str | None:
