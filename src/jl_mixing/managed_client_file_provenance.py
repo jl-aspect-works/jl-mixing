@@ -1,4 +1,11 @@
-"""Persistent provenance for managed Original Delivery -> Audio Prep lineage."""
+"""Persistent provenance for managed Original Delivery -> Audio Prep lineage.
+
+Source identity is the Original Delivery relative path. Content hashes are evidence used
+for migration/recovery only, not identity: working audio may be renamed, repaired, or
+converted while retaining the same lineage. Future repair operations should preserve the
+working path entry (or update it if they move/replace the working file) and may append to
+``transformations`` without changing ``source_relative_path``.
+"""
 
 from __future__ import annotations
 
