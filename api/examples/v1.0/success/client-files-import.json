@@ -1,6 +1,6 @@
 {
   "api_version":"1.0",
-  "operation":"client_files.import.execute",
+  "operation":"client.files.import.execute",
   "status":"success",
   "data":{
     "project":{"path":"/Mixes/Clients/Acme/Projects/Song","workspace_path":"/Mixes"},
