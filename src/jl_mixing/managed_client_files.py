@@ -1,0 +1,313 @@
+"""Managed Client Files import and Audio Prep reset planning/execution."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import shutil
+import stat
+import tempfile
+import zipfile
+from dataclasses import dataclass
+from pathlib import Path, PurePosixPath
+from typing import Any, Iterable
+
+from .errors import UnsafeOperationError, ValidationError
+
+ORIGINAL_ROOT = Path("01_Client_Files") / "Original_Delivery"
+AUDIO_ROOT = Path("02_Audio_Preparation") / "Working_Audio"
+INTAKE_CACHE = Path("00_Admin") / "intake-validation-cache.json"
+AUDIO_CACHE = Path("00_Admin") / "audio-prep-validation-cache.json"
+
+
+@dataclass(frozen=True)
+class SourceFile:
+    relative_path: str
+    source_path: Path | None
+    zip_member: str | None
+    size: int
+    fingerprint: str
+
+
+def _safe_relative(value: str) -> str:
+    normalized = value.replace("\\", "/")
+    path = PurePosixPath(normalized)
+    if not normalized or path.is_absolute() or any(part in {"", ".", ".."} for part in path.parts):
+        raise UnsafeOperationError(f"Unsafe relative path: {value}")
+    if ":" in path.parts[0]:
+        raise UnsafeOperationError(f"Unsafe drive-qualified path: {value}")
+    return path.as_posix()
+
+
+def _file_state(path: Path) -> str:
+    if not path.exists():
+        return "missing"
+    if path.is_symlink() or not path.is_file():
+        raise UnsafeOperationError(f"Managed destination is not a regular file: {path}")
+    info = path.stat()
+    return f"file:{info.st_size}:{info.st_mtime_ns}"
+
+
+def _source_fingerprint(path: Path) -> str:
+    info = path.stat()
+    return f"file:{info.st_size}:{info.st_mtime_ns}"
+
+
+def _collect_files(source_kind: str, sources: tuple[Path, ...]) -> list[SourceFile]:
+    files: list[SourceFile] = []
+    seen: set[str] = set()
+
+    def add(relative: str, source: Path | None, zip_member: str | None, size: int, fingerprint: str) -> None:
+        safe = _safe_relative(relative)
+        key = safe.casefold()
+        if key in seen:
+            raise ValidationError(f"Duplicate imported relative path: {safe}")
+        seen.add(key)
+        files.append(SourceFile(safe, source, zip_member, size, fingerprint))
+
+    if source_kind == "files":
+        if not sources:
+            raise ValidationError("At least one source file is required.")
+        for source in sources:
+            source = source.expanduser().resolve()
+            if source.is_symlink() or not source.is_file():
+                raise UnsafeOperationError(f"Import source is not a regular file: {source}")
+            add(source.name, source, None, source.stat().st_size, _source_fingerprint(source))
+    elif source_kind == "folder":
+        if len(sources) != 1:
+            raise ValidationError("Folder import requires exactly one source folder.")
+        root = sources[0].expanduser().resolve()
+        if root.is_symlink() or not root.is_dir():
+            raise UnsafeOperationError(f"Import source is not a safe folder: {root}")
+        for current, dirs, names in os.walk(root, followlinks=False):
+            current_path = Path(current)
+            for directory in dirs:
+                if (current_path / directory).is_symlink():
+                    raise UnsafeOperationError(f"Folder import does not allow symlinks: {current_path / directory}")
+            for name in names:
+                source = current_path / name
+                if source.is_symlink() or not source.is_file():
+                    raise UnsafeOperationError(f"Folder import does not allow special files: {source}")
+                relative = source.relative_to(root).as_posix()
+                add(relative, source, None, source.stat().st_size, _source_fingerprint(source))
+    elif source_kind == "zip":
+        if len(sources) != 1:
+            raise ValidationError("ZIP import requires exactly one source archive.")
+        archive = sources[0].expanduser().resolve()
+        if archive.is_symlink() or not archive.is_file():
+            raise UnsafeOperationError(f"Import source is not a regular ZIP file: {archive}")
+        try:
+            with zipfile.ZipFile(archive) as handle:
+                for info in handle.infolist():
+                    mode = (info.external_attr >> 16) & 0xFFFF
+                    if info.is_dir():
+                        continue
+                    if stat.S_ISLNK(mode) or (mode and not stat.S_ISREG(mode)):
+                        raise UnsafeOperationError(f"ZIP contains an unsupported special entry: {info.filename}")
+                    relative = _safe_relative(info.filename)
+                    add(relative, archive, info.filename, info.file_size, f"zip:{info.CRC}:{info.file_size}")
+        except zipfile.BadZipFile as exc:
+            raise ValidationError(f"Invalid ZIP archive: {archive}") from exc
+    else:
+        raise ValidationError(f"Unsupported import source kind: {source_kind}")
+
+    if not files:
+        raise ValidationError("Import source contains no files.")
+    files.sort(key=lambda item: item.relative_path.casefold())
+    return files
+
+
+def _item(item_id: str, area: str, relative: str, destination: Path, source: SourceFile, *, depends_on: str | None = None) -> dict[str, Any]:
+    state = _file_state(destination)
+    conflict = state != "missing"
+    result: dict[str, Any] = {
+        "id": item_id,
+        "area": area,
+        "source_relative_path": source.relative_path,
+        "destination_relative_path": relative,
+        "action": "replace_candidate" if conflict else "create",
+        "conflict": conflict,
+        "destination_state": state,
+        "size_bytes": source.size,
+    }
+    if depends_on:
+        result["depends_on"] = depends_on
+    return result
+
+
+def _plan_id(operation: str, source_kind: str, sources: Iterable[Path], files: Iterable[SourceFile], items: Iterable[dict[str, Any]]) -> str:
+    payload = {
+        "operation": operation,
+        "source_kind": source_kind,
+        "sources": [str(path.expanduser().resolve()) for path in sources],
+        "files": [{"path": item.relative_path, "fingerprint": item.fingerprint} for item in files],
+        "items": [{"id": item["id"], "destination_state": item["destination_state"]} for item in items],
+    }
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def plan_import(project_root: Path, source_kind: str, sources: tuple[Path, ...]) -> dict[str, Any]:
+    files = _collect_files(source_kind, sources)
+    items: list[dict[str, Any]] = []
+    for index, source in enumerate(files):
+        original_rel = (ORIGINAL_ROOT / Path(source.relative_path)).as_posix()
+        audio_rel = (AUDIO_ROOT / Path(source.relative_path)).as_posix()
+        original_id = f"original:{index}"
+        audio_id = f"audio:{index}"
+        items.append(_item(original_id, "original_delivery", original_rel, project_root / original_rel, source))
+        items.append(_item(audio_id, "audio_prep", audio_rel, project_root / audio_rel, source, depends_on=original_id))
+    return {
+        "operation": "client_files.import",
+        "source_kind": source_kind,
+        "sources": [str(path.expanduser().resolve()) for path in sources],
+        "plan_id": _plan_id("client_files.import", source_kind, sources, files, items),
+        "files": [source.__dict__ | {"source_path": str(source.source_path) if source.source_path else None} for source in files],
+        "items": items,
+    }
+
+
+def plan_reset(project_root: Path, relative_paths: tuple[str, ...]) -> dict[str, Any]:
+    files: list[SourceFile] = []
+    items: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for index, raw in enumerate(relative_paths):
+        relative = _safe_relative(raw)
+        key = relative.casefold()
+        if key in seen:
+            raise ValidationError(f"Duplicate reset path: {relative}")
+        seen.add(key)
+        source = project_root / ORIGINAL_ROOT / Path(relative)
+        if source.is_symlink() or not source.is_file():
+            raise ValidationError(f"Original Delivery file not found: {relative}")
+        source_file = SourceFile(relative, source, None, source.stat().st_size, _source_fingerprint(source))
+        files.append(source_file)
+        dest_rel = (AUDIO_ROOT / Path(relative)).as_posix()
+        items.append(_item(f"audio:{index}", "audio_prep", dest_rel, project_root / dest_rel, source_file))
+    if not files:
+        raise ValidationError("At least one Original Delivery file is required.")
+    return {
+        "operation": "audio_prep.reset",
+        "source_kind": "original_delivery",
+        "sources": [source.relative_path for source in files],
+        "plan_id": _plan_id("audio_prep.reset", "original_delivery", (), files, items),
+        "files": [source.__dict__ | {"source_path": str(source.source_path) if source.source_path else None} for source in files],
+        "items": items,
+    }
+
+
+def _decisions(plan: dict[str, Any], decisions: dict[str, str]) -> dict[str, str]:
+    conflict_ids = {item["id"] for item in plan["items"] if item["conflict"]}
+    unknown = set(decisions) - conflict_ids
+    if unknown:
+        raise ValidationError(f"Decision references unknown conflict: {sorted(unknown)[0]}")
+    missing = conflict_ids - set(decisions)
+    if missing:
+        raise ValidationError(f"Missing conflict decision: {sorted(missing)[0]}")
+    for value in decisions.values():
+        if value not in {"replace", "skip"}:
+            raise ValidationError(f"Unsupported conflict decision: {value}")
+    return decisions
+
+
+def _stage_source(source: SourceFile, stage: Path) -> Path:
+    target = stage / source.relative_path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if source.zip_member is None:
+        assert source.source_path is not None
+        shutil.copy2(source.source_path, target)
+    else:
+        assert source.source_path is not None
+        with zipfile.ZipFile(source.source_path) as archive, archive.open(source.zip_member) as input_stream, target.open("wb") as output_stream:
+            shutil.copyfileobj(input_stream, output_stream)
+    return target
+
+
+def _invalidate(project_root: Path, changed_original: bool, changed_audio: bool) -> list[str]:
+    invalidated: list[str] = []
+    if changed_original:
+        path = project_root / INTAKE_CACHE
+        if path.exists() and path.is_file() and not path.is_symlink():
+            path.unlink()
+        invalidated.append(INTAKE_CACHE.as_posix())
+    if changed_audio:
+        path = project_root / AUDIO_CACHE
+        if path.exists() and path.is_file() and not path.is_symlink():
+            path.unlink()
+        invalidated.append(AUDIO_CACHE.as_posix())
+    return invalidated
+
+
+def execute_plan(project_root: Path, plan: dict[str, Any], decisions: dict[str, str]) -> dict[str, Any]:
+    decisions = _decisions(plan, decisions)
+    files_by_relative = {item["relative_path"]: item for item in plan["files"]}
+    source_objects = {
+        relative: SourceFile(
+            relative,
+            Path(data["source_path"]) if data.get("source_path") else None,
+            data.get("zip_member"),
+            int(data["size"]),
+            data["fingerprint"],
+        )
+        for relative, data in files_by_relative.items()
+    }
+    transaction = Path(tempfile.mkdtemp(prefix=".jl-managed-import-", dir=project_root / "00_Admin"))
+    stage = transaction / "stage"
+    backups = transaction / "backups"
+    applied: list[tuple[Path, Path | None]] = []
+    results: list[dict[str, str]] = []
+    changed_original = False
+    changed_audio = False
+    staged: dict[str, Path] = {}
+    try:
+        for relative, source in source_objects.items():
+            staged[relative] = _stage_source(source, stage)
+        item_by_id = {item["id"]: item for item in plan["items"]}
+        for item in plan["items"]:
+            dependency = item.get("depends_on")
+            if dependency and any(result["id"] == dependency and result["result"] == "skipped" for result in results):
+                results.append({"id": item["id"], "result": "skipped"})
+                continue
+            decision = decisions.get(item["id"])
+            if item["conflict"] and decision == "skip":
+                results.append({"id": item["id"], "result": "skipped"})
+                continue
+            destination = project_root / Path(item["destination_relative_path"])
+            if _file_state(destination) != item["destination_state"]:
+                raise ValidationError(f"Managed destination changed after planning: {item['destination_relative_path']}")
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            backup: Path | None = None
+            if destination.exists():
+                backup = backups / item["destination_relative_path"]
+                backup.parent.mkdir(parents=True, exist_ok=True)
+                os.replace(destination, backup)
+            source_relative = item["source_relative_path"]
+            if item["area"] == "audio_prep" and dependency:
+                original_item = item_by_id[dependency]
+                authoritative_source = project_root / original_item["destination_relative_path"]
+                copy_source = authoritative_source if authoritative_source.exists() else staged[source_relative]
+            else:
+                copy_source = staged[source_relative]
+            temp_dest = destination.with_name(f".{destination.name}.jl-tmp")
+            shutil.copy2(copy_source, temp_dest)
+            os.replace(temp_dest, destination)
+            applied.append((destination, backup))
+            changed_original = changed_original or item["area"] == "original_delivery"
+            changed_audio = changed_audio or item["area"] == "audio_prep"
+            results.append({"id": item["id"], "result": "replaced" if backup else "created"})
+        invalidated = _invalidate(project_root, changed_original, changed_audio)
+        return {"items": results, "invalidations": invalidated}
+    except Exception:
+        for destination, backup in reversed(applied):
+            try:
+                if destination.exists():
+                    destination.unlink()
+                if backup and backup.exists():
+                    backup.parent.mkdir(parents=True, exist_ok=True)
+                    os.replace(backup, destination)
+            except OSError:
+                pass
+        raise
+    finally:
+        shutil.rmtree(transaction, ignore_errors=True)
