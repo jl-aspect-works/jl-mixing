@@ -20,7 +20,8 @@ assert d['api_version']==av
 assert d['application']=={'name':'jl-mixing','version':app}
 assert d['metadata']=={'readable_schema_versions':['1.1.0'],'writable_schema_version':'1.1.0'}
 assert d['capabilities']==[
-'audio.prep.provenance.sha256','audio.prep.validation.structured','client.create','client.update',
+'audio.prep.provenance.sha256','audio.prep.reset.execute','audio.prep.reset.plan','audio.prep.validation.structured',
+'client.create','client.update','client_files.import.execute','client_files.import.plan',
 'delivery.create','delivery.package.delete','delivery.package.rebuild','delivery.status','intake.validate',
 'intake.validate.incremental','intake.validate.report','intake.validate.structured','project.create','project.create.artist',
 'project.update','revision.approve','revision.create','revision.create.description','revision.update.description','studio.update','system.info']
