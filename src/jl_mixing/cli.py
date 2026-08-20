@@ -96,28 +96,28 @@ def main(argv: Sequence[str] | None = None) -> int:
         payload, status = client_update_execute(request); _emit_json(payload); return status
 
     if len(args) >= 2 and args[0:2] == ["client-files", "import-plan"]:
-        operation = "client_files.import.plan"
+        operation = "client.files.import.plan"
         try: request = parse_managed_import_args(args[2:], execute=False)
         except ArgumentError as exc:
             _emit_json(managed_files_error(operation, "INVALID_REQUEST", str(exc), exc.exit_code)); return exc.exit_code
         payload, status = managed_import_plan_execute(request); _emit_json(payload); return status
 
     if len(args) >= 2 and args[0:2] == ["client-files", "import-execute"]:
-        operation = "client_files.import.execute"
+        operation = "client.files.import.execute"
         try: request = parse_managed_import_args(args[2:], execute=True)
         except ArgumentError as exc:
             _emit_json(managed_files_error(operation, "INVALID_REQUEST", str(exc), exc.exit_code)); return exc.exit_code
         payload, status = managed_import_execute(request); _emit_json(payload); return status
 
     if len(args) >= 2 and args[0:2] == ["audio-prep", "reset-plan"]:
-        operation = "audio_prep.reset.plan"
+        operation = "audio.prep.reset.plan"
         try: request = parse_managed_reset_args(args[2:], execute=False)
         except ArgumentError as exc:
             _emit_json(managed_files_error(operation, "INVALID_REQUEST", str(exc), exc.exit_code)); return exc.exit_code
         payload, status = managed_reset_plan_execute(request); _emit_json(payload); return status
 
     if len(args) >= 2 and args[0:2] == ["audio-prep", "reset-execute"]:
-        operation = "audio_prep.reset.execute"
+        operation = "audio.prep.reset.execute"
         try: request = parse_managed_reset_args(args[2:], execute=True)
         except ArgumentError as exc:
             _emit_json(managed_files_error(operation, "INVALID_REQUEST", str(exc), exc.exit_code)); return exc.exit_code
