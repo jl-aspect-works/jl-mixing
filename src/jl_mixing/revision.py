@@ -57,6 +57,13 @@ def _load_manifest(project_root: Path) -> dict[str, Any]:
     return document
 
 
+def _revision_lifecycle(record: dict[str, Any]) -> str:
+    lifecycle = record.get("lifecycle", "open")
+    if lifecycle not in {"open", "closed"}:
+        raise ValidationError(f"Revision {record.get('number')} has invalid lifecycle state: {lifecycle}")
+    return lifecycle
+
+
 def _validate_project_state(document: dict[str, Any]) -> int:
     state = document.get("state")
     revisions = document.get("revisions")
@@ -65,14 +72,9 @@ def _validate_project_state(document: dict[str, Any]) -> int:
     current = state.get("current_revision")
     if not isinstance(current, int) or isinstance(current, bool) or current < 0:
         raise ValidationError("Project state.current_revision must be a non-negative integer.")
-    if current == 0:
-        if revisions:
-            raise ValidationError("Project revision records do not match state.current_revision.")
-        if state.get("approved_revision") is not None or state.get("delivered_revision") is not None:
-            raise ValidationError("Setup-state project cannot have approval or delivery pointers.")
-        return 0
 
     numbers: list[int] = []
+    open_numbers: list[int] = []
     revision_ids: set[str] = set()
     for record in revisions:
         if not isinstance(record, dict) or not isinstance(record.get("number"), int):
@@ -85,11 +87,21 @@ def _validate_project_state(document: dict[str, Any]) -> int:
             raise ValidationError("Project manifest contains duplicate revision IDs.")
         revision_ids.add(revision_id)
         numbers.append(number)
-    if numbers != list(range(1, current + 1)):
-        raise ValidationError("Project revision records do not match state.current_revision.")
+        if _revision_lifecycle(record) == "open":
+            open_numbers.append(number)
+
+    if numbers != list(range(1, len(numbers) + 1)):
+        raise ValidationError("Project revision records must use contiguous immutable revision numbers.")
+    expected_current = max(open_numbers, default=0)
+    if current != expected_current:
+        raise ValidationError(
+            f"Project state.current_revision must equal the highest open revision ({expected_current})."
+        )
+    if not revisions and (state.get("approved_revision") is not None or state.get("delivered_revision") is not None):
+        raise ValidationError("Project without revision history cannot have approval or delivery pointers.")
     for pointer_name in ("approved_revision", "delivered_revision"):
         pointer = state.get(pointer_name)
-        if pointer is not None and (not isinstance(pointer, int) or pointer not in numbers):
+        if pointer is not None and (not isinstance(pointer, int) or isinstance(pointer, bool) or pointer not in numbers):
             raise ValidationError(f"Project state.{pointer_name} is invalid.")
     return current
 
@@ -152,7 +164,11 @@ def create_revision(request: RevisionCreateRequest) -> RevisionCreateResult:
 
     manifest = _load_manifest(project_root)
     previous_revision = _validate_project_state(manifest)
-    number = previous_revision + 1
+    historical_numbers = [
+        record.get("number") for record in manifest.get("revisions", [])
+        if isinstance(record, dict) and isinstance(record.get("number"), int)
+    ]
+    number = max(historical_numbers, default=0) + 1
     if request.description is None:
         description = "Initial mix" if number == 1 else f"Revision {number}"
     else:
@@ -181,6 +197,7 @@ def create_revision(request: RevisionCreateRequest) -> RevisionCreateResult:
         "revision_id": revision_id,
         "created_at": timestamp,
         "description": description,
+        "lifecycle": "open",
         "approval": {"approved_at": None, "approved_by": None},
     }
     updated["revisions"].append(record)
