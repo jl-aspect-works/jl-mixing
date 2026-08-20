@@ -190,10 +190,10 @@ def plan_import(project_root: Path, source_kind: str, sources: tuple[Path, ...])
         items.append(_item(project_root, original_id, "original_delivery", original_rel, source))
         items.append(_item(project_root, f"audio:{index}", "audio_prep", audio_rel, source, depends_on=original_id))
     return {
-        "operation": "client_files.import",
+        "operation": "client.files.import",
         "source_kind": source_kind,
         "sources": [str(path.expanduser().absolute()) for path in sources],
-        "plan_id": _plan_id("client_files.import", source_kind, sources, files, items),
+        "plan_id": _plan_id("client.files.import", source_kind, sources, files, items),
         "files": [_serialized_source(source) for source in files],
         "items": items,
     }
@@ -219,10 +219,10 @@ def plan_reset(project_root: Path, relative_paths: tuple[str, ...]) -> dict[str,
     if not files:
         raise ValidationError("At least one Original Delivery file is required.")
     return {
-        "operation": "audio_prep.reset",
+        "operation": "audio.prep.reset",
         "source_kind": "original_delivery",
         "sources": [source.relative_path for source in files],
-        "plan_id": _plan_id("audio_prep.reset", "original_delivery", (), files, items),
+        "plan_id": _plan_id("audio.prep.reset", "original_delivery", (), files, items),
         "files": [_serialized_source(source) for source in files],
         "items": items,
     }
@@ -281,6 +281,7 @@ def execute_plan(project_root: Path, plan: dict[str, Any], decisions: dict[str, 
     transaction = Path(tempfile.mkdtemp(prefix=".jl-managed-import-", dir=project_root / "00_Admin"))
     stage = transaction / "stage"
     backups = transaction / "backups"
+    writes = transaction / "writes"
     applied: list[tuple[Path, Path | None]] = []
     results: list[dict[str, str]] = []
     changed_original = False
@@ -288,7 +289,7 @@ def execute_plan(project_root: Path, plan: dict[str, Any], decisions: dict[str, 
     try:
         staged = {relative: _stage_source(source, stage) for relative, source in source_objects.items()}
         item_by_id = {item["id"]: item for item in plan["items"]}
-        for item in plan["items"]:
+        for position, item in enumerate(plan["items"]):
             dependency = item.get("depends_on")
             if dependency and any(result["id"] == dependency and result["result"] == "skipped" for result in results):
                 results.append({"id": item["id"], "result": "skipped"})
@@ -305,16 +306,17 @@ def execute_plan(project_root: Path, plan: dict[str, Any], decisions: dict[str, 
                 backup = backups / Path(item["destination_relative_path"])
                 backup.parent.mkdir(parents=True, exist_ok=True)
                 os.replace(destination, backup)
+            applied.append((destination, backup))
             if item["area"] == "audio_prep" and dependency:
                 original_item = item_by_id[dependency]
                 authoritative_source = _managed_destination(project_root, original_item["destination_relative_path"])
                 copy_source = authoritative_source if authoritative_source.exists() else staged[item["source_relative_path"]]
             else:
                 copy_source = staged[item["source_relative_path"]]
-            temp_dest = destination.with_name(f".{destination.name}.jl-tmp")
+            writes.mkdir(parents=True, exist_ok=True)
+            temp_dest = writes / f"write-{position}.tmp"
             shutil.copy2(copy_source, temp_dest)
             os.replace(temp_dest, destination)
-            applied.append((destination, backup))
             changed_original = changed_original or item["area"] == "original_delivery"
             changed_audio = changed_audio or item["area"] == "audio_prep"
             results.append({"id": item["id"], "result": "replaced" if backup else "created"})
