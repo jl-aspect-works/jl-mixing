@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime
@@ -12,7 +11,7 @@ from typing import Any
 from .context import resolve_project, revision_root_for_number
 from .errors import ValidationError
 from .metadata import now_iso8601, write_json_document
-from .revision import _load_manifest, _validate_project_state, _validate_schema
+from .revision import _load_manifest, _revision_lifecycle, _validate_project_state, _validate_schema
 
 
 @dataclass(frozen=True)
@@ -61,6 +60,10 @@ def derive_project_stage(document: dict[str, Any]) -> str:
     approved = state.get("approved_revision")
     delivered = state.get("delivered_revision")
     if current == 0:
+        if delivered is not None:
+            return "Delivered"
+        if approved is not None:
+            return "Approved"
         return "Setup"
     if current != approved:
         return "In progress"
@@ -73,13 +76,15 @@ def approve_revision(request: RevisionApproveRequest) -> RevisionApproveResult:
     project_root = resolve_project(request.project_root, Path.cwd())
     manifest = _load_manifest(project_root)
     current = _validate_project_state(manifest)
-    if current == 0:
-        raise ValidationError("No revision exists to approve.")
+    if current == 0 and request.revision is None:
+        raise ValidationError("No open revision exists to approve.")
 
     number = current if request.revision is None else request.revision
     if not isinstance(number, int) or isinstance(number, bool) or number < 1:
         raise ValidationError(f"Revision number must be a positive integer: {number}")
     revision = _find_revision(manifest, number)
+    if _revision_lifecycle(revision) != "open":
+        raise ValidationError(f"Revision {number} is closed and cannot be approved until it is reopened.")
     revision_root = revision_root_for_number(project_root, number)
 
     approved_by = request.approved_by.strip()
