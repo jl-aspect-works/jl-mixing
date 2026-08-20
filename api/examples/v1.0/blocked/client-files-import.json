@@ -1,6 +1,6 @@
 {
   "api_version":"1.0",
-  "operation":"client_files.import.plan",
+  "operation":"client.files.import.plan",
   "status":"blocked",
   "data":{},
   "warnings":[],
