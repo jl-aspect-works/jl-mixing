@@ -23,6 +23,13 @@ from .api.delivery_management import parse_status_args as parse_delivery_status_
 from .api.intake_validate import _error_envelope as intake_error_envelope
 from .api.intake_validate import execute as intake_execute
 from .api.intake_validate import parse_args as parse_intake_args
+from .api.managed_client_files import _error as managed_files_error
+from .api.managed_client_files import execute_import as managed_import_execute
+from .api.managed_client_files import execute_import_plan as managed_import_plan_execute
+from .api.managed_client_files import execute_reset as managed_reset_execute
+from .api.managed_client_files import execute_reset_plan as managed_reset_plan_execute
+from .api.managed_client_files import parse_import_args as parse_managed_import_args
+from .api.managed_client_files import parse_reset_args as parse_managed_reset_args
 from .api.project_create import _error_envelope as project_error_envelope
 from .api.project_create import execute as project_execute
 from .api.project_create import parse_args as parse_project_args
@@ -87,6 +94,34 @@ def main(argv: Sequence[str] | None = None) -> int:
         except ValidationError as exc:
             _emit_json(client_update_error_envelope("VALIDATION_FAILED", str(exc), exc.exit_code, status="blocked")); return exc.exit_code
         payload, status = client_update_execute(request); _emit_json(payload); return status
+
+    if len(args) >= 2 and args[0:2] == ["client-files", "import-plan"]:
+        operation = "client.files.import.plan"
+        try: request = parse_managed_import_args(args[2:], execute=False)
+        except ArgumentError as exc:
+            _emit_json(managed_files_error(operation, "INVALID_REQUEST", str(exc), exc.exit_code)); return exc.exit_code
+        payload, status = managed_import_plan_execute(request); _emit_json(payload); return status
+
+    if len(args) >= 2 and args[0:2] == ["client-files", "import-execute"]:
+        operation = "client.files.import.execute"
+        try: request = parse_managed_import_args(args[2:], execute=True)
+        except ArgumentError as exc:
+            _emit_json(managed_files_error(operation, "INVALID_REQUEST", str(exc), exc.exit_code)); return exc.exit_code
+        payload, status = managed_import_execute(request); _emit_json(payload); return status
+
+    if len(args) >= 2 and args[0:2] == ["audio-prep", "reset-plan"]:
+        operation = "audio.prep.reset.plan"
+        try: request = parse_managed_reset_args(args[2:], execute=False)
+        except ArgumentError as exc:
+            _emit_json(managed_files_error(operation, "INVALID_REQUEST", str(exc), exc.exit_code)); return exc.exit_code
+        payload, status = managed_reset_plan_execute(request); _emit_json(payload); return status
+
+    if len(args) >= 2 and args[0:2] == ["audio-prep", "reset-execute"]:
+        operation = "audio.prep.reset.execute"
+        try: request = parse_managed_reset_args(args[2:], execute=True)
+        except ArgumentError as exc:
+            _emit_json(managed_files_error(operation, "INVALID_REQUEST", str(exc), exc.exit_code)); return exc.exit_code
+        payload, status = managed_reset_execute(request); _emit_json(payload); return status
 
     if len(args) >= 2 and args[0:2] == ["project", "create"]:
         try: request = parse_project_args(args[2:])
