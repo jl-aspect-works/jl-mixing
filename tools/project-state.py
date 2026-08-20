@@ -61,6 +61,15 @@ def validate_created_with(metadata: dict[str, Any], label: str) -> None:
         )
 
 
+def revision_lifecycle(revision: dict[str, Any]) -> str:
+    lifecycle = revision.get("lifecycle", "open")
+    if lifecycle not in ("open", "closed"):
+        raise StateValidationError(
+            f"Revision {revision.get('number')} lifecycle must be open or closed"
+        )
+    return lifecycle
+
+
 def validate_records(document: dict[str, Any]) -> None:
     revisions = document.get("revisions")
     state = document.get("state")
@@ -78,11 +87,16 @@ def validate_records(document: dict[str, Any]) -> None:
             f"Revision numbers must be ascending and contiguous: expected {expected}, got {numbers}"
         )
 
+    open_numbers = [
+        revision["number"]
+        for revision in revisions
+        if revision_lifecycle(revision) == "open"
+    ]
     current = state.get("current_revision")
-    expected_current = numbers[-1] if numbers else 0
+    expected_current = max(open_numbers, default=0)
     if current != expected_current:
         raise StateValidationError(
-            f"state.current_revision must equal {expected_current}; got {current}"
+            f"state.current_revision must equal highest open revision {expected_current}; got {current}"
         )
 
     for revision in revisions:
@@ -273,6 +287,10 @@ def derive_stage(document: dict[str, Any]) -> str:
     approved = state.get("approved_revision")
     delivered = state.get("delivered_revision")
     if current == 0:
+        if delivered is not None:
+            return "Delivered"
+        if approved is not None:
+            return "Approved"
         return "Setup"
     if current != approved:
         return "In progress"
