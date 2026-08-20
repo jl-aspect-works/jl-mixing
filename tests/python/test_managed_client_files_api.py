@@ -104,7 +104,7 @@ class ManagedClientFilesApiTests(unittest.TestCase):
             info = run(project, "system-info", "--json")
             self.assertEqual(info.returncode, 0, info.stderr)
             capabilities = set(json.loads(info.stdout)["capabilities"])
-            self.assertTrue({"client_files.import.plan","client_files.import.execute","audio.prep.reset.plan","audio.prep.reset.execute"}.issubset(capabilities))
+            self.assertTrue({"client.files.import.plan","client.files.import.execute","audio.prep.reset.plan","audio.prep.reset.execute"}.issubset(capabilities))
 
 
 if __name__ == "__main__":
