@@ -43,7 +43,7 @@ def _project_data(root: Path) -> dict[str, str]:
 
 
 def execute_import_plan(request: ImportRequest) -> tuple[dict[str, Any], int]:
-    operation = "client_files.import.plan"
+    operation = "client.files.import.plan"
     try:
         root = resolve_project(request.project, Path.cwd())
         plan = plan_import(root, request.source_kind, request.sources)
@@ -58,7 +58,7 @@ def execute_import_plan(request: ImportRequest) -> tuple[dict[str, Any], int]:
 
 
 def execute_import(request: ImportRequest) -> tuple[dict[str, Any], int]:
-    operation = "client_files.import.execute"
+    operation = "client.files.import.execute"
     try:
         if not request.plan_id:
             raise ValidationError("Import execute requires --plan-id.")
@@ -78,7 +78,7 @@ def execute_import(request: ImportRequest) -> tuple[dict[str, Any], int]:
 
 
 def execute_reset_plan(request: ResetRequest) -> tuple[dict[str, Any], int]:
-    operation = "audio_prep.reset.plan"
+    operation = "audio.prep.reset.plan"
     try:
         root = resolve_project(request.project, Path.cwd())
         plan = plan_reset(root, request.relative_paths)
@@ -93,7 +93,7 @@ def execute_reset_plan(request: ResetRequest) -> tuple[dict[str, Any], int]:
 
 
 def execute_reset(request: ResetRequest) -> tuple[dict[str, Any], int]:
-    operation = "audio_prep.reset.execute"
+    operation = "audio.prep.reset.execute"
     try:
         if not request.plan_id:
             raise ValidationError("Audio Prep reset execute requires --plan-id.")
