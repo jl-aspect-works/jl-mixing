@@ -81,6 +81,46 @@ def _source_fingerprint(path: Path) -> str:
     return f"file:{info.st_size}:{info.st_mtime_ns}"
 
 
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _audio_prep_content_match(project_root: Path, source: Path) -> str | None:
+    """Return the one Audio Prep path with identical content, regardless of rename."""
+    audio_root = project_root / AUDIO_ROOT
+    if not audio_root.exists():
+        return None
+    if audio_root.is_symlink() or not audio_root.is_dir():
+        raise UnsafeOperationError(f"Audio Prep root is unavailable or unsafe: {audio_root}")
+
+    source_hash = _sha256_file(source)
+    matches: list[str] = []
+    for current, dirs, names in os.walk(audio_root, followlinks=False):
+        current_path = Path(current)
+        for directory in dirs:
+            if (current_path / directory).is_symlink():
+                raise UnsafeOperationError(f"Audio Prep does not allow symlink traversal: {current_path / directory}")
+        for name in names:
+            candidate = current_path / name
+            if candidate.is_symlink() or not candidate.is_file():
+                continue
+            if candidate.stat().st_size != source.stat().st_size:
+                continue
+            if _sha256_file(candidate) == source_hash:
+                relative = candidate.relative_to(audio_root).as_posix()
+                matches.append((AUDIO_ROOT / Path(relative)).as_posix())
+
+    if len(matches) > 1:
+        raise ValidationError(
+            f"Multiple Audio Prep files match Original Delivery content for {_safe_relative(source.relative_to(project_root / ORIGINAL_ROOT).as_posix())}; repair is required before reset."
+        )
+    return matches[0] if matches else None
+
+
 def _collect_files(source_kind: str, sources: tuple[Path, ...]) -> list[SourceFile]:
     files: list[SourceFile] = []
     seen: set[str] = set()
@@ -164,7 +204,7 @@ def _plan_id(operation: str, source_kind: str, sources: Iterable[Path], files: I
         "source_kind": source_kind,
         "sources": [str(path.expanduser().absolute()) for path in sources],
         "files": [{"path": item.relative_path, "fingerprint": item.fingerprint} for item in files],
-        "items": [{"id": item["id"], "destination_state": item["destination_state"]} for item in items],
+        "items": [{"id": item["id"], "destination_state": item["destination_state"], "destination_relative_path": item["destination_relative_path"]} for item in items],
     }
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
@@ -214,7 +254,8 @@ def plan_reset(project_root: Path, relative_paths: tuple[str, ...]) -> dict[str,
             raise ValidationError(f"Original Delivery file not found: {relative}")
         source_file = SourceFile(relative, source, None, source.stat().st_size, _source_fingerprint(source))
         files.append(source_file)
-        dest_rel = (AUDIO_ROOT / Path(relative)).as_posix()
+        matched_audio_rel = _audio_prep_content_match(project_root, source)
+        dest_rel = matched_audio_rel or (AUDIO_ROOT / Path(relative)).as_posix()
         items.append(_item(project_root, f"audio:{index}", "audio_prep", dest_rel, source_file))
     if not files:
         raise ValidationError("At least one Original Delivery file is required.")
