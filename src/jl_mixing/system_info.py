@@ -6,9 +6,13 @@ from .versions import api_version, application_version, schema_root
 
 _CAPABILITIES = [
     "audio.prep.provenance.sha256",
+    "audio.prep.reset.execute",
+    "audio.prep.reset.plan",
     "audio.prep.validation.structured",
     "client.create",
     "client.update",
+    "client_files.import.execute",
+    "client_files.import.plan",
     "delivery.create",
     "delivery.package.delete",
     "delivery.package.rebuild",
