@@ -79,13 +79,14 @@ def _source_objects(plan: dict[str, Any]) -> list[base.SourceFile]:
     ]
 
 
-def _working_hash_match(project_root: Path, working_sha256: str) -> str | None:
+def _working_hash_index(project_root: Path) -> dict[str, list[str]]:
+    """Hash each safe Working_Audio file once for all plan-time recovery matches."""
     audio_root = project_root / base.AUDIO_ROOT
     if not audio_root.exists():
-        return None
+        return {}
     if audio_root.is_symlink() or not audio_root.is_dir():
         raise UnsafeOperationError(f"Audio Prep root is unavailable or unsafe: {audio_root}")
-    matches: list[str] = []
+    by_hash: dict[str, list[str]] = {}
     for current, dirs, names in os.walk(audio_root, followlinks=False):
         current_path = Path(current)
         for directory in dirs:
@@ -95,48 +96,86 @@ def _working_hash_match(project_root: Path, working_sha256: str) -> str | None:
             candidate = current_path / name
             if candidate.is_symlink() or not candidate.is_file():
                 continue
-            if base._sha256_file(candidate) == working_sha256:
-                relative = candidate.relative_to(audio_root).as_posix()
-                matches.append((base.AUDIO_ROOT / Path(relative)).as_posix())
+            digest = base._sha256_file(candidate)
+            relative = (base.AUDIO_ROOT / candidate.relative_to(audio_root)).as_posix()
+            by_hash.setdefault(digest, []).append(relative)
+    return by_hash
+
+
+def _unique_working_match(index: dict[str, list[str]], digest: str, *, ambiguity_message: str) -> str | None:
+    matches = index.get(digest, [])
     if len(matches) > 1:
-        raise ValidationError("Multiple Audio Prep files match recorded working-file provenance; repair is required.")
+        raise ValidationError(ambiguity_message)
     return matches[0] if matches else None
 
 
-def _lineage_destination(project_root: Path, source_relative: str) -> str | None:
-    document = _load(project_root)
-    matches = [
-        entry for entry in document["entries"]
-        if str(entry.get("source_relative_path", "")).casefold() == source_relative.casefold()
-    ]
-    if len(matches) > 1:
-        raise ValidationError(f"Multiple Audio Prep lineage entries exist for {source_relative}; repair is required.")
-    if not matches:
+def _provenance_by_source(document: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    return {
+        str(entry["source_relative_path"]).casefold(): entry
+        for entry in document["entries"]
+    }
+
+
+def _lineage_destination(
+    project_root: Path,
+    source_relative: str,
+    provenance: dict[str, dict[str, Any]],
+    working_index: dict[str, list[str]],
+) -> str | None:
+    entry = provenance.get(source_relative.casefold())
+    if entry is None:
         return None
-    entry = matches[0]
     working = base._safe_relative(str(entry["working_relative_path"]))
     destination = base._managed_destination(project_root, working)
     if destination.is_file():
         return working
     recorded_hash = entry.get("working_sha256")
     if isinstance(recorded_hash, str) and recorded_hash:
-        return _working_hash_match(project_root, recorded_hash)
+        return _unique_working_match(
+            working_index,
+            recorded_hash,
+            ambiguity_message="Multiple Audio Prep files match recorded working-file provenance; repair is required.",
+        )
     return None
 
 
-def _fallback_match(project_root: Path, source_relative: str, candidate: Path | None) -> str | None:
+def _fallback_match(
+    source_relative: str,
+    candidate: Path | None,
+    working_index: dict[str, list[str]],
+) -> str | None:
     if candidate is None or not candidate.is_file():
         return None
-    return base._audio_prep_content_match(project_root, candidate)
+    source_hash = base._sha256_file(candidate)
+    return _unique_working_match(
+        working_index,
+        source_hash,
+        ambiguity_message=(
+            f"Multiple Audio Prep files match Original Delivery content for {source_relative}; "
+            "repair is required before reset."
+        ),
+    )
 
 
-def _resolved_destination(project_root: Path, source_relative: str, fallback_source: Path | None) -> str | None:
-    return _lineage_destination(project_root, source_relative) or _fallback_match(project_root, source_relative, fallback_source)
+def _resolved_destination(
+    project_root: Path,
+    source_relative: str,
+    fallback_source: Path | None,
+    provenance: dict[str, dict[str, Any]],
+    working_index: dict[str, list[str]],
+) -> str | None:
+    return _lineage_destination(project_root, source_relative, provenance, working_index) or _fallback_match(
+        source_relative,
+        fallback_source,
+        working_index,
+    )
 
 
 def plan_import(project_root: Path, source_kind: str, sources: tuple[Path, ...]) -> dict[str, Any]:
     plan = base.plan_import(project_root, source_kind, sources)
     source_objects = {source.relative_path: source for source in _source_objects(plan)}
+    provenance = _provenance_by_source(_load(project_root))
+    working_index = _working_hash_index(project_root)
     items: list[dict[str, Any]] = []
     for item in plan["items"]:
         if item["area"] != "audio_prep":
@@ -148,7 +187,7 @@ def plan_import(project_root: Path, source_kind: str, sources: tuple[Path, ...])
             (base.ORIGINAL_ROOT / Path(source_relative)).as_posix(),
         )
         fallback = existing_original if existing_original.is_file() else source_objects[source_relative].source_path
-        destination = _resolved_destination(project_root, source_relative, fallback)
+        destination = _resolved_destination(project_root, source_relative, fallback, provenance, working_index)
         if destination:
             items.append(base._item(
                 project_root,
@@ -169,6 +208,8 @@ def plan_reset(project_root: Path, relative_paths: tuple[str, ...]) -> dict[str,
     files: list[base.SourceFile] = []
     items: list[dict[str, Any]] = []
     seen: set[str] = set()
+    provenance = _provenance_by_source(_load(project_root))
+    working_index = _working_hash_index(project_root)
     for index, raw in enumerate(relative_paths):
         relative = base._safe_relative(raw)
         key = relative.casefold()
@@ -180,7 +221,7 @@ def plan_reset(project_root: Path, relative_paths: tuple[str, ...]) -> dict[str,
             raise ValidationError(f"Original Delivery file not found: {relative}")
         source_file = base.SourceFile(relative, source, None, source.stat().st_size, base._source_fingerprint(source))
         files.append(source_file)
-        destination = _resolved_destination(project_root, relative, source) or (base.AUDIO_ROOT / Path(relative)).as_posix()
+        destination = _resolved_destination(project_root, relative, source, provenance, working_index) or (base.AUDIO_ROOT / Path(relative)).as_posix()
         items.append(base._item(project_root, f"audio:{index}", "audio_prep", destination, source_file))
     if not files:
         raise ValidationError("At least one Original Delivery file is required.")
