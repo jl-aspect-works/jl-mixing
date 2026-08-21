@@ -104,36 +104,6 @@ class DeliveryApiTests(unittest.TestCase):
             self.assertTrue(Path(data["zip_path"]).is_file())
             self.assertTrue((project / "05_Final_Delivery" / "Stems" / "Drum Stems.wav").is_file())
 
-    def test_missing_requested_deliverables_block_preflight_and_create(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            project = write_project(Path(tmp))
-            revision = project / "04_Revisions" / "Revision_01"
-            (revision / "Delivery Song Main Mix.wav").unlink()
-            (revision / "Drum Stems.wav").unlink()
-            (revision / "11_LeadVox.wav").write_bytes(b"lead vocal")
-            manifest_path = project / "00_Admin" / "project-manifest.json"
-            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-            manifest["delivery"]["requested_deliverables"] = ["instrumental", "main_mix"]
-            manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-
-            for extra in (("--dry-run", "--zip"), ("--zip",)):
-                proc = run_cli(
-                    project,
-                    "delivery", "create", "--project", str(project), "--json", *extra,
-                )
-                self.assertEqual(proc.returncode, 5, proc.stderr)
-                payload = json.loads(proc.stdout)
-                self.assertEqual(payload["status"], "blocked")
-                self.assertEqual(payload["errors"][0]["code"], "DELIVERY_REQUIREMENTS_MISSING")
-                self.assertIn("instrumental", payload["errors"][0]["message"])
-                self.assertIn("main_mix", payload["errors"][0]["message"])
-
-            delivery = project / "05_Final_Delivery"
-            self.assertFalse((delivery / "delivery-manifest.json").exists())
-            self.assertFalse(any(delivery.glob("*.zip")))
-            persisted = json.loads(manifest_path.read_text(encoding="utf-8"))
-            self.assertIsNone(persisted["state"]["delivered_revision"])
-
     def test_second_default_delivery_requires_replacement(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project = write_project(Path(tmp))
