@@ -20,6 +20,7 @@ class ImportRequest:
     sources: tuple[Path, ...]
     plan_id: str | None = None
     decisions: dict[str, str] | None = None
+    selected_relative_paths: tuple[str, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -40,6 +41,23 @@ def _error(operation: str, code: str, message: str, exit_code: int, *, status: s
 
 def _project_data(root: Path) -> dict[str, str]:
     return {"path": str(root), "workspace_path": str(studio_root(root))}
+
+
+def _selected_import_plan(plan: dict[str, Any], selected_relative_paths: tuple[str, ...] | None) -> dict[str, Any]:
+    if selected_relative_paths is None:
+        return plan
+    selected = set(selected_relative_paths)
+    if not selected:
+        raise ValidationError("Import execute requires at least one selected relative path.")
+    available = {item["relative_path"] for item in plan["files"]}
+    unknown = selected - available
+    if unknown:
+        raise ValidationError(f"Selected import path is not part of the plan: {sorted(unknown)[0]}")
+    return {
+        **plan,
+        "files": [item for item in plan["files"] if item["relative_path"] in selected],
+        "items": [item for item in plan["items"] if item["source_relative_path"] in selected],
+    }
 
 
 def execute_import_plan(request: ImportRequest) -> tuple[dict[str, Any], int]:
@@ -63,11 +81,12 @@ def execute_import(request: ImportRequest) -> tuple[dict[str, Any], int]:
         if not request.plan_id:
             raise ValidationError("Import execute requires --plan-id.")
         root = resolve_project(request.project, Path.cwd())
-        plan = plan_import(root, request.source_kind, request.sources)
-        if plan["plan_id"] != request.plan_id:
+        full_plan = plan_import(root, request.source_kind, request.sources)
+        if full_plan["plan_id"] != request.plan_id:
             raise ValidationError("Import plan is stale; run import-plan again.")
+        plan = _selected_import_plan(full_plan, request.selected_relative_paths)
         result = execute_plan(root, plan, request.decisions or {})
-        return _envelope(operation, "success", {"project": _project_data(root), "plan_id": plan["plan_id"], "result": result}), 0
+        return _envelope(operation, "success", {"project": _project_data(root), "plan_id": full_plan["plan_id"], "result": result}), 0
     except ContextError as exc: return _error(operation, "PROJECT_NOT_FOUND", str(exc), exc.exit_code), exc.exit_code
     except UnsafeOperationError as exc: return _error(operation, "UNSAFE_OPERATION", str(exc), exc.exit_code, status="blocked"), exc.exit_code
     except ValidationError as exc: return _error(operation, "VALIDATION_FAILED", str(exc), exc.exit_code, status="blocked"), exc.exit_code
@@ -124,11 +143,12 @@ def _parse_decisions(raw: str) -> dict[str, str]:
 
 def parse_import_args(args: list[str], *, execute: bool) -> ImportRequest:
     project: Path | None = None; source_kind: str | None = None; sources: list[Path] = []
-    plan_id: str | None = None; decisions: dict[str, str] | None = None; json_seen = 0; index = 0
+    plan_id: str | None = None; decisions: dict[str, str] | None = None; selected_relative_paths: list[str] = []
+    json_seen = 0; index = 0
     while index < len(args):
         arg = args[index]
         if arg == "--json": json_seen += 1
-        elif arg in {"--project", "--source-kind", "--source", "--plan-id", "--decisions-json"}:
+        elif arg in {"--project", "--source-kind", "--source", "--plan-id", "--decisions-json", "--include-relative-path"}:
             index += 1
             if index >= len(args): raise ArgumentError(f"{arg} requires a value.")
             value = args[index]
@@ -136,15 +156,16 @@ def parse_import_args(args: list[str], *, execute: bool) -> ImportRequest:
             elif arg == "--source-kind": source_kind = value
             elif arg == "--source": sources.append(Path(value))
             elif arg == "--plan-id": plan_id = value
+            elif arg == "--include-relative-path": selected_relative_paths.append(value)
             else: decisions = _parse_decisions(value)
         else: raise ArgumentError(f"Unknown option: {arg}")
         index += 1
     if json_seen != 1: raise ArgumentError("managed import requires exactly one --json option.")
     if source_kind not in {"zip", "folder", "files"}: raise ArgumentError("--source-kind must be zip, folder, or files.")
     if not sources: raise ArgumentError("At least one --source is required.")
-    if not execute and (plan_id is not None or decisions is not None): raise ArgumentError("import-plan does not accept execute-only options.")
+    if not execute and (plan_id is not None or decisions is not None or selected_relative_paths): raise ArgumentError("import-plan does not accept execute-only options.")
     if execute and plan_id is None: raise ArgumentError("import-execute requires --plan-id.")
-    return ImportRequest(project, source_kind, tuple(sources), plan_id, decisions)
+    return ImportRequest(project, source_kind, tuple(sources), plan_id, decisions, tuple(selected_relative_paths) if selected_relative_paths else None)
 
 
 def parse_reset_args(args: list[str], *, execute: bool) -> ResetRequest:
