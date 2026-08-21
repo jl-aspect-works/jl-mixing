@@ -79,49 +79,52 @@ def _source_objects(plan: dict[str, Any]) -> list[base.SourceFile]:
     ]
 
 
-def _working_hash_index(project_root: Path) -> dict[str, list[str]]:
-    """Hash each safe Working_Audio file once for all plan-time recovery matches."""
-    audio_root = project_root / base.AUDIO_ROOT
-    if not audio_root.exists():
-        return {}
-    if audio_root.is_symlink() or not audio_root.is_dir():
-        raise UnsafeOperationError(f"Audio Prep root is unavailable or unsafe: {audio_root}")
-    by_hash: dict[str, list[str]] = {}
-    for current, dirs, names in os.walk(audio_root, followlinks=False):
-        current_path = Path(current)
-        for directory in dirs:
-            if (current_path / directory).is_symlink():
-                raise UnsafeOperationError(f"Audio Prep does not allow symlink traversal: {current_path / directory}")
-        for name in names:
-            candidate = current_path / name
-            if candidate.is_symlink() or not candidate.is_file():
-                continue
-            digest = base._sha256_file(candidate)
-            relative = (base.AUDIO_ROOT / candidate.relative_to(audio_root)).as_posix()
-            by_hash.setdefault(digest, []).append(relative)
-    return by_hash
+class _WorkingHashIndex:
+    """Lazy per-plan Working_Audio content index.
 
+    Direct provenance hits need no content scan. The first recovery/fallback lookup
+    hashes each safe working file exactly once and subsequent lookups reuse the map.
+    """
 
-def _unique_working_match(index: dict[str, list[str]], digest: str, *, ambiguity_message: str) -> str | None:
-    matches = index.get(digest, [])
-    if len(matches) > 1:
-        raise ValidationError(ambiguity_message)
-    return matches[0] if matches else None
+    def __init__(self, project_root: Path):
+        self.project_root = project_root
+        self._by_hash: dict[str, list[str]] | None = None
+
+    def _build(self) -> dict[str, list[str]]:
+        audio_root = self.project_root / base.AUDIO_ROOT
+        if not audio_root.exists():
+            return {}
+        if audio_root.is_symlink() or not audio_root.is_dir():
+            raise UnsafeOperationError(f"Audio Prep root is unavailable or unsafe: {audio_root}")
+        by_hash: dict[str, list[str]] = {}
+        for current, dirs, names in os.walk(audio_root, followlinks=False):
+            current_path = Path(current)
+            for directory in dirs:
+                if (current_path / directory).is_symlink():
+                    raise UnsafeOperationError(f"Audio Prep does not allow symlink traversal: {current_path / directory}")
+            for name in names:
+                candidate = current_path / name
+                if candidate.is_symlink() or not candidate.is_file():
+                    continue
+                digest = base._sha256_file(candidate)
+                relative = (base.AUDIO_ROOT / candidate.relative_to(audio_root)).as_posix()
+                by_hash.setdefault(digest, []).append(relative)
+        return by_hash
+
+    def match(self, digest: str, *, ambiguity_message: str) -> str | None:
+        if self._by_hash is None:
+            self._by_hash = self._build()
+        matches = self._by_hash.get(digest, [])
+        if len(matches) > 1:
+            raise ValidationError(ambiguity_message)
+        return matches[0] if matches else None
 
 
 def _provenance_by_source(document: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    return {
-        str(entry["source_relative_path"]).casefold(): entry
-        for entry in document["entries"]
-    }
+    return {str(entry["source_relative_path"]).casefold(): entry for entry in document["entries"]}
 
 
-def _lineage_destination(
-    project_root: Path,
-    source_relative: str,
-    provenance: dict[str, dict[str, Any]],
-    working_index: dict[str, list[str]],
-) -> str | None:
+def _lineage_destination(project_root: Path, source_relative: str, provenance: dict[str, dict[str, Any]], working_index: _WorkingHashIndex) -> str | None:
     entry = provenance.get(source_relative.casefold())
     if entry is None:
         return None
@@ -131,72 +134,37 @@ def _lineage_destination(
         return working
     recorded_hash = entry.get("working_sha256")
     if isinstance(recorded_hash, str) and recorded_hash:
-        return _unique_working_match(
-            working_index,
-            recorded_hash,
-            ambiguity_message="Multiple Audio Prep files match recorded working-file provenance; repair is required.",
-        )
+        return working_index.match(recorded_hash, ambiguity_message="Multiple Audio Prep files match recorded working-file provenance; repair is required.")
     return None
 
 
-def _fallback_match(
-    source_relative: str,
-    candidate: Path | None,
-    working_index: dict[str, list[str]],
-) -> str | None:
+def _fallback_match(source_relative: str, candidate: Path | None, working_index: _WorkingHashIndex) -> str | None:
     if candidate is None or not candidate.is_file():
         return None
     source_hash = base._sha256_file(candidate)
-    return _unique_working_match(
-        working_index,
-        source_hash,
-        ambiguity_message=(
-            f"Multiple Audio Prep files match Original Delivery content for {source_relative}; "
-            "repair is required before reset."
-        ),
-    )
+    return working_index.match(source_hash, ambiguity_message=f"Multiple Audio Prep files match Original Delivery content for {source_relative}; repair is required before reset.")
 
 
-def _resolved_destination(
-    project_root: Path,
-    source_relative: str,
-    fallback_source: Path | None,
-    provenance: dict[str, dict[str, Any]],
-    working_index: dict[str, list[str]],
-) -> str | None:
-    return _lineage_destination(project_root, source_relative, provenance, working_index) or _fallback_match(
-        source_relative,
-        fallback_source,
-        working_index,
-    )
+def _resolved_destination(project_root: Path, source_relative: str, fallback_source: Path | None, provenance: dict[str, dict[str, Any]], working_index: _WorkingHashIndex) -> str | None:
+    return _lineage_destination(project_root, source_relative, provenance, working_index) or _fallback_match(source_relative, fallback_source, working_index)
 
 
 def plan_import(project_root: Path, source_kind: str, sources: tuple[Path, ...]) -> dict[str, Any]:
     plan = base.plan_import(project_root, source_kind, sources)
     source_objects = {source.relative_path: source for source in _source_objects(plan)}
     provenance = _provenance_by_source(_load(project_root))
-    working_index = _working_hash_index(project_root)
+    working_index = _WorkingHashIndex(project_root)
     items: list[dict[str, Any]] = []
     for item in plan["items"]:
         if item["area"] != "audio_prep":
             items.append(item)
             continue
         source_relative = item["source_relative_path"]
-        existing_original = base._managed_destination(
-            project_root,
-            (base.ORIGINAL_ROOT / Path(source_relative)).as_posix(),
-        )
+        existing_original = base._managed_destination(project_root, (base.ORIGINAL_ROOT / Path(source_relative)).as_posix())
         fallback = existing_original if existing_original.is_file() else source_objects[source_relative].source_path
         destination = _resolved_destination(project_root, source_relative, fallback, provenance, working_index)
         if destination:
-            items.append(base._item(
-                project_root,
-                item["id"],
-                "audio_prep",
-                destination,
-                source_objects[source_relative],
-                depends_on=item.get("depends_on"),
-            ))
+            items.append(base._item(project_root, item["id"], "audio_prep", destination, source_objects[source_relative], depends_on=item.get("depends_on")))
         else:
             items.append(item)
     plan["items"] = items
@@ -209,7 +177,7 @@ def plan_reset(project_root: Path, relative_paths: tuple[str, ...]) -> dict[str,
     items: list[dict[str, Any]] = []
     seen: set[str] = set()
     provenance = _provenance_by_source(_load(project_root))
-    working_index = _working_hash_index(project_root)
+    working_index = _WorkingHashIndex(project_root)
     for index, raw in enumerate(relative_paths):
         relative = base._safe_relative(raw)
         key = relative.casefold()
@@ -251,11 +219,7 @@ def _record_successful_lineage(project_root: Path, plan: dict[str, Any], result:
             continue
         source_key = source_relative.casefold()
         working_key = working_relative.casefold()
-        entries = [
-            entry for entry in entries
-            if str(entry.get("source_relative_path", "")).casefold() != source_key
-            and str(entry.get("working_relative_path", "")).casefold() != working_key
-        ]
+        entries = [entry for entry in entries if str(entry.get("source_relative_path", "")).casefold() != source_key and str(entry.get("working_relative_path", "")).casefold() != working_key]
         entries.append({
             "source_relative_path": source_relative,
             "working_relative_path": working_relative,
