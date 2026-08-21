@@ -53,6 +53,54 @@ class ManagedClientFilesApiTests(unittest.TestCase):
             self.assertEqual((project / "01_Client_Files" / "Original_Delivery" / "Stems" / "bass.wav").read_bytes(), b"bass")
             self.assertEqual((project / "02_Audio_Preparation" / "Working_Audio" / "mix.wav").read_bytes(), b"mix")
 
+    def test_folder_execute_can_select_only_part_of_the_immutable_plan(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); project = fixture(root / "studio")
+            source = root / "delivery"; (source / "Stems").mkdir(parents=True)
+            (source / "mix.wav").write_bytes(b"mix")
+            (source / "Stems" / "bass.wav").write_bytes(b"bass")
+            planned = run(project, "client-files", "import-plan", "--json", "--source-kind", "folder", "--source", str(source))
+            plan = json.loads(planned.stdout)["data"]["plan"]
+            executed = run(
+                project,
+                "client-files", "import-execute", "--json", "--source-kind", "folder", "--source", str(source),
+                "--plan-id", plan["plan_id"], "--include-relative-path", "Stems/bass.wav",
+            )
+            self.assertEqual(executed.returncode, 0, executed.stdout + executed.stderr)
+            self.assertEqual((project / "01_Client_Files" / "Original_Delivery" / "Stems" / "bass.wav").read_bytes(), b"bass")
+            self.assertEqual((project / "02_Audio_Preparation" / "Working_Audio" / "Stems" / "bass.wav").read_bytes(), b"bass")
+            self.assertFalse((project / "01_Client_Files" / "Original_Delivery" / "mix.wav").exists())
+            self.assertFalse((project / "02_Audio_Preparation" / "Working_Audio" / "mix.wav").exists())
+
+    def test_selection_rejects_unknown_paths_and_ignores_deselected_conflicts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); project = fixture(root / "studio")
+            source = root / "delivery"; source.mkdir()
+            (source / "keep.wav").write_bytes(b"keep")
+            (source / "conflict.wav").write_bytes(b"new")
+            existing = project / "01_Client_Files" / "Original_Delivery" / "conflict.wav"
+            existing.write_bytes(b"old")
+            planned = run(project, "client-files", "import-plan", "--json", "--source-kind", "folder", "--source", str(source))
+            plan = json.loads(planned.stdout)["data"]["plan"]
+
+            unknown = run(
+                project,
+                "client-files", "import-execute", "--json", "--source-kind", "folder", "--source", str(source),
+                "--plan-id", plan["plan_id"], "--include-relative-path", "missing.wav",
+            )
+            self.assertEqual(unknown.returncode, 5)
+            self.assertIn("Selected import path is not part of the plan", unknown.stdout)
+
+            executed = run(
+                project,
+                "client-files", "import-execute", "--json", "--source-kind", "folder", "--source", str(source),
+                "--plan-id", plan["plan_id"], "--include-relative-path", "keep.wav",
+            )
+            self.assertEqual(executed.returncode, 0, executed.stdout + executed.stderr)
+            self.assertEqual(existing.read_bytes(), b"old")
+            self.assertEqual((project / "01_Client_Files" / "Original_Delivery" / "keep.wav").read_bytes(), b"keep")
+            self.assertEqual((project / "02_Audio_Preparation" / "Working_Audio" / "keep.wav").read_bytes(), b"keep")
+
     def test_conflicts_require_decisions_and_skip_couples_audio_operation(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp); project = fixture(root / "studio")
