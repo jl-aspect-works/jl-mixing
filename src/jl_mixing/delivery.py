@@ -310,16 +310,6 @@ def plan_delivery(
                 extracted.append(record["path"])
         old_files = tuple(extracted)
         old_map = {path.casefold(): path for path in old_files}
-        new_map = {record.path.casefold(): record.path for record in selected}
-        if set(old_map) != set(new_map):
-            missing = sorted(set(old_map) - set(new_map))
-            extra = sorted(set(new_map) - set(old_map))
-            details: list[str] = []
-            if missing:
-                details.append("stale prior files: " + ", ".join(old_map[key] for key in missing))
-            if extra:
-                details.append("new paths not present in prior package: " + ", ".join(new_map[key] for key in extra))
-            raise ValidationError("--overwrite requires the same delivery path set; use --clean (" + "; ".join(details) + ")")
         for record in selected:
             destination = delivery_root.joinpath(*_safe_relative(record.path).parts)
             if (destination.exists() or destination.is_symlink()) and record.path.casefold() not in old_map:
