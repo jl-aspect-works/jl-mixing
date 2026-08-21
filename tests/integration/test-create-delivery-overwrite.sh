@@ -24,7 +24,15 @@ assert_file_exists "$delivery/client-reference.pdf"
 assert_contains "$(cat "$delivery/Blue Sky Main Mix.wav")" 'main-v2' 'overwrite replaces tracked file'
 
 mv "$revision/BlueSky_Custom.wav" "$revision/BlueSky_Renamed.wav"
-assert_failure 'overwrite rejects changed path set' \
+(cd "$project_root" && "$ROOT/bin/create-delivery" --overwrite >/dev/null)
+assert_path_not_exists "$delivery/BlueSky_Custom.wav"
+assert_file_exists "$delivery/BlueSky_Renamed.wav"
+assert_contains "$(cat "$delivery/Delivery_Notes.md")" 'user note' 'changed-path overwrite preserves delivery notes'
+assert_file_exists "$delivery/client-reference.pdf"
+
+printf 'untracked\n' > "$delivery/BlueSky_Collision.wav"
+mv "$revision/BlueSky_Renamed.wav" "$revision/BlueSky_Collision.wav"
+assert_failure 'overwrite rejects collision with untracked destination' \
     env JL_MIXING_HOME="$ROOT" JL_MIXING_ROOT="$studio_root" \
         "$ROOT/bin/create-delivery" --project "$project_root" --overwrite
 

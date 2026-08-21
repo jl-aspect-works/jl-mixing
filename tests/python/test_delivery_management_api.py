@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -31,6 +32,27 @@ class DeliveryManagementApiTests(unittest.TestCase):
             self.assertEqual(payload["status"], "success")
             self.assertEqual(payload["data"]["state"], "ready")
             self.assertEqual(payload["data"]["package_state"], "current")
+
+    def test_requested_deliverables_are_not_inferred_from_filenames(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = write_project(Path(tmp))
+            create_delivery(DeliveryCreateRequest(project, make_zip=True))
+            manifest_path = project / "00_Admin" / "project-manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["delivery"]["requested_deliverables"] = [
+                "instrumental",
+                "main_mix",
+                "custom_client_variant",
+            ]
+            manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+
+            payload, exit_code = execute_status(DeliveryStatusApiRequest(project))
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(payload["data"]["state"], "ready")
+            self.assertEqual(payload["data"]["package_state"], "current")
+            codes = {issue["code"] for issue in payload["data"]["issues"]}
+            self.assertNotIn("DELIVERY_REQUIREMENTS_CHANGED", codes)
 
     def test_delete_package_api_returns_reconciled_state(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

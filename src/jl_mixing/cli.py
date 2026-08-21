@@ -42,6 +42,12 @@ from .api.revision_approve import parse_args as parse_approval_args
 from .api.revision_create import _error_envelope as revision_error_envelope
 from .api.revision_create import execute as revision_execute
 from .api.revision_create import parse_args as parse_revision_args
+from .api.revision_lifecycle import _error as lifecycle_error_envelope
+from .api.revision_lifecycle import execute as lifecycle_execute
+from .api.revision_lifecycle import parse_args as parse_lifecycle_args
+from .api.revision_unapprove import _error as unapprove_error_envelope
+from .api.revision_unapprove import execute as unapprove_execute
+from .api.revision_unapprove import parse_args as parse_unapprove_args
 from .api.revision_update_description import _error_envelope as revision_description_error_envelope
 from .api.revision_update_description import execute as revision_description_execute
 from .api.revision_update_description import parse_args as parse_revision_description_args
@@ -162,6 +168,24 @@ def main(argv: Sequence[str] | None = None) -> int:
         except ValidationError as exc:
             _emit_json(approval_error_envelope("VALIDATION_FAILED", str(exc), exc.exit_code, status="blocked")); return exc.exit_code
         payload, status = approval_execute(request); _emit_json(payload); return status
+
+    if len(args) >= 2 and args[0] == "revision" and args[1] in {"close", "reopen"}:
+        action = args[1]
+        operation = f"revision.{action}"
+        try: request = parse_lifecycle_args(args[2:], action)
+        except ArgumentError as exc:
+            _emit_json(lifecycle_error_envelope(operation, "INVALID_REQUEST", str(exc), exc.exit_code)); return exc.exit_code
+        except ValidationError as exc:
+            _emit_json(lifecycle_error_envelope(operation, "VALIDATION_FAILED", str(exc), exc.exit_code, status="blocked")); return exc.exit_code
+        payload, status = lifecycle_execute(request); _emit_json(payload); return status
+
+    if len(args) >= 2 and args[0:2] == ["revision", "unapprove"]:
+        try: request = parse_unapprove_args(args[2:])
+        except ArgumentError as exc:
+            _emit_json(unapprove_error_envelope("INVALID_REQUEST", str(exc), exc.exit_code)); return exc.exit_code
+        except ValidationError as exc:
+            _emit_json(unapprove_error_envelope("VALIDATION_FAILED", str(exc), exc.exit_code, status="blocked")); return exc.exit_code
+        payload, status = unapprove_execute(request); _emit_json(payload); return status
 
     if len(args) >= 2 and args[0:2] == ["delivery", "create"]:
         try: request = parse_delivery_args(args[2:])

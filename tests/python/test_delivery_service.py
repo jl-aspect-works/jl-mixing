@@ -100,22 +100,47 @@ class DeliveryServiceTests(unittest.TestCase):
             manifest = json.loads((project / "00_Admin" / "project-manifest.json").read_text(encoding="utf-8"))
             self.assertEqual(manifest["state"]["delivered_revision"], 1)
 
-    def test_overwrite_requires_same_path_set_and_preserves_notes(self) -> None:
+    def test_overwrite_replaces_managed_path_set_and_preserves_notes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project = write_project(Path(tmp))
             delivery = project / "05_Final_Delivery"
             create_delivery(DeliveryCreateRequest(project))
             notes = delivery / "Delivery_Notes.md"
             notes.write_text("Edited after first package\n", encoding="utf-8")
+            (delivery / "client-reference.pdf").write_bytes(b"untracked reference")
             revision = project / "04_Revisions" / "Revision_01"
-            (revision / "Delivery Song Main Mix.wav").write_bytes(b"main-v2")
-            result = create_delivery(DeliveryCreateRequest(project, overwrite=True))
-            self.assertTrue(result.created)
-            self.assertEqual((delivery / "Delivery Song Main Mix.wav").read_bytes(), b"main-v2")
-            self.assertEqual(notes.read_text(encoding="utf-8"), "Edited after first package\n")
+            old_main = revision / "Delivery Song Main Mix.wav"
+            old_main.unlink()
+            (revision / "Delivery Song Main v2.wav").write_bytes(b"main-v2")
             (revision / "Delivery Song Instrumental.wav").unlink()
-            with self.assertRaisesRegex(ValidationError, "same delivery path set"):
+
+            result = create_delivery(DeliveryCreateRequest(project, overwrite=True))
+
+            self.assertTrue(result.created)
+            self.assertFalse((delivery / "Delivery Song Main Mix.wav").exists())
+            self.assertFalse((delivery / "Delivery Song Instrumental.wav").exists())
+            self.assertEqual((delivery / "Delivery Song Main v2.wav").read_bytes(), b"main-v2")
+            self.assertEqual(notes.read_text(encoding="utf-8"), "Edited after first package\n")
+            self.assertEqual((delivery / "client-reference.pdf").read_bytes(), b"untracked reference")
+            manifest = json.loads((delivery / "delivery-manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(
+                {item["path"] for item in manifest["files"]},
+                {"Delivery Song Main v2.wav", "Stems/Drum Stems.wav"},
+            )
+
+    def test_overwrite_rejects_new_path_that_collides_with_untracked_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = write_project(Path(tmp))
+            delivery = project / "05_Final_Delivery"
+            create_delivery(DeliveryCreateRequest(project))
+            revision = project / "04_Revisions" / "Revision_01"
+            (delivery / "Custom Mix.wav").write_bytes(b"untracked")
+            (revision / "Delivery Song Main Mix.wav").unlink()
+            (revision / "Custom Mix.wav").write_bytes(b"new managed")
+
+            with self.assertRaisesRegex(ValidationError, "untracked item"):
                 create_delivery(DeliveryCreateRequest(project, overwrite=True))
+            self.assertEqual((delivery / "Custom Mix.wav").read_bytes(), b"untracked")
 
     def test_clean_allows_new_path_set_and_resets_delivery_notes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
