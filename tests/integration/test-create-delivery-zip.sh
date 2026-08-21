@@ -89,13 +89,40 @@ PY_ZIP_NOTES
 )"
 assert_contains "$zip_notes" 'Final client notes' 'ZIP contains edited delivery notes'
 
-# Adding a new delivered path still invalidates --overwrite. The failed rebuild
-# must preserve the previously generated ZIP and the edited working notes.
+# Adding a new managed delivered path is supported by overwrite. The rebuilt
+# ZIP must reflect the current managed delivery while preserving edited notes.
 printf 'instrumental\n' > "$revision/Blue Sky Instrumental.wav"
-assert_failure 'changed delivery path set rejected during ZIP overwrite' \
-    sh -c 'cd "$1" && "$2" --zip --overwrite' sh "$project_root" "$ROOT/bin/create-delivery"
-assert_file_exists "$zip_file"
+changed_zip_output="$(cd "$project_root" && "$ROOT/bin/create-delivery" --zip --overwrite)"
+changed_zip_name="$(printf '%s\n' "$changed_zip_output" | sed -n 's/^ZIP:[[:space:]]*//p')"
+changed_zip_file="$delivery/$changed_zip_name"
+assert_file_exists "$changed_zip_file"
+assert_file_exists "$delivery/Blue Sky Instrumental.wav"
 assert_contains "$(cat "$delivery/Delivery_Notes.md")" 'Final client notes' \
-    'failed changed-path overwrite preserves edited notes'
+    'changed-path ZIP overwrite preserves edited notes'
+changed_zip_inventory="$(python3 - "$changed_zip_file" <<'PY_ZIP_CHANGED_LIST'
+from pathlib import Path
+from zipfile import ZipFile
+import sys
+with ZipFile(Path(sys.argv[1])) as archive:
+    print("\n".join(sorted(archive.namelist())))
+PY_ZIP_CHANGED_LIST
+)"
+assert_contains "$changed_zip_inventory" 'Blue Sky Instrumental.wav' \
+    'changed-path ZIP overwrite contains new managed file'
+assert_contains "$changed_zip_inventory" 'Blue Sky Main Mix.wav' \
+    'changed-path ZIP overwrite retains current managed file'
+changed_zip_notes="$(python3 - "$changed_zip_file" <<'PY_ZIP_CHANGED_NOTES'
+from pathlib import Path
+from zipfile import ZipFile
+import sys
+with ZipFile(Path(sys.argv[1])) as archive:
+    matches = [name for name in archive.namelist() if name.endswith('/Delivery_Notes.md') or name == 'Delivery_Notes.md']
+    if len(matches) != 1:
+        raise SystemExit(f"expected one Delivery_Notes.md, found {len(matches)}")
+    print(archive.read(matches[0]).decode('utf-8'))
+PY_ZIP_CHANGED_NOTES
+)"
+assert_contains "$changed_zip_notes" 'Final client notes' \
+    'changed-path ZIP overwrite includes edited notes'
 
 echo "[OK] create-delivery ZIP ($TEST_COUNT assertions)"
