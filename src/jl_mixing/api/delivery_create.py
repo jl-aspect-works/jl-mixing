@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from ..context import studio_root
-from ..delivery import DeliveryCreateRequest, create_delivery
+from ..delivery import DeliveryCreateRequest, DeliveryCreateResult, create_delivery
 from ..errors import ArgumentError, ContextError, JLMixingError, UnsafeOperationError, ValidationError
 from ..versions import api_version
 
@@ -40,18 +40,45 @@ def _error_envelope(code: str, message: str, exit_code: int, *, status: str = "e
     }
 
 
+def _service_request(request: DeliveryCreateApiRequest, *, dry_run: bool) -> DeliveryCreateRequest:
+    return DeliveryCreateRequest(
+        project_root=request.project,
+        include=request.include,
+        exclude=request.exclude,
+        working_prefix=request.working_prefix,
+        overwrite=request.overwrite,
+        clean=request.clean,
+        make_zip=request.make_zip,
+        dry_run=dry_run,
+    )
+
+
+def _validate_requested_deliverables(result: DeliveryCreateResult) -> None:
+    delivery = result.manifest.get("delivery")
+    requested = delivery.get("requested_deliverables") if isinstance(delivery, dict) else None
+    if not isinstance(requested, list):
+        return
+    requested_types = {
+        item for item in requested
+        if isinstance(item, str) and item
+    }
+    selected_types = {item.deliverable_type for item in result.plan.selected}
+    missing = sorted(requested_types - selected_types)
+    if missing:
+        raise ValidationError(
+            "Delivery is missing required deliverable types: " + ", ".join(missing)
+        )
+
+
 def execute(request: DeliveryCreateApiRequest) -> tuple[dict[str, Any], int]:
     try:
-        result = create_delivery(DeliveryCreateRequest(
-            project_root=request.project,
-            include=request.include,
-            exclude=request.exclude,
-            working_prefix=request.working_prefix,
-            overwrite=request.overwrite,
-            clean=request.clean,
-            make_zip=request.make_zip,
-            dry_run=request.dry_run,
-        ))
+        if request.dry_run:
+            result = create_delivery(_service_request(request, dry_run=True))
+            _validate_requested_deliverables(result)
+        else:
+            preview = create_delivery(_service_request(request, dry_run=True))
+            _validate_requested_deliverables(preview)
+            result = create_delivery(_service_request(request, dry_run=False))
         manifest_path = result.project_root / "00_Admin" / "project-manifest.json"
         delivery_notes_path = result.delivery_root / "Delivery_Notes.md"
         delivery_manifest_path = result.delivery_root / "delivery-manifest.json"
@@ -114,6 +141,8 @@ def execute(request: DeliveryCreateApiRequest) -> tuple[dict[str, Any], int]:
         lowered = message.lower()
         if "must be approved" in lowered or "approved revision" in lowered:
             code = "REVISION_NOT_APPROVED"
+        elif "missing required deliverable types" in lowered:
+            code = "DELIVERY_REQUIREMENTS_MISSING"
         elif "overwrite" in lowered or "already exists" in lowered or "replacement" in lowered:
             code = "DELIVERY_REPLACEMENT_REQUIRED"
         elif "unsafe" in lowered or "clean" in lowered or "symbolic link" in lowered:
