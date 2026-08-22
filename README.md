@@ -5,7 +5,7 @@
     <img alt="JL Mixing Automation by JL Aspect Works" width="420" src="https://raw.githubusercontent.com/jl-aspect-works/jl-brand/main/jl-mixing-automation-light-product.png">
   </picture>
 </p>
-JL Mixing Automation v2.0 is the cross-platform workflow engine behind JL Mixing Studio. It creates consistent workspaces, preserves original client files, validates intake, manages revisions/approval, exposes the Automation API used by Studio, and builds verified final-delivery packages.
+JL Mixing Automation v2.1 is the cross-platform workflow engine behind JL Mixing Studio. It creates consistent workspaces, preserves original client files, validates intake, manages revisions/approval, exposes the Automation API used by Studio, and builds verified final-delivery packages.
 
 The authoritative runtime is Python and is shared across Windows and macOS. Automation API remains version `1.0`, while workspace metadata schemas remain version `1.1.0`.
 
@@ -22,13 +22,15 @@ new-studio
   -> create-delivery
 ```
 
+Studio 2.1 additionally uses Automation-managed metadata editing, Client Files import, Audio Prep reset, revision Close/Reopen, and Unapprove operations.
+
 The default workspace is `~/Music/Mixes/`. Projects live directly beneath `Clients/<Client>/Projects/<Project>/`; there are no `Active/` or `Completed/` directories.
 
 ## Installation
 
 ### Windows
 
-Download and extract `jl-mixing-2.0.0-windows.zip`, then run:
+For the release candidate, download and extract `jl-mixing-2.1.0-rc.1-windows.zip`, then run:
 
 ```powershell
 .\windows\install.ps1
@@ -45,11 +47,11 @@ The package includes its private Python runtime. The default installation is ben
 
 ### macOS
 
-Choose the release archive for your architecture (`macos-x86_64` for Intel or `macos-arm64` for Apple Silicon) and extract it. The 2.0 packages are unsigned and not notarized, so after verifying the release checksum remove quarantine recursively from the extracted folder before installing:
+Choose the release archive for your architecture (`macos-x86_64` for Intel or `macos-arm64` for Apple Silicon) and extract it. The packages are unsigned and not notarized, so after verifying the release checksum remove quarantine recursively from the extracted folder before installing:
 
 ```bash
-xattr -dr com.apple.quarantine /path/to/jl-mixing-2.0.0
-cd /path/to/jl-mixing-2.0.0
+xattr -dr com.apple.quarantine /path/to/jl-mixing-2.1.0-rc.1
+cd /path/to/jl-mixing-2.1.0-rc.1
 ./macos/install.sh
 ```
 
@@ -75,22 +77,22 @@ Machine clients discover the installed provider with:
 jl-mixing system-info --json
 ```
 
-Studio 2.0 consumes additive API 1.0 capabilities for structured cached intake validation, Audio Prep validation/provenance, revision-description updates, managed Delivery status, and package reconciliation in addition to the established client/project/revision/approval/delivery operations.
+Studio 2.1 consumes additive API 1.0 capabilities for Studio/client/project metadata updates, structured cached intake validation, managed Client Files import, Audio Prep validation/reset/provenance, revision creation/description/Close/Reopen, approval/Unapprove, and managed Delivery status/reconciliation.
 
 Clients must use the reported `api_version` and `capabilities`; they must not infer compatibility from the Automation product release number.
 
 ## Compatibility
 
-- Automation application release: v2.0
+- Automation application release: v2.1
 - Automation API: `1.0`
 - readable metadata schemas: `1.1.0`
 - writable metadata schema: `1.1.0`
-- existing valid v1.1 workspaces remain compatible
+- existing valid v1.1+ workspaces remain compatible
 
 New records identify the current application release in `created_with` without changing metadata schema identity.
 
 ## Documentation
 
-Start with [`docs/README.md`](docs/README.md), the [`User Guide`](docs/USER_GUIDE.md), the [`Installation Guide`](docs/INSTALLATION_GUIDE.md), and the [`2.0 release notes`](docs/RELEASE_NOTES_V2.0.md).
+Start with [`docs/README.md`](docs/README.md), the [`v2.1 User Guide`](docs/USER_GUIDE.md), the [`Installation Guide`](docs/INSTALLATION_GUIDE.md), and the [`2.1 release notes`](docs/RELEASE_NOTES_V2.1.md).
 
 JL Mixing Automation is licensed under Apache-2.0. See [LICENSE](LICENSE).
