@@ -2,12 +2,12 @@
 
 ## Current user and integration documentation
 
-- [User Guide](USER_GUIDE.md)
+- [v2.1 User Guide](USER_GUIDE.md)
 - [Command Reference](SCRIPT_REFERENCE.md)
 - [Installation Guide](INSTALLATION_GUIDE.md)
 - [Automation API Design](AUTOMATION_API.md)
 - [Automation API Implementation Status](AUTOMATION_API_IMPLEMENTATION.md)
-- [v1.5 Release Notes](RELEASE_NOTES_V1.5.md)
+- [v2.0 Release Notes](RELEASE_NOTES_V2.0.md)
 
 ## Development and architecture
 
@@ -25,8 +25,9 @@
 - [v1.2 Release Notes](RELEASE_NOTES_V1.2.md)
 - [v1.3 Release Notes](RELEASE_NOTES_V1.3.md)
 - [v1.4 Release Notes](RELEASE_NOTES_V1.4.md)
+- [v1.5 Release Notes](RELEASE_NOTES_V1.5.md)
 
-For current behavior, prefer the v1.5 User Guide, Command Reference,
-Installation Guide, API implementation-status document, and v1.5 release notes.
-Older design/scope documents remain available as historical records and should
-not override the current implementation contract.
+For current behavior, prefer the v2.1 User Guide, Command Reference,
+Installation Guide, and API implementation-status document. Release notes remain
+version-specific historical records and should not override the current
+implementation contract.
