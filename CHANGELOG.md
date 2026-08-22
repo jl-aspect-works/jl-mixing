@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.1.0
+
+- Added Automation-owned Studio, client, and project metadata update capabilities used by Studio v2.1.
+- Added managed Client Files import planning/execution with selected-file support and safe Audio Prep reset workflows.
+- Added reversible revision Close/Reopen and approval Unapprove lifecycle operations without destructive revision deletion.
+- Added capability discovery for the new v2.1 workflow operations while preserving Automation API `1.0` and metadata schema `1.1.0`.
+- Reduced repeated Working Audio hashing during managed provenance recovery by building one lazy hash index per plan.
+- Preserved path containment, provenance ambiguity checks, stale-plan validation, transactional mutation behavior, and existing valid v1.1+ workspace compatibility.
+
 ## 2.0.0
 
 - Added incremental cached intake validation with structured per-file findings and technical metadata for Studio.

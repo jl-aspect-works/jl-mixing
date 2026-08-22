@@ -7,7 +7,7 @@
 - [Installation Guide](INSTALLATION_GUIDE.md)
 - [Automation API Design](AUTOMATION_API.md)
 - [Automation API Implementation Status](AUTOMATION_API_IMPLEMENTATION.md)
-- [v2.0 Release Notes](RELEASE_NOTES_V2.0.md)
+- [v2.1 Release Notes](RELEASE_NOTES_V2.1.md)
 
 ## Development and architecture
 
@@ -26,6 +26,7 @@
 - [v1.3 Release Notes](RELEASE_NOTES_V1.3.md)
 - [v1.4 Release Notes](RELEASE_NOTES_V1.4.md)
 - [v1.5 Release Notes](RELEASE_NOTES_V1.5.md)
+- [v2.0 Release Notes](RELEASE_NOTES_V2.0.md)
 
 For current behavior, prefer the v2.1 User Guide, Command Reference,
 Installation Guide, and API implementation-status document. Release notes remain
